@@ -1,0 +1,48 @@
+{
+  // ===========================================================================
+  // tsconfig used by the Node SDK build to emit per-file `.d.ts` declarations
+  // alongside tsup's JS output.
+  //
+  // Extends Fern's own emitted `tsconfig.json` verbatim — same `strict`,
+  // `module: NodeNext`, `moduleResolution: NodeNext`, `target`, `include`,
+  // `exclude` as the source-of-truth. The only override is the addition of
+  // `emitDeclarationOnly: true`: tsup handles the JS emit, this pass produces
+  // only the per-file `.d.ts` declarations. The `declaration: true` and
+  // `outDir: ./dist` flags Fern already set carry through.
+  //
+  // This replaces tsup's `--dts` bundled output. The bundler (rollup-plugin-dts
+  // under the hood) rewrites every top-level declaration to a synthetic
+  // `index_X` alias and re-exports them. That rewrite is destructive of
+  // TypeScript's declaration-merging semantics: when a name has BOTH
+  // `interface X` AND `declare namespace X { … }` at source level, the bundled
+  // barrel can only re-export ONE side, so partners writing `Vectros.X` (the
+  // documented Fern pattern) hit TS2749 / TS2724. Per-file `.d.ts` next to
+  // the source preserves the merger end-to-end — Fern's source-level barrels
+  // (`export * from "./X.js"`) are the canonical shape, and the consumer
+  // resolves through them naturally.
+  //
+  // Tracking: monorepo #104.
+  // ===========================================================================
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "emitDeclarationOnly": true,
+    // STRICT type-check intentionally (no `noCheck`). The full `tsc` is a real
+    // gate: it FAILS the build on dangling/orphaned generated files (e.g. the
+    // pre-rename AccessProfileTemplate* wrappers importing a type the barrel
+    // no longer exports) that tsup's lenient `--dts` bundling silently shipped.
+    // #104 first used `noCheck:true` to match tsup's leniency, but that just
+    // perpetuated the blind spot. #105 makes the sibling-repo sync authoritative
+    // (deletes orphans before the cp), so the generated input is consistent and
+    // strict `tsc` passes — verified. Keeping strict means a future rename that
+    // re-introduces an orphan fails the build instead of shipping broken types.
+    // Strip `.d.ts.map` emission — Fern's own tsconfig sets
+    // `declarationMap: true`, but the maps reference source `.ts` paths
+    // OUTSIDE `dist/`, and the SDK's `files: ["dist", "README.md"]` does
+    // not ship the sources. Shipping maps without sources produces broken
+    // click-throughs (PostHog's accident). The AI/API-SDK dominant pattern
+    // at our scale (OpenAI, Anthropic, Resend, Twilio) is `.d.ts` only —
+    // the declaration file already carries every signature and JSDoc the
+    // partner needs.
+    "declarationMap": false
+  }
+}

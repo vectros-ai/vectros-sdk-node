@@ -1,0 +1,11 @@
+export type { DeleteDocumentRequest } from "./DeleteDocumentRequest.js";
+export { DocumentLookupRequest } from "./DocumentLookupRequest.js";
+export { FileUploadRequest } from "./FileUploadRequest.js";
+export type { GetDocumentDownloadUrlRequest } from "./GetDocumentDownloadUrlRequest.js";
+export type { GetDocumentRequest } from "./GetDocumentRequest.js";
+export type { GetDocumentTextRequest } from "./GetDocumentTextRequest.js";
+export type { GetDocumentVersionsRequest } from "./GetDocumentVersionsRequest.js";
+export type { ListDocumentsRequest } from "./ListDocumentsRequest.js";
+export type { LookupDocumentsRequest } from "./LookupDocumentsRequest.js";
+export type { PatchDocumentRequest } from "./PatchDocumentRequest.js";
+export type { UpdateDocumentRequest } from "./UpdateDocumentRequest.js";

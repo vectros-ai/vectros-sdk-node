@@ -1,0 +1,11 @@
+# Build artifacts — regenerated on every publish via prepublishOnly (tsup).
+# Never commit; consumers always get the freshly-built version from npm.
+dist/
+
+# npm
+node_modules/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
