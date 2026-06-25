@@ -30,7 +30,7 @@ export interface RecordResponse {
     orgId?: string | undefined;
     /** Identifier of the associated client (a Vectros-assigned UUID). Set automatically from the calling token's identity when the token carries a client identity. */
     clientId?: string | undefined;
-    /** Search-index status. PENDING_INDEX means the record is queued for indexing. INDEXED means it is searchable via `POST /v1/search`. FAILED means indexing hit an error — the record is still readable but not searchable. Null for a store-only record (`indexMode` NONE), which has no indexing to track. */
+    /** Search-index status. PENDING_INDEX means the record is queued for indexing. INDEXED means it is searchable via `POST /v1/search`. SKIPPED means the record had no indexable text (e.g. only non-searchable fields populated) so there was nothing to index — it is stored and retrievable, just not full-text/semantic searchable until a searchable field is filled in; not an error. FAILED means indexing hit an error — the record is still readable but not searchable. Null for a store-only record (`indexMode` NONE), which has no indexing to track. */
     indexStatus?: RecordResponse.IndexStatus | undefined;
     /** The record's resolved search-index mode: the per-record override if set, otherwise the schema's type-level default, otherwise NONE. HYBRID, SEMANTIC, and TEXT make the record searchable; NONE is store-only. */
     indexMode?: RecordResponse.IndexMode | undefined;
@@ -45,10 +45,11 @@ export interface RecordResponse {
 }
 
 export namespace RecordResponse {
-    /** Search-index status. PENDING_INDEX means the record is queued for indexing. INDEXED means it is searchable via `POST /v1/search`. FAILED means indexing hit an error — the record is still readable but not searchable. Null for a store-only record (`indexMode` NONE), which has no indexing to track. */
+    /** Search-index status. PENDING_INDEX means the record is queued for indexing. INDEXED means it is searchable via `POST /v1/search`. SKIPPED means the record had no indexable text (e.g. only non-searchable fields populated) so there was nothing to index — it is stored and retrievable, just not full-text/semantic searchable until a searchable field is filled in; not an error. FAILED means indexing hit an error — the record is still readable but not searchable. Null for a store-only record (`indexMode` NONE), which has no indexing to track. */
     export const IndexStatus = {
         PendingIndex: "PENDING_INDEX",
         Indexed: "INDEXED",
+        Skipped: "SKIPPED",
         Failed: "FAILED",
     } as const;
     export type IndexStatus = (typeof IndexStatus)[keyof typeof IndexStatus];

@@ -1,13 +1,26 @@
-# Changelog — Vectros SDK
+# Changelog — Vectros API & SDKs
 
-The Vectros SDK is published for **TypeScript** (`@vectros-ai/sdk`), **Python**
-(`vectros`), and **Java** (`ai.vectros:vectros-sdk`). All three are generated from
-one OpenAPI surface and share this changelog — a release changes the API surface
-for every language at once. This file is the canonical source (maintained here
-alongside `sdk-version.txt`); the publish pipeline copies it into each language's
-package and public mirror.
+The Vectros API and its official SDKs — **TypeScript** (`@vectros-ai/sdk`),
+**Python** (`vectros`), and **Java** (`ai.vectros:vectros-sdk`) — share one version
+line and this changelog. The SDKs are generated from the OpenAPI surface, so a
+release moves the API and all three SDKs together. This file is the canonical
+source (maintained alongside `sdk-version.txt`); the publish pipeline copies it
+into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
+
+## 0.29.9 — 2026-06-25
+
+A record or document with no indexable text now reports a clear `SKIPPED`
+index status instead of `FAILED`.
+
+### Added
+
+- **`SKIPPED` index status** — a record (`indexStatus`) or document (`status`)
+  saved with no searchable text now resolves to `SKIPPED`: it is stored and
+  retrievable but was not added to the search index, and this is not an error.
+  Populate a searchable field (or re-ingest with extractable text) to index it.
+  Previously such items reported `FAILED`.
 
 ## 0.29.8 — 2026-06-24
 

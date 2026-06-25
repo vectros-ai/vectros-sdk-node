@@ -10,7 +10,7 @@ export interface DocumentResponse {
     title?: string | undefined;
     /** Your own stable identifier for this document (immutable, and unique within your context). Null if the document was created without one. */
     externalId?: string | undefined;
-    /** Processing status of the document. PENDING_UPLOAD, UPLOADED, EXTRACTING, and PENDING_INDEX are in-flight states; INDEXED means the document is indexed and searchable; STORED means it is store-only (indexMode=NONE) — persisted and retrievable but by design not searchable; FAILED means processing failed. */
+    /** Processing status of the document. PENDING_UPLOAD, UPLOADED, EXTRACTING, and PENDING_INDEX are in-flight states; INDEXED means the document is indexed and searchable; SKIPPED means extraction produced no indexable text so there was nothing to index — the document is stored and retrievable, just not searchable (not an error); STORED means it is store-only (indexMode=NONE) — persisted and retrievable but by design not searchable; FAILED means processing failed. */
     status?: DocumentResponse.Status | undefined;
     /** How this document is indexed. HYBRID, SEMANTIC, and TEXT are searchable; NONE is store-only (not indexed for search). */
     indexMode?: DocumentResponse.IndexMode | undefined;
@@ -47,13 +47,14 @@ export interface DocumentResponse {
 }
 
 export namespace DocumentResponse {
-    /** Processing status of the document. PENDING_UPLOAD, UPLOADED, EXTRACTING, and PENDING_INDEX are in-flight states; INDEXED means the document is indexed and searchable; STORED means it is store-only (indexMode=NONE) — persisted and retrievable but by design not searchable; FAILED means processing failed. */
+    /** Processing status of the document. PENDING_UPLOAD, UPLOADED, EXTRACTING, and PENDING_INDEX are in-flight states; INDEXED means the document is indexed and searchable; SKIPPED means extraction produced no indexable text so there was nothing to index — the document is stored and retrievable, just not searchable (not an error); STORED means it is store-only (indexMode=NONE) — persisted and retrievable but by design not searchable; FAILED means processing failed. */
     export const Status = {
         PendingUpload: "PENDING_UPLOAD",
         Uploaded: "UPLOADED",
         Extracting: "EXTRACTING",
         PendingIndex: "PENDING_INDEX",
         Indexed: "INDEXED",
+        Skipped: "SKIPPED",
         Stored: "STORED",
         Failed: "FAILED",
     } as const;
