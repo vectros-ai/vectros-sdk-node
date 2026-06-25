@@ -9,6 +9,19 @@ package and public mirror.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.29.8 — 2026-06-24
+
+Documentation — **no API or wire changes**. Each SDK now ships a curated,
+hand-maintained README in place of generated or outdated content.
+
+### Changed
+
+- **READMEs** for the TypeScript, Python, and Java SDKs are now consistent,
+  customer-focused, and verified against the generated client surface,
+  correcting earlier TypeScript examples that used outdated method names
+  (hybrid search is `client.search.content(...)`; document ingestion is
+  `client.documents.ingestDocument(...)`).
+
 ## 0.29.7 — 2026-06-24
 
 Licensing correction — **no API or wire changes**. The SDKs are now released
