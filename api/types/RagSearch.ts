@@ -24,7 +24,7 @@ export interface RagSearch {
     folderId?: string | undefined;
     /** Restrict retrieval to content under this subtree — the folder and all of its descendants. Provide the UUID of a top-level (root) folder. Applies uniformly to documents and records. Use `folderId` to scope to a single folder exactly. */
     rootFolderId?: string | undefined;
-    /** Restrict retrieval to records of a specific schema type. Applies only to records: setting it implicitly limits results to records unless `contentTypes` also includes `documents`, in which case documents are still returned unfiltered. */
+    /** Restrict retrieval to content of a specific schema type — for example `patient` or `runbook`. Applies to both documents and records: any item whose bound schema type matches is kept. On its own it narrows both content types to that type; combine it with `contentTypes` to narrow within a single content type. Untyped content (ingested without a schema) never matches. */
     typeName?: string | undefined;
     /** Restrict retrieval to content created at or after this ISO-8601 UTC timestamp. Useful for incremental retrieval (for example, answering based only on content ingested today). Pair with `createdBefore` to define a time window. */
     createdAfter?: string | undefined;

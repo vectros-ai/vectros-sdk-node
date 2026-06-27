@@ -28,4 +28,12 @@ export interface CreditBreakdown {
     storageEstimate?: number | undefined;
     /** storageEstimate in milli-credit precision (exact) */
     storageEstimateMilli?: number | undefined;
+    /** Credits consumed by read-call overage */
+    reads?: number | undefined;
+    /** reads in milli-credit precision (exact) */
+    readsMilli?: number | undefined;
+    /** Credits consumed by data-out (egress) overage — includes document downloads */
+    dataOut?: number | undefined;
+    /** dataOut in milli-credit precision (exact) */
+    dataOutMilli?: number | undefined;
 }

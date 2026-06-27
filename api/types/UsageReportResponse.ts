@@ -15,6 +15,7 @@ export interface UsageReportResponse {
     readAccess?: Vectros.ReadAccessSection | undefined;
     identity?: Vectros.IdentitySection | undefined;
     inference?: Vectros.InferenceSection | undefined;
+    reads?: Vectros.ReadsSection | undefined;
     tenants?: Vectros.Tenants | undefined;
     /** Per-AppContext usage breakdown. One entry per context across your live and test environments — the finest granularity at which Vectros usage is attributed. Additive to the environment and account rollups: a context's metrics roll up into its environment, which rolls up into your account totals. Filtered to a single context when the `contextId` query param is supplied; otherwise lists every context with activity or provisioned rows. */
     contexts?: Vectros.ContextDetail[] | undefined;

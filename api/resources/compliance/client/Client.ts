@@ -31,6 +31,7 @@ export class ComplianceClient {
      * @param {ComplianceClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.TooManyRequestsError}
      * @throws {@link Vectros.NotImplementedError}
      *
      * @example
@@ -81,6 +82,8 @@ export class ComplianceClient {
             switch (_response.error.statusCode) {
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 case 501:
                     throw new Vectros.NotImplementedError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -174,6 +177,7 @@ export class ComplianceClient {
      * @param {ComplianceClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.TooManyRequestsError}
      * @throws {@link Vectros.NotImplementedError}
      *
      * @example
@@ -222,6 +226,8 @@ export class ComplianceClient {
             switch (_response.error.statusCode) {
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 case 501:
                     throw new Vectros.NotImplementedError(_response.error.body as unknown, _response.rawResponse);
                 default:

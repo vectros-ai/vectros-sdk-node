@@ -31,6 +31,7 @@ export class RecordsClient {
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.TooManyRequestsError}
      * @throws {@link Vectros.NotImplementedError}
      *
      * @example
@@ -79,6 +80,8 @@ export class RecordsClient {
             switch (_response.error.statusCode) {
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 case 501:
                     throw new Vectros.NotImplementedError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -100,6 +103,7 @@ export class RecordsClient {
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.TooManyRequestsError}
      * @throws {@link Vectros.NotImplementedError}
      *
      * @example
@@ -148,6 +152,8 @@ export class RecordsClient {
             switch (_response.error.statusCode) {
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 case 501:
                     throw new Vectros.NotImplementedError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -169,6 +175,7 @@ export class RecordsClient {
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.TooManyRequestsError}
      * @throws {@link Vectros.NotImplementedError}
      *
      * @example
@@ -217,6 +224,8 @@ export class RecordsClient {
             switch (_response.error.statusCode) {
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 case 501:
                     throw new Vectros.NotImplementedError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -318,6 +327,7 @@ export class RecordsClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.records.createRecord({
@@ -375,6 +385,8 @@ export class RecordsClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -462,6 +474,7 @@ export class RecordsClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.records.updateRecord({
@@ -517,6 +530,8 @@ export class RecordsClient {
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
                     throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -536,6 +551,7 @@ export class RecordsClient {
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.records.deleteRecord({
@@ -583,6 +599,8 @@ export class RecordsClient {
             switch (_response.error.statusCode) {
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -604,6 +622,7 @@ export class RecordsClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.records.patchRecord({
@@ -664,6 +683,8 @@ export class RecordsClient {
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
                     throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -769,6 +790,7 @@ export class RecordsClient {
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.records.lookupRecordsByBody({
@@ -819,6 +841,8 @@ export class RecordsClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,

@@ -128,6 +128,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.createClient({
@@ -177,6 +178,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -262,6 +265,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.updateClient({
@@ -315,6 +319,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -334,6 +340,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.deleteClient({
@@ -381,6 +388,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -400,6 +409,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.lookupClients({
@@ -450,6 +460,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -636,6 +648,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.createOrg({
@@ -685,6 +698,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -770,6 +785,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.updateOrg({
@@ -823,6 +839,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -842,6 +860,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.deleteOrg({
@@ -889,6 +908,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -908,6 +929,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.lookupOrgs({
@@ -958,6 +980,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -1130,6 +1154,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.createUser({
@@ -1179,6 +1204,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -1264,6 +1291,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.updateUser({
@@ -1317,6 +1345,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -1336,6 +1366,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.deleteUser({
@@ -1383,6 +1414,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -1402,6 +1435,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.lookupUsers({
@@ -1452,6 +1486,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,

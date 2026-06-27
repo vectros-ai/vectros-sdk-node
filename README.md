@@ -80,6 +80,16 @@ browser token-minting pattern.
 - **Identity & access** — `client.identity`, `client.auth` — manage clients,
   organizations, and users; mint and revoke scoped credentials.
 
+## Rate limits
+
+Requests are rate limited per account on a fixed one-minute window — writes, searches, and
+inference count against it; reads do not. When you exceed the limit the API returns HTTP `429`
+with a `Retry-After` header (seconds until the window resets) plus `X-RateLimit-Limit` and
+`X-RateLimit-Remaining`. Honor `Retry-After` (or back off exponentially with jitter), and pace
+bulk work so your steady rate stays under your plan's per-minute budget. See the
+[rate limits guide](https://docs.vectros.ai/guides/operations-trust/rate-limits) for the
+per-plan limits.
+
 ## Documentation
 
 - **Guides & reference:** [docs.vectros.ai](https://docs.vectros.ai)

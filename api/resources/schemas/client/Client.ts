@@ -106,6 +106,7 @@ export class SchemasClient {
      * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.schemas.createSchema({
@@ -175,6 +176,8 @@ export class SchemasClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -261,6 +264,7 @@ export class SchemasClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.schemas.updateSchema({
@@ -318,6 +322,8 @@ export class SchemasClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -338,6 +344,7 @@ export class SchemasClient {
      *
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.schemas.deleteSchema({
@@ -387,6 +394,8 @@ export class SchemasClient {
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
                     throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,

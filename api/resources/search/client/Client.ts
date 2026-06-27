@@ -32,6 +32,7 @@ export class SearchClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.search.content({
@@ -83,6 +84,8 @@ export class SearchClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,

@@ -106,6 +106,7 @@ export class FoldersClient {
      * @param {FoldersClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.folders.createFolder({
@@ -155,6 +156,8 @@ export class FoldersClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -240,6 +243,7 @@ export class FoldersClient {
      * @param {FoldersClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.folders.updateFolder({
@@ -293,6 +297,8 @@ export class FoldersClient {
             switch (_response.error.statusCode) {
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -313,6 +319,7 @@ export class FoldersClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.folders.deleteFolder({
@@ -362,6 +369,8 @@ export class FoldersClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -383,6 +392,7 @@ export class FoldersClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.folders.patchFolder({
@@ -440,6 +450,8 @@ export class FoldersClient {
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
                     throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,

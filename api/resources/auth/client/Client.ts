@@ -258,6 +258,7 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.createScopedKey({
@@ -314,6 +315,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -403,6 +406,7 @@ export class AuthClient {
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.revokeScopedKey({
@@ -452,6 +456,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -647,6 +653,7 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.createAccessProfile({
@@ -704,6 +711,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -801,6 +810,7 @@ export class AuthClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.createAppContext({
@@ -853,6 +863,8 @@ export class AuthClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -956,6 +968,7 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.createRole({
@@ -1017,6 +1030,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -1117,6 +1132,7 @@ export class AuthClient {
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.updateAccessProfile({
@@ -1173,6 +1189,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -1198,6 +1216,7 @@ export class AuthClient {
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.deleteAccessProfile({
@@ -1248,6 +1267,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -1342,6 +1363,7 @@ export class AuthClient {
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.updateAppContext({
@@ -1398,6 +1420,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -1419,6 +1443,7 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.deleteAppContext({
@@ -1477,6 +1502,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -1577,6 +1604,7 @@ export class AuthClient {
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.updateRole({
@@ -1637,6 +1665,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -1662,6 +1692,7 @@ export class AuthClient {
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.deleteRole({
@@ -1712,6 +1743,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -2112,6 +2145,7 @@ export class AuthClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.mintToken({
@@ -2173,6 +2207,8 @@ export class AuthClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -2195,6 +2231,7 @@ export class AuthClient {
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.createInvite({
@@ -2252,6 +2289,8 @@ export class AuthClient {
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
                     throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -2273,6 +2312,7 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.auth.resendInvite({
@@ -2328,6 +2368,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
