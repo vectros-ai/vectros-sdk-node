@@ -5,6 +5,7 @@ export type { GetDocumentDownloadUrlRequest } from "./GetDocumentDownloadUrlRequ
 export type { GetDocumentRequest } from "./GetDocumentRequest.js";
 export type { GetDocumentTextRequest } from "./GetDocumentTextRequest.js";
 export type { GetDocumentVersionsRequest } from "./GetDocumentVersionsRequest.js";
+export type { IngestDocumentRequest } from "./IngestDocumentRequest.js";
 export type { ListDocumentsRequest } from "./ListDocumentsRequest.js";
 export type { LookupDocumentsRequest } from "./LookupDocumentsRequest.js";
 export type { PatchDocumentRequest } from "./PatchDocumentRequest.js";

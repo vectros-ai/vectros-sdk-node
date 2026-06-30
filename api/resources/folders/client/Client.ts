@@ -100,30 +100,37 @@ export class FoldersClient {
     }
 
     /**
-     * Creates a folder to organize your documents and records. If `parentFolderId` is omitted, the folder is created under your context's default root folder. Requires the `folders:c` scope.
+     * Creates a folder to organize your documents and records. If `parentFolderId` is omitted, the folder is created under your context's default root folder. Folder creation is idempotent by (slug + parent): if a folder with the same slug already exists under the same parent, that existing folder is returned unchanged instead of a duplicate being created. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing folder was returned) tells the two apart. To overwrite an existing folder's mutable fields instead of returning it unchanged, set `?upsert=true` (this also requires the `folders:u` scope). Requires the `folders:c` scope.
      *
-     * @param {Vectros.FolderRequest} request
+     * @param {Vectros.CreateFolderRequest} request
      * @param {FoldersClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.folders.createFolder({
-     *         name: "Patient Records 2024"
+     *         body: {
+     *             name: "Patient Records 2024"
+     *         }
      *     })
      */
     public createFolder(
-        request: Vectros.FolderRequest,
+        request: Vectros.CreateFolderRequest,
         requestOptions?: FoldersClient.RequestOptions,
     ): core.HttpResponsePromise<Vectros.FolderResponse> {
         return core.HttpResponsePromise.fromPromise(this.__createFolder(request, requestOptions));
     }
 
     private async __createFolder(
-        request: Vectros.FolderRequest,
+        request: Vectros.CreateFolderRequest,
         requestOptions?: FoldersClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.FolderResponse>> {
+        const { upsert, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            upsert,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -139,9 +146,13 @@ export class FoldersClient {
             method: "POST",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
-            body: request,
+            body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -156,6 +167,8 @@ export class FoldersClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:

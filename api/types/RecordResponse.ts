@@ -4,6 +4,8 @@
  * A record: a structured JSON payload that is stored and, optionally, indexed for search.
  */
 export interface RecordResponse {
+    /** Whether this call created a new record. True when a new record was created; false when a record with the same `externalId` already existed and was returned unchanged (idempotent create) or updated (when `?upsert=true`). Present only on the create response (POST /v1/records); absent on reads. The HTTP status mirrors it — 201 when created, 200 when an existing record was returned. */
+    created?: boolean | undefined;
     /** Unique identifier for this record (UUID), assigned by Vectros at creation. */
     id?: string | undefined;
     /** The record's type, matching the `typeName` declared on the schema this record was created against. */

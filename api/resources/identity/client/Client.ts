@@ -122,30 +122,37 @@ export class IdentityClient {
     }
 
     /**
-     * Creates a new client identity in your account. This call is idempotent on `externalId`: if a client with the same `externalId` already exists, the existing record is returned instead of creating a duplicate. Requires the `clients:c` scope.
+     * Creates a new client identity in your account. This call is idempotent on `externalId`: if a client with the same `externalId` already exists, the existing record is returned instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing client was returned) tells the two apart. To overwrite an existing client's content instead of returning it unchanged, set `?upsert=true` (this also requires the `clients:u` scope). Requires the `clients:c` scope.
      *
-     * @param {Vectros.ClientRequest} request
+     * @param {Vectros.CreateClientRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.createClient({
-     *         externalId: "patient_789"
+     *         body: {
+     *             externalId: "patient_789"
+     *         }
      *     })
      */
     public createClient(
-        request: Vectros.ClientRequest,
+        request: Vectros.CreateClientRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): core.HttpResponsePromise<Vectros.ClientResponse> {
         return core.HttpResponsePromise.fromPromise(this.__createClient(request, requestOptions));
     }
 
     private async __createClient(
-        request: Vectros.ClientRequest,
+        request: Vectros.CreateClientRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.ClientResponse>> {
+        const { upsert, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            upsert,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -161,9 +168,13 @@ export class IdentityClient {
             method: "POST",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
-            body: request,
+            body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -178,6 +189,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -642,30 +655,37 @@ export class IdentityClient {
     }
 
     /**
-     * Creates a new organization in your account. This call is idempotent on `externalId`: if an organization with the same `externalId` already exists, the existing record is returned instead of creating a duplicate. Requires the `orgs:c` scope.
+     * Creates a new organization in your account. This call is idempotent on `externalId`: if an organization with the same `externalId` already exists, the existing record is returned instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing organization was returned) tells the two apart. To overwrite an existing organization's content instead of returning it unchanged, set `?upsert=true` (this also requires the `orgs:u` scope). Requires the `orgs:c` scope.
      *
-     * @param {Vectros.OrgRequest} request
+     * @param {Vectros.CreateOrgRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.createOrg({
-     *         externalId: "clinic_001"
+     *         body: {
+     *             externalId: "clinic_001"
+     *         }
      *     })
      */
     public createOrg(
-        request: Vectros.OrgRequest,
+        request: Vectros.CreateOrgRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): core.HttpResponsePromise<Vectros.OrgResponse> {
         return core.HttpResponsePromise.fromPromise(this.__createOrg(request, requestOptions));
     }
 
     private async __createOrg(
-        request: Vectros.OrgRequest,
+        request: Vectros.CreateOrgRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.OrgResponse>> {
+        const { upsert, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            upsert,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -681,9 +701,13 @@ export class IdentityClient {
             method: "POST",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
-            body: request,
+            body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -698,6 +722,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -1148,30 +1174,37 @@ export class IdentityClient {
     }
 
     /**
-     * Creates a user identity in your account. The operation is idempotent on `externalId`: if a user with the same `externalId` already exists, the existing record is returned instead of creating a duplicate. Requires the `users:c` scope.
+     * Creates a user identity in your account. The operation is idempotent on `externalId`: if a user with the same `externalId` already exists, the existing record is returned instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing user was returned) tells the two apart. To overwrite an existing user's mutable fields (email, status, payload, schema binding) instead of returning it unchanged, set `?upsert=true` (this also requires the `users:u` scope). Requires the `users:c` scope.
      *
-     * @param {Vectros.UserRequest} request
+     * @param {Vectros.CreateUserRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.identity.createUser({
-     *         externalId: "usr_12345"
+     *         body: {
+     *             externalId: "usr_12345"
+     *         }
      *     })
      */
     public createUser(
-        request: Vectros.UserRequest,
+        request: Vectros.CreateUserRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): core.HttpResponsePromise<Vectros.UserResponse> {
         return core.HttpResponsePromise.fromPromise(this.__createUser(request, requestOptions));
     }
 
     private async __createUser(
-        request: Vectros.UserRequest,
+        request: Vectros.CreateUserRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.UserResponse>> {
+        const { upsert, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            upsert,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -1187,9 +1220,13 @@ export class IdentityClient {
             method: "POST",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
-            body: request,
+            body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -1204,6 +1241,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:

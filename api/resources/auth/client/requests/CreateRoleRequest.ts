@@ -17,5 +17,7 @@ import type * as Vectros from "../../../../index.js";
  */
 export interface CreateRoleRequest {
     contextId: string;
+    /** When `true`, if a role with the same `roleId` already exists its `name`, `description`, and `scopes` are updated to the submitted values instead of being returned unchanged. Defaults to `false`. Requires the `profiles:u` scope in addition to `profiles:c`. */
+    upsert?: boolean;
     body: Vectros.RoleRequest;
 }

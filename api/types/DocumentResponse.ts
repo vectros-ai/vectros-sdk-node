@@ -4,6 +4,8 @@
  * A document, created either by ingesting raw text or by uploading a file.
  */
 export interface DocumentResponse {
+    /** Whether this call created a new document. True when a new document was created; false when a document with the same `externalId` already existed and was returned unchanged (idempotent create) or updated (when `?upsert=true`). Present only on the create response (POST /v1/documents); absent on reads. The HTTP status mirrors it — 201 when created, 200 when an existing document was returned. */
+    created?: boolean | undefined;
     /** The Vectros-assigned unique ID of the document. */
     id?: string | undefined;
     /** The document's title. */

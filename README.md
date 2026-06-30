@@ -32,14 +32,18 @@ const results = await client.search.content({
 
 // Ingest a document — extracted, chunked, and indexed for search + RAG
 const doc = await client.documents.ingestDocument({
-  title: "Patient Intake Form — Jane Doe",
+  body: {
+    title: "Patient Intake Form — Jane Doe",
+  },
 });
 
 // Write a structured record against one of your schemas
 const record = await client.records.createRecord({
-  typeName: "intake_form",
-  schemaId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-  payload: { first_name: "Jane", email: "jane@example.com" },
+  body: {
+    typeName: "intake_form",
+    schemaId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    payload: { first_name: "Jane", email: "jane@example.com" },
+  },
 });
 ```
 

@@ -1,3 +1,4 @@
+export type { CreateSchemaRequest } from "./CreateSchemaRequest.js";
 export type { DeleteSchemaRequest } from "./DeleteSchemaRequest.js";
 export type { GetSchemaRequest } from "./GetSchemaRequest.js";
 export type { GetSchemaVersionsRequest } from "./GetSchemaVersionsRequest.js";

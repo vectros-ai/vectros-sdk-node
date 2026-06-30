@@ -4,6 +4,8 @@
  * An organization in your account — an organizational unit you define and control.
  */
 export interface OrgResponse {
+    /** Whether this call created a new organization. True when a new organization was created; false when an organization with the same `externalId` already existed and was returned unchanged (idempotent create) or updated (when `?upsert=true`). Present only on the create response (POST /v1/orgs); absent on reads. The HTTP status mirrors it — 201 when created, 200 when an existing organization was returned. */
+    created?: boolean | undefined;
     /** The Vectros-assigned ID (UUID) for this organization. Use it wherever you reference the organization elsewhere — for example as the owner of a record or as a filter value when listing records. */
     id?: string | undefined;
     /** Your own identifier for this organization, as supplied when it was created. */

@@ -645,7 +645,7 @@ export class AuthClient {
     }
 
     /**
-     * Creates a new access profile under the given app context. This call is idempotent by `principalId`: if a profile with the same `principalId` already exists, the existing profile is returned (with status 200) instead of creating a duplicate. You must provide exactly one of `scopes` (an inline list of scopes) or `roleId` (a reference to a role); supplying both, or neither, is rejected. `identityOverrides` may set only `orgId` and `clientId`; any other key (including the account identifier or `userId`) is rejected. If you use a scoped credential, the profile's effective scopes may not exceed your own; a root API key (`sk_`) is exempt. Requires the `profiles:c` scope.
+     * Creates a new access profile under the given app context. This call is idempotent by `principalId`: if a profile with the same `principalId` already exists, the existing profile is returned (with status 200) instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing profile was returned) tells the two apart. To overwrite an existing profile's `scopes`/`roleId`, `identityOverrides`, and `status` instead of returning it unchanged, set `?upsert=true` (this also requires the `profiles:u` scope). You must provide exactly one of `scopes` (an inline list of scopes) or `roleId` (a reference to a role); supplying both, or neither, is rejected. `identityOverrides` may set only `orgId` and `clientId`; any other key (including the account identifier or `userId`) is rejected. If you use a scoped credential, the profile's effective scopes may not exceed your own; a root API key (`sk_`) is exempt. Requires the `profiles:c` scope.
      *
      * @param {Vectros.CreateAccessProfileRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -674,7 +674,10 @@ export class AuthClient {
         request: Vectros.CreateAccessProfileRequest,
         requestOptions?: AuthClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.AccessProfileResponse>> {
-        const { contextId, body: _body } = request;
+        const { contextId, upsert, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            upsert,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -690,7 +693,11 @@ export class AuthClient {
             method: "POST",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
             body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
@@ -803,9 +810,9 @@ export class AuthClient {
     }
 
     /**
-     * Creates a new app context. This call is idempotent by `contextId`: if an app context with the same `contextId` already exists, the existing app context is returned (with status 200) instead of creating a duplicate. The reserved `contextId` value `vectros-admin` cannot be created through this endpoint; it is provisioned automatically for your account. Requires the `app-contexts:c` scope.
+     * Creates a new app context. This call is idempotent by `contextId`: if an app context with the same `contextId` already exists, the existing app context is returned (with status 200) instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing context was returned) tells the two apart. To overwrite an existing context's `name`/`description` instead of returning it unchanged, set `?upsert=true` (this also requires the `app-contexts:u` scope). The reserved `contextId` value `vectros-admin` cannot be created through this endpoint; it is provisioned automatically for your account. Requires the `app-contexts:c` scope.
      *
-     * @param {Vectros.AppContextRequest} request
+     * @param {Vectros.CreateAppContextRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
@@ -814,21 +821,27 @@ export class AuthClient {
      *
      * @example
      *     await client.auth.createAppContext({
-     *         contextId: "myapp",
-     *         name: "My Internal App"
+     *         body: {
+     *             contextId: "myapp",
+     *             name: "My Internal App"
+     *         }
      *     })
      */
     public createAppContext(
-        request: Vectros.AppContextRequest,
+        request: Vectros.CreateAppContextRequest,
         requestOptions?: AuthClient.RequestOptions,
     ): core.HttpResponsePromise<Vectros.AppContextResponse> {
         return core.HttpResponsePromise.fromPromise(this.__createAppContext(request, requestOptions));
     }
 
     private async __createAppContext(
-        request: Vectros.AppContextRequest,
+        request: Vectros.CreateAppContextRequest,
         requestOptions?: AuthClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.AppContextResponse>> {
+        const { upsert, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            upsert,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -844,9 +857,13 @@ export class AuthClient {
             method: "POST",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
-            body: request,
+            body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -960,7 +977,7 @@ export class AuthClient {
     }
 
     /**
-     * Creates a new role under the given app context. This call is idempotent by `roleId`: if a role with the same `roleId` already exists, the existing role is returned (with status 200) instead of creating a duplicate. If you use a scoped credential, the role's scopes may not exceed your own; a root API key (`sk_`) is exempt. Requires the `profiles:c` scope.
+     * Creates a new role under the given app context. This call is idempotent by `roleId`: if a role with the same `roleId` already exists, the existing role is returned (with status 200) instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing role was returned) tells the two apart. To overwrite an existing role's `name`/`description`/`scopes` instead of returning it unchanged, set `?upsert=true` (this also requires the `profiles:u` scope). If you use a scoped credential, the role's scopes may not exceed your own; a root API key (`sk_`) is exempt. Requires the `profiles:c` scope.
      *
      * @param {Vectros.CreateRoleRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -993,7 +1010,10 @@ export class AuthClient {
         request: Vectros.CreateRoleRequest,
         requestOptions?: AuthClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.RoleResponse>> {
-        const { contextId, body: _body } = request;
+        const { contextId, upsert, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            upsert,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -1009,7 +1029,11 @@ export class AuthClient {
             method: "POST",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
             body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,

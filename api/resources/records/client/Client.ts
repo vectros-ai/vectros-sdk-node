@@ -320,9 +320,9 @@ export class RecordsClient {
     }
 
     /**
-     * Creates a new record of a given type. The `payload` is validated against that type's schema before the record is stored. Identify the type by sending `typeName`, `schemaId`, or both (they must agree); if you send only `schemaId`, the type is taken from that schema. Optionally supply an `externalId` to make the create idempotent — if a record with the same `externalId` already exists in your context, that existing record is returned unchanged instead of a duplicate being created. Requires the `records:c:<type>` scope.
+     * Creates a new record of a given type. The `payload` is validated against that type's schema before the record is stored. Identify the type by sending `typeName`, `schemaId`, or both (they must agree); if you send only `schemaId`, the type is taken from that schema. Optionally supply an `externalId` to make the create idempotent — if a record with the same `externalId` already exists in your context, that existing record is returned unchanged instead of a duplicate being created. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing record was returned) tells the two apart. To overwrite an existing record's content instead of returning it unchanged, set `?upsert=true` (this also requires the `records:u:<type>` scope). Requires the `records:c:<type>` scope.
      *
-     * @param {Vectros.RecordRequest} request
+     * @param {Vectros.CreateRecordRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
@@ -331,26 +331,32 @@ export class RecordsClient {
      *
      * @example
      *     await client.records.createRecord({
-     *         typeName: "intake_form",
-     *         schemaId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-     *         payload: {
-     *             "first_name": "Jane",
-     *             "email": "jane@example.com"
-     *         },
-     *         folderId: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+     *         body: {
+     *             typeName: "intake_form",
+     *             schemaId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+     *             payload: {
+     *                 "first_name": "Jane",
+     *                 "email": "jane@example.com"
+     *             },
+     *             folderId: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+     *         }
      *     })
      */
     public createRecord(
-        request: Vectros.RecordRequest,
+        request: Vectros.CreateRecordRequest,
         requestOptions?: RecordsClient.RequestOptions,
     ): core.HttpResponsePromise<Vectros.RecordResponse> {
         return core.HttpResponsePromise.fromPromise(this.__createRecord(request, requestOptions));
     }
 
     private async __createRecord(
-        request: Vectros.RecordRequest,
+        request: Vectros.CreateRecordRequest,
         requestOptions?: RecordsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.RecordResponse>> {
+        const { upsert, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            upsert,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -366,9 +372,13 @@ export class RecordsClient {
             method: "POST",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
-            body: request,
+            body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,

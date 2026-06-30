@@ -4,6 +4,8 @@
  * An app context: a namespace you define to group access profiles and roles for one of your applications.
  */
 export interface AppContextResponse {
+    /** Whether this call created a new app context. True when a new app context was created; false when an app context with the same `contextId` already existed and was returned unchanged (idempotent create) or updated (when `?upsert=true`). Present only on the create response (POST /v1/app-contexts); absent on reads. The HTTP status mirrors it — 201 when created, 200 when an existing app context was returned. */
+    created?: boolean | undefined;
     /** Opaque composite identifier for this app context. Use it as the pagination cursor (pass it as `startFrom` to page through results); for everything else, refer to the app context by its `contextId`. */
     id?: string | undefined;
     /** Your identifier for the app context. */

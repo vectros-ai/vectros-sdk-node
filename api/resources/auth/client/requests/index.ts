@@ -1,4 +1,5 @@
 export type { CreateAccessProfileRequest } from "./CreateAccessProfileRequest.js";
+export type { CreateAppContextRequest } from "./CreateAppContextRequest.js";
 export type { CreateRoleRequest } from "./CreateRoleRequest.js";
 export type { CreateScopedKeyRequest } from "./CreateScopedKeyRequest.js";
 export type { DeleteAccessProfileRequest } from "./DeleteAccessProfileRequest.js";

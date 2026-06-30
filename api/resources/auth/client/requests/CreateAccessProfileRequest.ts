@@ -13,5 +13,7 @@ import type * as Vectros from "../../../../index.js";
  */
 export interface CreateAccessProfileRequest {
     contextId: string;
+    /** When `true`, if a profile with the same `principalId` already exists its grant source (`scopes` or `roleId`), `identityOverrides`, and `status` are updated to the submitted values instead of being returned unchanged. Defaults to `false`. Requires the `profiles:u` scope in addition to `profiles:c`. */
+    upsert?: boolean;
     body: Vectros.AccessProfileRequest;
 }

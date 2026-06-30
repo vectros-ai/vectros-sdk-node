@@ -9,6 +9,38 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.31.0 — 2026-06-29
+
+Tell a created record from a returned one, and overwrite by `externalId` on purpose.
+
+### Added
+
+- **`created` flag on every create response.** Creating a record, document, schema, user,
+  organization, client, app context, folder, role, or access profile now returns a `created`
+  boolean: `true` when a new entity was created, `false` when one with the same identity key
+  (`externalId`, `typeName`, `contextId`, slug, `roleId`, or `principalId`) already existed and was
+  returned. Previously the two outcomes were indistinguishable, so a re-create over changed content
+  looked like it succeeded even though the submitted fields were not applied. The HTTP status now
+  mirrors the flag (see Changed).
+- **`?upsert=true` on every create endpoint — explicit overwrite-by-identity-key.** By default a
+  create is still idempotent (an existing entity is returned unchanged). Pass `?upsert=true` to
+  instead apply the submitted fields to the existing entity and bump its version — the first-class
+  way to sync changed content without a separate fetch-then-update. The immutable identity and
+  ownership fields (`externalId`, `schemaId`/`typeName`, owner) are never changed, and a re-applied
+  upsert whose content already matches is a no-op (no version bump). Upsert requires the resource's
+  **update** scope (e.g. `records:u:<type>`) in addition to its create scope, so a create-only
+  credential cannot overwrite through the flag.
+
+### Changed
+
+- **Idempotent create now returns `200 OK`, not `201 Created`.** When a create returns an existing
+  entity (same identity key) it now responds `200`; a genuinely new entity still responds `201`.
+  This makes created-vs-returned visible at the HTTP layer, consistent across all create endpoints
+  (it matches what app-context create already did). Clients that treat any `2xx` as success are
+  unaffected; a client that strictly asserted `201` on a re-applied create will now see `200` —
+  which is the created-vs-existing signal, not an error. Read the `created` field for a
+  transport-independent check.
+
 ## 0.30.0 — 2026-06-26
 
 Search by document type, clearer rate-limit signals, and usage-report read metering.

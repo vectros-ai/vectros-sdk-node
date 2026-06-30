@@ -10,7 +10,7 @@
 export interface DocumentLookupRequest {
     /** Document type to look up (the type defined by the bound schema). */
     type: string;
-    /** Name of a lookup field declared on the schema. For a sensitive field, this body variant is required (the GET variant rejects sensitive-field lookups). */
+    /** The field to look up by. Use `externalId` to look up by the document's external identifier (no schema declaration required), or the name of any lookup field declared on the bound schema. For a sensitive field, this body variant is required (the GET variant rejects sensitive-field lookups). */
     field: string;
     /** Exact value to match (equality mode). Mutually exclusive with `from`/`to` and `prefix`. */
     value?: string;

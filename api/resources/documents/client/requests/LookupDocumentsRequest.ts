@@ -15,7 +15,7 @@ import type * as Vectros from "../../../../index.js";
 export interface LookupDocumentsRequest {
     /** The document type to look up (the `type` of the bound schema). */
     type: string;
-    /** The name of the lookup field declared on the schema. */
+    /** The field to look up by. Use `externalId` to look up by the document's external identifier, or the name of any lookup field declared on the bound schema. */
     field: string;
     /** Exact value to match. Mutually exclusive with `from`/`to` and `prefix`. Rejected for a sensitive field — use POST /v1/documents/lookup so the value isn't exposed in the URL. */
     value?: string;

@@ -4,6 +4,8 @@
  * A folder used to organize your documents and records.
  */
 export interface FolderResponse {
+    /** Present only on a create response: `true` when a new folder was created (HTTP 201), `false` when a folder with the same slug already existed under the same parent and was returned instead (HTTP 200). Omitted on reads, lists, and updates. */
+    created?: boolean | undefined;
     /** Unique identifier for the folder, assigned by Vectros. */
     id?: string | undefined;
     /** Human-readable display name of the folder. */

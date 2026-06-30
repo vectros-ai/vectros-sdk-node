@@ -1,3 +1,6 @@
+export type { CreateClientRequest } from "./CreateClientRequest.js";
+export type { CreateOrgRequest } from "./CreateOrgRequest.js";
+export type { CreateUserRequest } from "./CreateUserRequest.js";
 export type { DeleteClientRequest } from "./DeleteClientRequest.js";
 export type { DeleteOrgRequest } from "./DeleteOrgRequest.js";
 export type { DeleteUserRequest } from "./DeleteUserRequest.js";

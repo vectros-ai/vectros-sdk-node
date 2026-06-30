@@ -100,50 +100,57 @@ export class SchemasClient {
     }
 
     /**
-     * Defines a new record type with optional field definitions, validation rules, and lookup indexes. Idempotent by `typeName` within the same ownership scope: re-creating an existing `typeName` returns the existing schema rather than failing. Requires the `schemas:w` scope.
+     * Defines a new record type with optional field definitions, validation rules, and lookup indexes. Idempotent by `typeName` within the same ownership scope: re-creating an existing `typeName` returns the existing schema rather than failing. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing schema was returned) tells the two apart. To reconcile an existing schema to the submitted shape instead of returning it unchanged, set `?upsert=true` (this also requires the `schemas:w` scope; only legal schema changes are applied — migration-locked changes are rejected). Requires the `schemas:w` scope.
      *
-     * @param {Vectros.SchemaRequest} request
+     * @param {Vectros.CreateSchemaRequest} request
      * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
      *     await client.schemas.createSchema({
-     *         typeName: "intake_form",
-     *         displayName: "Client Intake Form",
-     *         description: "Captures initial client information",
-     *         fields: [{
-     *                 fieldId: "first_name",
-     *                 fieldType: "string",
-     *                 required: true,
-     *                 searchable: true
-     *             }, {
-     *                 fieldId: "email",
-     *                 fieldType: "string",
-     *                 required: true
-     *             }],
-     *         lookupFields: [{
-     *                 fieldName: "email",
-     *                 unique: true
-     *             }],
-     *         capabilities: {
-     *             "auditHistory": true
-     *         },
-     *         allowedSurfaces: ["record"]
+     *         body: {
+     *             typeName: "intake_form",
+     *             displayName: "Client Intake Form",
+     *             description: "Captures initial client information",
+     *             fields: [{
+     *                     fieldId: "first_name",
+     *                     fieldType: "string",
+     *                     required: true,
+     *                     searchable: true
+     *                 }, {
+     *                     fieldId: "email",
+     *                     fieldType: "string",
+     *                     required: true
+     *                 }],
+     *             lookupFields: [{
+     *                     fieldName: "email",
+     *                     unique: true
+     *                 }],
+     *             capabilities: {
+     *                 "auditHistory": true
+     *             },
+     *             allowedSurfaces: ["record"]
+     *         }
      *     })
      */
     public createSchema(
-        request: Vectros.SchemaRequest,
+        request: Vectros.CreateSchemaRequest,
         requestOptions?: SchemasClient.RequestOptions,
     ): core.HttpResponsePromise<Vectros.SchemaResponse> {
         return core.HttpResponsePromise.fromPromise(this.__createSchema(request, requestOptions));
     }
 
     private async __createSchema(
-        request: Vectros.SchemaRequest,
+        request: Vectros.CreateSchemaRequest,
         requestOptions?: SchemasClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.SchemaResponse>> {
+        const { upsert, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            upsert,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -159,9 +166,13 @@ export class SchemasClient {
             method: "POST",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
-            body: request,
+            body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -176,6 +187,8 @@ export class SchemasClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
