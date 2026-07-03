@@ -9,6 +9,35 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.32.0 — 2026-07-03
+
+Soft-retract documents, and re-index a file document by re-uploading it.
+
+### Added
+
+- **Document lifecycle `status` — archive and restore without deleting.** Documents now carry a
+  caller-settable `status` of `ACTIVE` (the default) or `ARCHIVED`. Setting it to `ARCHIVED`
+  soft-retracts a document — it is pulled from search and recall but kept and fully retrievable — and
+  setting it back to `ACTIVE` restores it. This is the documents analog of the record lifecycle
+  `status`, so you can model a review/retirement workflow (or a reversible delete) without destroying
+  content. Requires the `documents:u` scope.
+- **File-backed documents re-index when you re-upload them.** Re-initiating a file upload with the same
+  `externalId` re-issues a presigned URL to the existing document; uploading new bytes now re-extracts
+  the text and re-indexes the document, so search reflects the new content. Previously a re-upload
+  replaced the stored file but its searchable content did not change.
+
+### Changed
+
+- **Document responses split lifecycle state from processing state.** The document response `status`
+  field now reports the lifecycle state (`ACTIVE`/`ARCHIVED`, above); the extraction/indexing state
+  (`PENDING_UPLOAD`, `EXTRACTING`, `PENDING_INDEX`, `INDEXED`, `SKIPPED`, `STORED`, `FAILED`) moves to a
+  new `indexStatus` field — matching how records already separate the two. If you read a document's
+  `status` expecting `INDEXED`, read `indexStatus` instead.
+- **Re-uploading over an existing document requires the `documents:u` scope.** A re-upload overwrites
+  (and now re-indexes) the document's body, so it is treated as an update: creating a new document still
+  requires `documents:c`, but re-uploading over an existing one requires `documents:u`. A create-only
+  credential can still create new documents but can no longer overwrite an existing document's file.
+
 ## 0.31.0 — 2026-06-29
 
 Tell a created record from a returned one, and overwrite by `externalId` on purpose.

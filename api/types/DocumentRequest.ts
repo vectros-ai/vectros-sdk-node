@@ -28,6 +28,8 @@ export interface DocumentRequest {
     externalId?: string | undefined;
     /** Optimistic-concurrency token. Pass the `version` you last read (from a GET or a prior write response) to make this update conditional — it is rejected with `409 VERSION_CONFLICT` if the document was modified since, leaving the stored document untouched. Omit for last-write-wins (the default). Ignored on create. */
     expectedVersion?: number | undefined;
+    /** Caller-controlled lifecycle status. `ACTIVE` (the default) keeps the document live and searchable; `ARCHIVED` soft-retracts it — the document is pulled from search/recall but kept and recoverable (set it back to `ACTIVE` to re-index and restore). Use this to retire superseded content without deleting it. On update, omit to leave the current lifecycle status unchanged. Distinct from the read-only `indexStatus` (the processing pipeline). */
+    status?: DocumentRequest.Status | undefined;
 }
 
 export namespace DocumentRequest {
@@ -39,4 +41,10 @@ export namespace DocumentRequest {
         None: "NONE",
     } as const;
     export type IndexMode = (typeof IndexMode)[keyof typeof IndexMode];
+    /** Caller-controlled lifecycle status. `ACTIVE` (the default) keeps the document live and searchable; `ARCHIVED` soft-retracts it — the document is pulled from search/recall but kept and recoverable (set it back to `ACTIVE` to re-index and restore). Use this to retire superseded content without deleting it. On update, omit to leave the current lifecycle status unchanged. Distinct from the read-only `indexStatus` (the processing pipeline). */
+    export const Status = {
+        Active: "ACTIVE",
+        Archived: "ARCHIVED",
+    } as const;
+    export type Status = (typeof Status)[keyof typeof Status];
 }

@@ -12,8 +12,10 @@ export interface DocumentResponse {
     title?: string | undefined;
     /** Your own stable identifier for this document (immutable, and unique within your context). Null if the document was created without one. */
     externalId?: string | undefined;
-    /** Processing status of the document. PENDING_UPLOAD, UPLOADED, EXTRACTING, and PENDING_INDEX are in-flight states; INDEXED means the document is indexed and searchable; SKIPPED means extraction produced no indexable text so there was nothing to index — the document is stored and retrievable, just not searchable (not an error); STORED means it is store-only (indexMode=NONE) — persisted and retrievable but by design not searchable; FAILED means processing failed. */
+    /** Lifecycle status you control. `ACTIVE` (the default) means the document is live and returned in search/recall; `ARCHIVED` means you have soft-retracted it — it is pulled from search but kept and recoverable (set it back to `ACTIVE` to restore). Set via the document update endpoint. Distinct from `indexStatus`, which reports the processing pipeline. */
     status?: DocumentResponse.Status | undefined;
+    /** Processing status of the document (system-managed, read-only). PENDING_UPLOAD, UPLOADED, EXTRACTING, and PENDING_INDEX are in-flight states; INDEXED means the document is indexed and searchable; SKIPPED means extraction produced no indexable text so there was nothing to index — the document is stored and retrievable, just not searchable (not an error); STORED means it is store-only (indexMode=NONE) — persisted and retrievable but by design not searchable; FAILED means processing failed. */
+    indexStatus?: DocumentResponse.IndexStatus | undefined;
     /** How this document is indexed. HYBRID, SEMANTIC, and TEXT are searchable; NONE is store-only (not indexed for search). */
     indexMode?: DocumentResponse.IndexMode | undefined;
     /** Whether the raw text is stored and retrievable via GET /v1/documents/{id}/text. */
@@ -49,8 +51,14 @@ export interface DocumentResponse {
 }
 
 export namespace DocumentResponse {
-    /** Processing status of the document. PENDING_UPLOAD, UPLOADED, EXTRACTING, and PENDING_INDEX are in-flight states; INDEXED means the document is indexed and searchable; SKIPPED means extraction produced no indexable text so there was nothing to index — the document is stored and retrievable, just not searchable (not an error); STORED means it is store-only (indexMode=NONE) — persisted and retrievable but by design not searchable; FAILED means processing failed. */
+    /** Lifecycle status you control. `ACTIVE` (the default) means the document is live and returned in search/recall; `ARCHIVED` means you have soft-retracted it — it is pulled from search but kept and recoverable (set it back to `ACTIVE` to restore). Set via the document update endpoint. Distinct from `indexStatus`, which reports the processing pipeline. */
     export const Status = {
+        Active: "ACTIVE",
+        Archived: "ARCHIVED",
+    } as const;
+    export type Status = (typeof Status)[keyof typeof Status];
+    /** Processing status of the document (system-managed, read-only). PENDING_UPLOAD, UPLOADED, EXTRACTING, and PENDING_INDEX are in-flight states; INDEXED means the document is indexed and searchable; SKIPPED means extraction produced no indexable text so there was nothing to index — the document is stored and retrievable, just not searchable (not an error); STORED means it is store-only (indexMode=NONE) — persisted and retrievable but by design not searchable; FAILED means processing failed. */
+    export const IndexStatus = {
         PendingUpload: "PENDING_UPLOAD",
         Uploaded: "UPLOADED",
         Extracting: "EXTRACTING",
@@ -60,7 +68,7 @@ export namespace DocumentResponse {
         Stored: "STORED",
         Failed: "FAILED",
     } as const;
-    export type Status = (typeof Status)[keyof typeof Status];
+    export type IndexStatus = (typeof IndexStatus)[keyof typeof IndexStatus];
     /** How this document is indexed. HYBRID, SEMANTIC, and TEXT are searchable; NONE is store-only (not indexed for search). */
     export const IndexMode = {
         Hybrid: "HYBRID",
