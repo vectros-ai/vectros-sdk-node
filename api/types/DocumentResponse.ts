@@ -18,7 +18,7 @@ export interface DocumentResponse {
     indexStatus?: DocumentResponse.IndexStatus | undefined;
     /** How this document is indexed. HYBRID, SEMANTIC, and TEXT are searchable; NONE is store-only (not indexed for search). */
     indexMode?: DocumentResponse.IndexMode | undefined;
-    /** Whether the raw text is stored and retrievable via GET /v1/documents/{id}/text. */
+    /** Whether the document's text is retained after indexing — fixed at ingest time. Text-ingested documents always retain their body. File-uploaded documents retain their extracted text by default; uploaded with `storeText=false`, the extracted text is discarded once indexing completes (`/text` then returns 404 and `/ask` 409; search and the file download are unaffected). Note: documents created before this flag reached its current semantics may report `false` while their text was in fact retained (file documents from before the flag was settable, and text documents ingested under the old opt-in) — `GET /{id}/text` succeeding is the authoritative signal for those. */
     storeText?: boolean | undefined;
     /** The ID of the folder that contains this document. */
     folderId?: string | undefined;

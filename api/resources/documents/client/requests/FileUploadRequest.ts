@@ -16,6 +16,8 @@ export interface FileUploadRequest {
     fileType: string;
     /** Indexing strategy applied after the file is processed and its text is extracted. `HYBRID` runs both BM25 keyword and dense-vector semantic indexing (recommended). `SEMANTIC` indexes only as dense vectors. `TEXT` indexes only with BM25. `NONE` is store-only (archival): the file is still uploaded and its text extracted, but it is not search-indexed — retrievable by id/download and structured-field lookup only. Optional: omit to inherit the bound schema's default index mode. If neither this field nor the schema specifies one, the request is rejected. When both are set, this per-file value wins. */
     indexMode?: FileUploadRequest.IndexMode;
+    /** Whether the text extracted from this file is retained after indexing. Defaults to true: the extracted text stays retrievable via `GET /v1/documents/{id}/text` and usable by `POST /v1/documents/{id}/ask`. Set false to discard the extracted text once indexing completes — search results and the original file download are unaffected, but `/text` returns 404 and `/ask` returns 409 for the document. Fixed at ingest time: it cannot be changed later, and a re-upload to the same document keeps the original choice. */
+    storeText?: boolean;
     /** ID of the folder in which to place this document. Omit to use your account's default root folder. */
     folderId?: string;
     /** The document's structured data, as a flat key/value object. When `schemaId` is set, declared fields are validated against the schema and its lookup fields become directly queryable (matching record and text-ingest behavior); undeclared keys pass through as free-form and are searchable via the `filters` parameter on `POST /v1/search`. */

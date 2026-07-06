@@ -9,6 +9,43 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.33.0 — 2026-07-05
+
+Control whether a file's extracted text is retained, and rely on retention
+behavior that finally matches its documentation.
+
+### Added
+
+- **`storeText` on the file-upload request — choose text retention at upload time.** File uploads
+  (`POST /v1/documents/upload`) now accept `storeText`. The default (`true`) retains the text
+  extracted from your file: it stays retrievable via `GET /v1/documents/{id}/text` and powers
+  `POST /v1/documents/{id}/ask`. Set `false` to discard the extracted text once indexing
+  completes — search results and the original-file download are unaffected, but `/text` returns
+  404 and `/ask` returns 409 for that document. The choice is fixed at ingest: it cannot be
+  changed later, and a re-upload keeps the original choice. Previously the flag existed only on
+  document responses and could not be set on uploads at all.
+
+### Changed
+
+- **Text-ingested documents always retain their body, and it is always metered.** `storeText` is
+  no longer part of the text-ingest request (`POST /v1/documents`): the ingested body is the
+  document, is always retrievable via `/text`, and now always counts toward text-storage usage.
+  Requests that still send the field are accepted and the value ignored. Previously a
+  `storeText: false` text document stored fully retrievable text without being metered for it.
+- **`storeText` is immutable after ingest.** `PATCH /v1/documents/{id}` requests naming
+  `storeText` are now rejected with 400 (previously accepted). Retention is decided when the
+  document is created.
+- **`/ask` availability is now determined by actual text presence.** Documents whose text exists
+  can always be interrogated (including text documents created under the old opt-in flag), and
+  documents whose extracted text was discarded return an actionable 409. Previously the guard
+  keyed on the stored flag and rejected some documents whose text was fully available.
+
+### Fixed
+
+- The `/text` endpoint, `/ask` 409, and document-response `storeText` descriptions now describe
+  the implemented behavior exactly, including how documents created before this release report
+  the flag.
+
 ## 0.32.0 — 2026-07-03
 
 Soft-retract documents, and re-index a file document by re-uploading it.
