@@ -9,6 +9,115 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.34.0 — 2026-07-10
+
+Custom ownership scopes: organize records, documents, and folders under your own
+namespaces — teams, projects, departments, anything — and confine tokens, lists,
+and search to them, exactly like the built-in org and client scopes.
+
+### Added
+
+- **`scopes` on create — namespaced ownership values.** `POST /v1/records`, `POST /v1/documents`,
+  `POST /v1/documents/upload` (file uploads), and `POST /v1/folders` accept a `scopes` array of
+  `<namespace>:<value>` entries (e.g.
+  `group:eng-team`, `project:apollo`). A namespace is 2–32 characters, starts with a lowercase
+  letter, and may contain lowercase letters, digits, `_`, and `-`; `org` and `client` are the
+  built-ins, and a handful of reserved words (`user`, `self`, `tenant`, `context`, `scope`) are
+  rejected. An item carries up to **two** scope values alongside its owning user. The values you
+  select must come from the credential's own identity, and the resulting ownership must still be
+  readable under the credential's `data_scope` (400 otherwise). Omitting `scopes` keeps today's
+  behavior — the credential's full identity is stamped. An empty array (`[]`) creates a
+  **private, user-owned item** with no shared scopes; it requires a user-carrying identity.
+- **`scopes` read-back everywhere.** Record, document, and folder responses — and their webhook
+  envelopes — now include the canonical `scopes` list. The existing `orgId`/`clientId` response
+  fields are unchanged.
+- **`scope` filter on lists, search, and RAG.** Record and document lists accept
+  `?scope=<namespace>:<value>`; search and RAG requests accept the same value in a `scope` field.
+  For the built-ins, `scope=org:<id>` / `scope=client:<id>` are equivalent to the existing
+  `orgId`/`clientId` filters (sending both forms with different values is a 400).
+- **`scope:<namespace>` keys in `data_scope`.** Scoped tokens, scoped keys, and access profiles
+  can now confine a credential by any custom namespace — per-namespace value lists with the same
+  matching rules as the built-ins, including the explicit `null` opt-in for scope-less items.
+  Access-profile `identityOverrides` accept the same namespaced keys (at most two scope
+  namespaces per identity).
+- **Record expiry with `expiresAt` (auto-delete).** `POST`/`PUT /v1/records` accept an optional
+  `expiresAt` (ISO-8601 UTC timestamp); the record is automatically deleted at (or shortly after)
+  that time — removed from search and storage, the same as an explicit delete. It requires the
+  record's schema to opt in with `capabilities.ttlEligible: true` (otherwise the request is
+  rejected), and must be at least 10 minutes in the future. Omit it to leave a record's expiry
+  unchanged; records have no expiry by default. Record responses echo `expiresAt` when set. In this
+  release an expiry can be set or extended but not removed once set.
+- **`payloadPartial` on list/lookup responses.** When a large record's or document's payload is
+  stored externally, a list or lookup response returns only the indexed projection and now sets
+  `payloadPartial: true` so you can tell the payload in hand is incomplete (distinct from
+  `payloadExternalized`, which is also true on a by-id read that returned the full payload). Fetch
+  the full payload with a by-id `GET` or `includePayload=true`, and use `PATCH` (not `PUT`) to
+  update such a record without clearing the omitted fields.
+
+### Changed
+
+- **Canonical scope keys on read-back.** `orgId` and `clientId` remain accepted wherever you
+  author a `data_scope` or identity, as before — but stored and minted credentials now report
+  those dimensions canonically as `scope:org` / `scope:client` (the `userId` key is unchanged).
+  Treat the authored form as write-only sugar; read the canonical form.
+- **Record `status` is now a lifecycle: `ACTIVE` or `ARCHIVED`.** `POST`/`PUT`/`PATCH /v1/records`
+  accept only `ACTIVE` (the default) or `ARCHIVED` for `status` (any other value is a 400).
+  `ARCHIVED` retracts a record from search and recall (`POST /v1/search` and RAG) while keeping it
+  stored, retrievable by id, findable by structured-field lookup, and returned by `GET /v1/records` —
+  set `status` back to `ACTIVE` to re-index and restore. This matches how documents' lifecycle already
+  works, and is the recommended way to retire a record from search without deleting it. (Previously
+  `status` was a free-form label with no effect on search.)
+- **Document search filters are now limited to structured fields.** A document's free-text payload
+  values are no longer indexed as exact-match search filters; only schema-declared `filterable` fields
+  and short scalar values (≤256 bytes) become `?filters=` targets. Free text remains fully full-text
+  searchable (via the document body, and via schema-declared `searchable` fields). This prevents a
+  large free-text field from silently breaking a document's indexing.
+- **`PUT` is guarded against silently clearing externally-stored fields.** For a large record or
+  document whose payload is stored externally, a list/lookup response returns only the indexed
+  projection — so a `PUT` built from one would omit (and therefore clear) the stored fields it never
+  saw. Such a `PUT` is now rejected with a clear error naming the fields that would be cleared. Send
+  those fields explicitly, use `PATCH` (which preserves omitted fields), or pass `?allowClear=true`
+  to confirm a full replacement. `PATCH` semantics are unchanged.
+
+### Fixed
+
+- **Re-indexing no longer drops documents whose extracted text was discarded.** A
+  `storeText: false` file document that was re-indexed after its text had been discarded
+  previously fell out of search results silently; the index now re-extracts from your original
+  upload transparently. The retention contract is unchanged — the text remains unretrievable via
+  `/text` and `/ask`.
+- **Authoring a `data_scope` that names both an alias and its canonical form** (e.g. `orgId`
+  and `scope:org` with different values) now returns a clear 400 instead of a server error.
+- **A document with too much filterable metadata now fails fast at ingest instead of silently.**
+  Previously a document whose filterable fields exceeded the search engine's per-item limit could be
+  accepted but never become searchable, with no signal. Ingest now rejects it with a clear 400 naming
+  the oversized fields, so you can shorten them, mark them non-filterable, or move the text into the
+  document body.
+- **A corrected re-ingest now actually re-applies its metadata.** Re-ingesting a document or record
+  (or editing a filterable field) previously re-indexed against the values captured at first ingest, so
+  a fix to a filter field never took effect; it now re-reads the current values on every re-index.
+
+## 0.33.1 — 2026-07-09
+
+Scope-authoring hygiene: mistaken grants now fail loudly instead of quietly
+authorizing nothing.
+
+### Changed
+
+- **Scope `allowed_actions` must use the compact `resource:ops` form.** When you author an access
+  profile, role, or scoped token, each `allowed_actions` entry must be `*`, the compact
+  `resource:ops[:type]` form (e.g. `records:cru`, `documents:r`, `search:r`, `keys:crd`,
+  `profiles:cru`), or the literal `create_own_scoped_key`. Bare verbs (`read`, `write`, `delete`)
+  and the older `admin:keys` / `admin:profiles` shorthand are **no longer accepted**: they matched
+  no resource at runtime, so a credential authored with them was silently granted nothing. They are
+  now rejected when you save, so the mistake surfaces immediately. The `s` letter inside the compact
+  form still grants sensitive-field reveal for a record type (e.g. `records:rs:patient`).
+- **Scope `data_scope` honors the public `userId` ownership key.** A `data_scope` may key on
+  `userId`, `orgId`, or `clientId`. Previously a filter keyed on `userId` was silently ignored — a
+  credential confined that way matched no records, including its own; it now scopes correctly to the
+  named user's records. An unrecognized ownership key is rejected when you save, instead of being
+  stored inert.
+
 ## 0.33.0 — 2026-07-05
 
 Control whether a file's extracted text is retained, and rely on retention

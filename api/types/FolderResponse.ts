@@ -26,6 +26,8 @@ export interface FolderResponse {
     orgId?: string | undefined;
     /** ID of the client associated with this folder — the Vectros-assigned UUID of a client in your account. Null if the folder is not associated with a specific client. */
     clientId?: string | undefined;
+    /** The folder's scope ownership as canonical `namespace:value` entries (at most 2). `org:` and `client:` entries mirror the `orgId` and `clientId` fields; any other namespace is a custom scope attached at creation. Empty for a folder owned by a user alone (or unowned). */
+    scopes?: string[] | undefined;
     /** When the folder was created, as an ISO-8601 UTC timestamp. */
     createdAt?: string | undefined;
     /** When the folder was last modified, as an ISO-8601 UTC timestamp. */

@@ -8,6 +8,7 @@
  *         userId: "550e8400-e29b-41d4-a716-446655440000",
  *         orgId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
  *         clientId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+ *         scope: "group:eng-team",
  *         startFrom: "550e8400-e29b-41d4-a716-446655440000"
  *     }
  */
@@ -22,6 +23,8 @@ export interface ListRecordsRequest {
     orgId?: string;
     /** Filter to records owned by this client (requires `userId` or `orgId` as well). The value is the Vectros-assigned UUID of a client; resolve one via `GET /v1/clients?externalId=`. */
     clientId?: string;
+    /** Filter to records carrying this scope value, in `namespace:value` form — for example `group:eng-team`. `scope=org:<id>` and `scope=client:<id>` are equivalent to the `orgId` and `clientId` filters. Combine with `type` or `folderId`. */
+    scope?: string;
     /** Pagination cursor. Pass the `nextCursor` returned by the previous page to fetch the next page; omit it for the first page. */
     startFrom?: string;
     /** Maximum number of records to return per page. Allowed range 1–100; defaults to 20. */

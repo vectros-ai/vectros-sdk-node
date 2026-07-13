@@ -241,7 +241,7 @@ export class RecordsClient {
     }
 
     /**
-     * Returns a paginated list of records in your account as a `{data, nextCursor}` page. Supply exactly one of `type`, `folderId`, or `recent=true` to choose the mode: `type` lists all records of a single type; `folderId` lists all records in a folder (any type); and `recent=true` returns the account-wide recently-updated feed across all types, newest first. You may combine `type` with `folderId` to list a single type within a folder. The owner filters (`userId`, `orgId`, `clientId`) further narrow the type and folder modes; the `recent` feed is standalone and ignores all filters. Each token only sees the record types it is scoped to read. Requires the `records:r` scope. By default the response returns the indexed projection of each record; set `includePayload=true` to include full payloads.
+     * Returns a paginated list of records in your account as a `{data, nextCursor}` page. Supply exactly one of `type`, `folderId`, or `recent=true` to choose the mode: `type` lists all records of a single type; `folderId` lists all records in a folder (any type); and `recent=true` returns the account-wide recently-updated feed across all types, newest first. You may combine `type` with `folderId` to list a single type within a folder. The owner filters (`userId`, `orgId`, `clientId`, `scope`) further narrow the type and folder modes; the `recent` feed is standalone and ignores all filters. Each token only sees the record types it is scoped to read. Requires the `records:r` scope. By default the response returns the indexed projection of each record; set `includePayload=true` to include full payloads.
      *
      * @param {Vectros.ListRecordsRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -253,6 +253,7 @@ export class RecordsClient {
      *         userId: "550e8400-e29b-41d4-a716-446655440000",
      *         orgId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
      *         clientId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+     *         scope: "group:eng-team",
      *         startFrom: "550e8400-e29b-41d4-a716-446655440000"
      *     })
      */
@@ -267,13 +268,25 @@ export class RecordsClient {
         request: Vectros.ListRecordsRequest = {},
         requestOptions?: RecordsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.RecordPage>> {
-        const { type: type_, folderId, userId, orgId, clientId, startFrom, limit, includePayload, recent } = request;
+        const {
+            type: type_,
+            folderId,
+            userId,
+            orgId,
+            clientId,
+            scope,
+            startFrom,
+            limit,
+            includePayload,
+            recent,
+        } = request;
         const _queryParams: Record<string, unknown> = {
             type: type_,
             folderId,
             userId,
             orgId,
             clientId,
+            scope,
             startFrom,
             limit,
             includePayload,
@@ -353,9 +366,10 @@ export class RecordsClient {
         request: Vectros.CreateRecordRequest,
         requestOptions?: RecordsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.RecordResponse>> {
-        const { upsert, body: _body } = request;
+        const { upsert, allowClear, body: _body } = request;
         const _queryParams: Record<string, unknown> = {
             upsert,
+            allowClear,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -503,7 +517,10 @@ export class RecordsClient {
         request: Vectros.UpdateRecordRequest,
         requestOptions?: RecordsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.RecordResponse>> {
-        const { id, body: _body } = request;
+        const { id, allowClear, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            allowClear,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -519,7 +536,11 @@ export class RecordsClient {
             method: "PUT",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
             body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,

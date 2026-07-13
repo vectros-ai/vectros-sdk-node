@@ -26,6 +26,8 @@ export interface DocumentResponse {
     payload?: Record<string, unknown> | undefined;
     /** True when this document's structured payload is large enough to be stored externally rather than inline. In that case `payload` on a list response holds only the inline subset of fields; fetch the full payload with a by-id GET. */
     payloadExternalized?: boolean | undefined;
+    /** True when THIS response returned only a PARTIAL structured payload — a large document's bulk fields are omitted from `payload` because you did not request them (a list or lookup without `includePayload=true`). Unlike `payloadExternalized` (also true on a by-id read that DID return the full payload), this tells you the payload in hand is incomplete: fetch the full payload with a by-id GET or `includePayload=true`. To UPDATE such a document, use `PATCH` (which preserves omitted fields) — a `PUT` built from this response would clear them unless you pass `?allowClear=true`. Null when the payload is complete. (The document's text/body is always preserved on a `PUT` that omits `text`.) */
+    payloadPartial?: boolean | undefined;
     /** The ID of the record schema this document's `payload` is validated and indexed against. Null if the document is schemaless. */
     schemaId?: string | undefined;
     /** The version of the bound schema in effect when this document was written. A document keeps the version it was stamped with at write time, even after the schema is later edited. Null when the document is schemaless. */
@@ -38,6 +40,8 @@ export interface DocumentResponse {
     orgId?: string | undefined;
     /** The associated client — the Vectros-assigned UUID of a client in your account. */
     clientId?: string | undefined;
+    /** The document's scope ownership as canonical `namespace:value` entries (at most 2). `org:` and `client:` entries mirror the `orgId` and `clientId` fields; any other namespace is a custom scope attached at creation. Empty for a document owned by a user alone (or unowned). Filter lists by these values with `?scope=`. */
+    scopes?: string[] | undefined;
     /** MIME type of the uploaded file. Present only for file-backed documents. */
     fileType?: string | undefined;
     /** Size of the uploaded file, in bytes. Present only for file-backed documents. */

@@ -10,7 +10,7 @@ import type * as Vectros from "../../../../index.js";
  *             roleId: "engineering-member",
  *             name: "Engineering Team Member",
  *             scopes: [{
- *                     allowed_actions: ["read", "write"]
+ *                     allowed_actions: ["records:cru", "search:r"]
  *                 }]
  *         }
  *     }

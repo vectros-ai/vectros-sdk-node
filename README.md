@@ -99,6 +99,13 @@ per-plan limits.
 - **Guides & reference:** [docs.vectros.ai](https://docs.vectros.ai)
 - **Product:** [vectros.ai](https://vectros.ai)
 
+## Security & trust
+
+Vectros enforces per-customer, fail-closed isolation and least-privilege scoped keys, with a
+tamper-evident audit and version history. Customer-facing surfaces are hardened through extensive
+adversarial security review. For the full trust posture, drawn plainly with its boundaries, see the
+[compliance and trust guide](https://docs.vectros.ai/guides/operations-trust/compliance).
+
 ## License
 
 [Apache License 2.0](./LICENSE).

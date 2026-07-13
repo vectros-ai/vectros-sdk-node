@@ -13,5 +13,7 @@ import type * as Vectros from "../../../../index.js";
 export interface IngestDocumentRequest {
     /** When `true`, if a document with the same `externalId` already exists its content is overwritten (the submitted `payload`, `title`, and — when supplied — `text` are applied and the version is bumped) instead of being returned unchanged; the immutable `externalId`, `schemaId`, `indexMode`, and ownership are never changed. Defaults to `false`. Requires the `documents:u` scope in addition to `documents:c`. */
     upsert?: boolean;
+    /** Only relevant with `?upsert=true`, which overwrites an existing document as a full replacement. If the submitted request omits (or sends as null) a stored field that a list or lookup response returns only as an indexed projection (a large document whose payload is stored externally), the overwrite is rejected unless you set `allowClear=true` to confirm that clearing those fields is intended. Use PATCH to update without clearing omitted fields. Defaults to `false`. */
+    allowClear?: boolean;
     body: Vectros.DocumentRequest;
 }

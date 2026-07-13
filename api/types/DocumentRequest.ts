@@ -22,6 +22,8 @@ export interface DocumentRequest {
     orgId?: string | undefined;
     /** Associated client ID — the Vectros-assigned UUID of a client in your account. Optional. With an API key, sets the document's client explicitly. With a scoped token, must match the token's identity claim (if set) or fall within its data scope. */
     clientId?: string | undefined;
+    /** The document's scope ownership, as `namespace:value` entries (at most 2 namespaces) — for example `["org:6ba7b810-9dad-11d1-80b4-00c04fd430c8", "group:eng-team"]`. `org:` and `client:` entries are equivalent to the `orgId` and `clientId` fields; other namespaces are custom scopes you define (lowercase, 2-32 chars). When supplied, this is the document's COMPLETE scope declaration: for a token that stamps identity, entries must match the token's identity values, and an empty array creates a document owned by the calling user alone (the private tier). Omit the field to inherit the token's full identity — the default. Filter lists by these values with `?scope=`. */
+    scopes?: string[] | undefined;
     /** Stable, caller-supplied identifier for this document. Optional. Immutable after create. Unique within your account and context: posting again with the same `externalId` returns the existing document (idempotent ingest), and it is the key other records use to reference this one. Max 256 characters. */
     externalId?: string | undefined;
     /** Optimistic-concurrency token. Pass the `version` you last read (from a GET or a prior write response) to make this update conditional — it is rejected with `409 VERSION_CONFLICT` if the document was modified since, leaving the stored document untouched. Omit for last-write-wins (the default). Ignored on create. */

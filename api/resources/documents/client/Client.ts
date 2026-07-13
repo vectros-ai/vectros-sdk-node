@@ -25,7 +25,7 @@ export class DocumentsClient {
     }
 
     /**
-     * Returns a paginated list of your documents, optionally filtered by folder (`folderId`) and/or owner (`userId`, `orgId`, or `clientId`). The response is a `{data, nextCursor}` envelope; pass `nextCursor` back as `startFrom` to fetch the next page. Requires the `documents:r` scope.
+     * Returns a paginated list of your documents, optionally filtered by folder (`folderId`) and/or owner (`userId`, `orgId`, `clientId`, or `scope`). The response is a `{data, nextCursor}` envelope; pass `nextCursor` back as `startFrom` to fetch the next page. Requires the `documents:r` scope.
      *
      * @param {Vectros.ListDocumentsRequest} request
      * @param {DocumentsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -35,6 +35,7 @@ export class DocumentsClient {
      *         userId: "550e8400-e29b-41d4-a716-446655440000",
      *         orgId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
      *         clientId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+     *         scope: "group:eng-team",
      *         folderId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
      *         startFrom: "doc_prev123"
      *     })
@@ -50,11 +51,12 @@ export class DocumentsClient {
         request: Vectros.ListDocumentsRequest = {},
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.DocumentPage>> {
-        const { userId, orgId, clientId, folderId, startFrom, limit } = request;
+        const { userId, orgId, clientId, scope, folderId, startFrom, limit } = request;
         const _queryParams: Record<string, unknown> = {
             userId,
             orgId,
             clientId,
+            scope,
             folderId,
             startFrom,
             limit,
@@ -127,9 +129,10 @@ export class DocumentsClient {
         request: Vectros.IngestDocumentRequest,
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.DocumentResponse>> {
-        const { upsert, body: _body } = request;
+        const { upsert, allowClear, body: _body } = request;
         const _queryParams: Record<string, unknown> = {
             upsert,
+            allowClear,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -279,7 +282,10 @@ export class DocumentsClient {
         request: Vectros.UpdateDocumentRequest,
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.DocumentResponse>> {
-        const { id, body: _body } = request;
+        const { id, allowClear, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            allowClear,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -295,7 +301,11 @@ export class DocumentsClient {
             method: "PUT",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
             body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,

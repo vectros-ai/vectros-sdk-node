@@ -6,6 +6,7 @@
  *         userId: "550e8400-e29b-41d4-a716-446655440000",
  *         orgId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
  *         clientId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+ *         scope: "group:eng-team",
  *         folderId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
  *         startFrom: "doc_prev123"
  *     }
@@ -17,6 +18,8 @@ export interface ListDocumentsRequest {
     orgId?: string;
     /** Filter by associated client — the Vectros-assigned UUID of a client. To resolve from your own identifier, call GET /v1/clients?externalId=. */
     clientId?: string;
+    /** Filter to documents carrying this scope value, in `namespace:value` form — for example `group:eng-team`. `scope=org:<id>` and `scope=client:<id>` are equivalent to the `orgId` and `clientId` filters. */
+    scope?: string;
     /** List only documents in this folder (the Vectros folder ID). Can be combined with the owner filters. */
     folderId?: string;
     /** Pagination cursor — pass the `nextCursor` returned by the previous page. */

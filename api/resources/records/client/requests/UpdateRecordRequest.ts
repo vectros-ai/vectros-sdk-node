@@ -12,5 +12,7 @@ import type * as Vectros from "../../../../index.js";
 export interface UpdateRecordRequest {
     /** The Vectros-assigned UUID of the record to update. */
     id: string;
+    /** A `PUT` is a full replacement: if the submitted `payload` omits (or sends as null) a stored field that a list or lookup response returns only as an indexed projection (a large record whose payload is stored externally), the update is rejected unless you set `allowClear=true` to confirm that clearing those fields is intended. Use PATCH to update without clearing omitted fields. Defaults to `false`. */
+    allowClear?: boolean;
     body: Vectros.RecordRequest;
 }

@@ -22,8 +22,10 @@ export interface RecordResponse {
     payloadExternalized?: boolean | undefined;
     /** Size in bytes of the full externalized payload. Present only when `payloadExternalized` is true. */
     payloadBytes?: number | undefined;
-    /** Record lifecycle status. ACTIVE records are live. Use this field to model soft-delete or workflow states without physically deleting records. */
-    status?: string | undefined;
+    /** True when THIS response returned only a PARTIAL payload — a large record's bulk fields are omitted from `payload` because you did not request them (a list or lookup without `includePayload=true`). Unlike `payloadExternalized` (which is also true on a by-id read that DID return the full payload), this tells you the payload in hand is incomplete. To get the full payload, fetch the record by id (`GET /v1/records/{id}`) or pass `includePayload=true`. To UPDATE such a record, use `PATCH` (which preserves omitted fields) — a `PUT` built from this response would clear the omitted fields unless you pass `?allowClear=true`. Null (omitted) when the payload is complete. */
+    payloadPartial?: boolean | undefined;
+    /** Record lifecycle status. `ACTIVE` records are live and searchable; `ARCHIVED` records are retracted from search and recall while kept stored, retrievable by id, findable by structured-field lookup, and listed by `GET /v1/records` (set `status` back to `ACTIVE` to restore). */
+    status?: RecordResponse.Status | undefined;
     /** Identifier of the folder grouping this record. A folder can group both records and documents together. */
     folderId?: string | undefined;
     /** Identifier of the owning user (a Vectros-assigned UUID). Set automatically from the calling token's identity when the token carries a user identity. */
@@ -32,6 +34,8 @@ export interface RecordResponse {
     orgId?: string | undefined;
     /** Identifier of the associated client (a Vectros-assigned UUID). Set automatically from the calling token's identity when the token carries a client identity. */
     clientId?: string | undefined;
+    /** The record's scope ownership as canonical `namespace:value` entries (at most 2). `org:` and `client:` entries mirror the `orgId` and `clientId` fields; any other namespace is a custom scope attached at creation. Empty for a record owned by a user alone (or unowned). Filter lists by these values with `?scope=`. */
+    scopes?: string[] | undefined;
     /** Search-index status. PENDING_INDEX means the record is queued for indexing. INDEXED means it is searchable via `POST /v1/search`. SKIPPED means the record had no indexable text (e.g. only non-searchable fields populated) so there was nothing to index — it is stored and retrievable, just not full-text/semantic searchable until a searchable field is filled in; not an error. FAILED means indexing hit an error — the record is still readable but not searchable. Null for a store-only record (`indexMode` NONE), which has no indexing to track. */
     indexStatus?: RecordResponse.IndexStatus | undefined;
     /** The record's resolved search-index mode: the per-record override if set, otherwise the schema's type-level default, otherwise NONE. HYBRID, SEMANTIC, and TEXT make the record searchable; NONE is store-only. */
@@ -44,9 +48,17 @@ export interface RecordResponse {
     updatedAt?: string | undefined;
     /** Optimistic-concurrency version. Pass this value back as `expectedVersion` on a later update to avoid silently overwriting a concurrent change — the update is rejected with 409 VERSION_CONFLICT if the record changed in the meantime. Incremented on every successful write. */
     version?: number | undefined;
+    /** The record's absolute expiry as an ISO-8601 UTC timestamp, when a TTL is set (#630) — the record is automatically deleted at (or shortly after) this time. Null when the record has no expiry. */
+    expiresAt?: string | undefined;
 }
 
 export namespace RecordResponse {
+    /** Record lifecycle status. `ACTIVE` records are live and searchable; `ARCHIVED` records are retracted from search and recall while kept stored, retrievable by id, findable by structured-field lookup, and listed by `GET /v1/records` (set `status` back to `ACTIVE` to restore). */
+    export const Status = {
+        Active: "ACTIVE",
+        Archived: "ARCHIVED",
+    } as const;
+    export type Status = (typeof Status)[keyof typeof Status];
     /** Search-index status. PENDING_INDEX means the record is queued for indexing. INDEXED means it is searchable via `POST /v1/search`. SKIPPED means the record had no indexable text (e.g. only non-searchable fields populated) so there was nothing to index — it is stored and retrievable, just not full-text/semantic searchable until a searchable field is filled in; not an error. FAILED means indexing hit an error — the record is still readable but not searchable. Null for a store-only record (`indexMode` NONE), which has no indexing to track. */
     export const IndexStatus = {
         PendingIndex: "PENDING_INDEX",
