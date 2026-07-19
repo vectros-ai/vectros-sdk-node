@@ -22,8 +22,8 @@ export declare namespace VectrosClient {
 export class VectrosClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<VectrosClient.Options>;
     protected _auth: AuthClient | undefined;
-    protected _identity: IdentityClient | undefined;
     protected _documents: DocumentsClient | undefined;
+    protected _identity: IdentityClient | undefined;
     protected _compliance: ComplianceClient | undefined;
     protected _folders: FoldersClient | undefined;
     protected _inference: InferenceClient | undefined;
@@ -39,12 +39,12 @@ export class VectrosClient {
         return (this._auth ??= new AuthClient(this._options));
     }
 
-    public get identity(): IdentityClient {
-        return (this._identity ??= new IdentityClient(this._options));
-    }
-
     public get documents(): DocumentsClient {
         return (this._documents ??= new DocumentsClient(this._options));
+    }
+
+    public get identity(): IdentityClient {
+        return (this._identity ??= new IdentityClient(this._options));
     }
 
     public get compliance(): ComplianceClient {

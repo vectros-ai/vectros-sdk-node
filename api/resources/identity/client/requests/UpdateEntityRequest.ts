@@ -5,13 +5,16 @@ import type * as Vectros from "../../../../index.js";
 /**
  * @example
  *     {
+ *         namespace: "team",
  *         id: "id",
  *         body: {
- *             externalId: "patient_789"
+ *             externalId: "team_eng_platform"
  *         }
  *     }
  */
-export interface UpdateClientRequest {
+export interface UpdateEntityRequest {
+    /** The entity namespace. */
+    namespace: string;
     id: string;
-    body: Vectros.ClientRequest;
+    body: Vectros.EntityRequest;
 }

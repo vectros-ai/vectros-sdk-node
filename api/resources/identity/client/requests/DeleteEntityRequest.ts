@@ -3,9 +3,12 @@
 /**
  * @example
  *     {
+ *         namespace: "team",
  *         id: "id"
  *     }
  */
-export interface DeleteClientRequest {
+export interface DeleteEntityRequest {
+    /** The entity namespace. */
+    namespace: string;
     id: string;
 }

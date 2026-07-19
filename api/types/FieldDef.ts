@@ -26,8 +26,8 @@ export interface FieldDef {
     targetField?: string | undefined;
     /** For a `reference` field: `one` (a single id, the default) or `many` (an array of ids). */
     cardinality?: string | undefined;
-    /** For a `reference` field: which surface the target lives on — record, document, user, org, or client. Required for reference fields. The same type name can exist on more than one surface, so this disambiguates which lookup resolves the reference. */
-    targetSurface?: FieldDef.TargetSurface | undefined;
+    /** For a `reference` field: where the target lives — `record`, `document`, `user`, or the name of an identity namespace (`org`, `client`, or one you registered, such as `team`). Required for reference fields. The same type name can exist in more than one place, so this disambiguates which lookup resolves the reference. A namespace must already be registered and entity-backed, otherwise the schema is rejected — a reference that could never resolve fails when you define it, not on every write. */
+    targetSurface?: string | undefined;
     /** Marks the field as sensitive (PHI/PII). Sensitive fields are redacted in logs, audit trails, and errors; blind-indexed for lookups; excluded from search; and masked in responses unless the token carries the `s` reveal scope for this record type. */
     sensitive?: boolean | undefined;
 }
@@ -45,13 +45,4 @@ export namespace FieldDef {
         Reference: "reference",
     } as const;
     export type FieldType = (typeof FieldType)[keyof typeof FieldType];
-    /** For a `reference` field: which surface the target lives on — record, document, user, org, or client. Required for reference fields. The same type name can exist on more than one surface, so this disambiguates which lookup resolves the reference. */
-    export const TargetSurface = {
-        Record: "record",
-        Document: "document",
-        User: "user",
-        Org: "org",
-        Client: "client",
-    } as const;
-    export type TargetSurface = (typeof TargetSurface)[keyof typeof TargetSurface];
 }

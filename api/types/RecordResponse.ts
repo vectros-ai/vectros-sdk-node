@@ -30,11 +30,7 @@ export interface RecordResponse {
     folderId?: string | undefined;
     /** Identifier of the owning user (a Vectros-assigned UUID). Set automatically from the calling token's identity when the token carries a user identity. */
     userId?: string | undefined;
-    /** Identifier of the owning organization (a Vectros-assigned UUID). Set automatically from the calling token's identity when the token carries an organization identity. */
-    orgId?: string | undefined;
-    /** Identifier of the associated client (a Vectros-assigned UUID). Set automatically from the calling token's identity when the token carries a client identity. */
-    clientId?: string | undefined;
-    /** The record's scope ownership as canonical `namespace:value` entries (at most 2). `org:` and `client:` entries mirror the `orgId` and `clientId` fields; any other namespace is a custom scope attached at creation. Empty for a record owned by a user alone (or unowned). Filter lists by these values with `?scope=`. */
+    /** The record's scope ownership as canonical `namespace:value` entries (at most 2). `org` and `client` are built-in namespaces; any other is a custom scope you define. Set at creation, either explicitly or automatically from the calling token's identity. Empty for a record owned by a user alone (or unowned). Filter lists by these values with `?scope=`. */
     scopes?: string[] | undefined;
     /** Search-index status. PENDING_INDEX means the record is queued for indexing. INDEXED means it is searchable via `POST /v1/search`. SKIPPED means the record had no indexable text (e.g. only non-searchable fields populated) so there was nothing to index — it is stored and retrievable, just not full-text/semantic searchable until a searchable field is filled in; not an error. FAILED means indexing hit an error — the record is still readable but not searchable. Null for a store-only record (`indexMode` NONE), which has no indexing to track. */
     indexStatus?: RecordResponse.IndexStatus | undefined;

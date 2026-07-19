@@ -6,7 +6,6 @@
  *         subjectType: "user",
  *         subjectId: "user_abc123",
  *         contextId: "ctx_intake",
- *         clientId: "client_xyz789",
  *         action: "read",
  *         callerKeyId: "key_abc123",
  *         resourceType: "intake_form",
@@ -14,14 +13,12 @@
  *     }
  */
 export interface GetAccessLogRequest {
-    /** Kind of subject to account for: `user`, `client`, or `org`. */
+    /** Kind of subject to account for: `user`, or any ownership namespace — the built-in `org` and `client`, or one you registered such as `team`. A subject kind is your data, not a fixed list. */
     subjectType?: string;
     /** Identifier of the data subject whose read history to return — the primary accounting-of-disclosures axis. Must be supplied together with `subjectType` (and a `contextId`). */
     subjectId?: string;
     /** Restrict results to a single app context (the data-partition axis). Required for a subject or record query. */
     contextId?: string;
-    /** Further restrict a subject query to reads about a single nested client/patient. */
-    clientId?: string;
     /** Start of the time window (ISO-8601 UTC, inclusive). */
     from?: string;
     /** End of the time window (ISO-8601 UTC, exclusive; defaults to now). */

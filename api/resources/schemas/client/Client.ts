@@ -25,7 +25,7 @@ export class SchemasClient {
     }
 
     /**
-     * Returns a paginated list of the record schemas defined in your account. Filter by `userId` or `orgId` to scope to an owner, by `surface` to list the types bindable to one surface, or by `recordType` to resolve the single schema for a type directly. Filtering by an identity surface (user, org, or client) lists your account-wide identity schemas regardless of the calling context; filtering by record or document lists within the calling context. Requires the `schemas:r` scope.
+     * Returns a paginated list of the record schemas defined in your account. Filter by `userId` or `scope` to scope to an owner, by `surface` to list the types bindable to one surface, or by `recordType` to resolve the single schema for a type directly. Filtering by an identity surface (`user` or `entity`) lists your account-wide identity schemas regardless of the calling context; filtering by record or document lists within the calling context. Requires the `schemas:r` scope.
      *
      * @param {Vectros.ListSchemasRequest} request
      * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -33,7 +33,7 @@ export class SchemasClient {
      * @example
      *     await client.schemas.listSchemas({
      *         userId: "550e8400-e29b-41d4-a716-446655440000",
-     *         orgId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+     *         scope: "org:6ba7b810-9dad-11d1-80b4-00c04fd430c8",
      *         surface: "document",
      *         recordType: "intake_form",
      *         startFrom: "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
@@ -50,10 +50,10 @@ export class SchemasClient {
         request: Vectros.ListSchemasRequest = {},
         requestOptions?: SchemasClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.SchemaPage>> {
-        const { userId, orgId, surface, recordType, startFrom, limit } = request;
+        const { userId, scope, surface, recordType, startFrom, limit } = request;
         const _queryParams: Record<string, unknown> = {
             userId,
-            orgId,
+            scope,
             surface,
             recordType,
             startFrom,

@@ -7,6 +7,5 @@ import type * as Vectros from "../index.js";
  */
 export interface IdentitySection {
     users?: Vectros.IdentitySurface | undefined;
-    orgs?: Vectros.IdentitySurface | undefined;
-    clients?: Vectros.IdentitySurface | undefined;
+    entities?: Vectros.IdentitySurface | undefined;
 }

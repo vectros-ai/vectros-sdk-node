@@ -8,12 +8,10 @@ export interface ReadAccessLogResponse {
     id?: string | undefined;
     /** The app context the read occurred in (the data-partition axis). */
     contextId?: string | undefined;
-    /** The kind of subject whose PHI was read: `user`, `client`, or `org`. */
-    subjectType?: ReadAccessLogResponse.SubjectType | undefined;
+    /** The kind of subject whose PHI was read: `user`, or an ownership namespace such as `org` or `client`. */
+    subjectType?: string | undefined;
     /** Identifier of the data subject whose PHI was read. */
     subjectId?: string | undefined;
-    /** Identifier of the nested client/patient the read was scoped to, when applicable. */
-    clientId?: string | undefined;
     /** The credential (API key / scoped token key id) that performed the read — the actor. */
     callerKeyId?: string | undefined;
     /** What the caller did: `read` (single fetch), `list`, `lookup`, `search`, or `rag`. */
@@ -35,13 +33,6 @@ export interface ReadAccessLogResponse {
 }
 
 export namespace ReadAccessLogResponse {
-    /** The kind of subject whose PHI was read: `user`, `client`, or `org`. */
-    export const SubjectType = {
-        User: "user",
-        Client: "client",
-        Org: "org",
-    } as const;
-    export type SubjectType = (typeof SubjectType)[keyof typeof SubjectType];
     /** What the caller did: `read` (single fetch), `list`, `lookup`, `search`, or `rag`. */
     export const Action = {
         Read: "read",

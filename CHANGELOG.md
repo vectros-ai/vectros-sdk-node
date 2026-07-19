@@ -9,6 +9,146 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.35.0 — unreleased
+
+**One ownership vocabulary.** Organizations and clients are no longer special-cased types with their
+own endpoints, fields, and scopes — they are ordinary namespaces alongside the ones you define. The
+same endpoints that serve your `team` or `project` entities now serve `org` and `client`, and
+everything that used to speak `orgId`/`clientId` speaks `scope:<namespace>`.
+
+**This is a breaking release**, and deliberately a clean one: there is no compatibility shim and no
+deprecation period, because the alternative was carrying two spellings for two privileged namespaces
+forever. Every change is mechanical, and every removed form fails loudly — as a compile error or a
+`400` that names its replacement. Nothing about *how* ownership behaves changes: the values, the
+matching rules, and the `null` tenant-level opt-in are all exactly as before.
+
+### Added
+
+- **`/v1/entities/{namespace}` — one CRUD surface for every identity entity.** Create, read, update,
+  delete, list, look up, and read version history for an entity in any entity-backed namespace —
+  including the built-in `org` and `client`. Supports `externalId` idempotent create, `?upsert=true`,
+  sensitive-field masking, `?scope=<namespace>:<value>` parent listing, and the full schema field
+  lookup surface (`?type=&field=&value=`, plus `POST /v1/entities/{namespace}/lookup` for sensitive
+  values) — the same capabilities the per-type endpoints had, now uniform across namespaces.
+- **`/v1/namespaces` — declare your own entity-backed namespaces.** Register a namespace with
+  `entityBacked: true` and it gains a full identity-entity surface, ownership references that are
+  existence-checked on create, and parent listing. Reads are open to any credential; writes require
+  a root API key. `org` and `client` are built in and read-only.
+- **Ownership parents are validated.** Creating an item scoped to an entity-backed namespace now
+  fails with a clear 400 if the referenced entity does not exist in your account, instead of storing
+  a dangling reference.
+
+### Changed
+
+Ownership is declared and filtered one way, everywhere:
+
+- **Declare it with `scopes`** — an array of `namespace:value` entries — on records, documents,
+  folders, schemas, and uploads. On update the array is the complete declaration: what you omit is
+  removed, and `[]` clears ownership. `userId` is unchanged and remains its own field: the user is a
+  separate dimension, not a namespace.
+- **Read it back from `scopes`** on those same responses and on the webhook envelope.
+- **Filter by it with `?scope=<namespace>:<value>`** on the list endpoints, and with
+  `"scope": "<namespace>:<value>"` in search and in the RAG `search` block. One entry per query — pair
+  it with `?userId=` when you need both dimensions.
+- **Bind a credential to it with `scope:<namespace>`** in a token's `dataScope`/`identity` and in an
+  access profile's `identityOverrides`; reference it with `${{ self.scope.<namespace> }}`. Grant
+  access to it with `entities:<verb>:<namespace>` — mirroring the existing `records:<verb>:<type>`
+  grammar. `GET /v1/ping` reports the resulting binding as `dataScope.scopes`.
+- **`subjectType` is a plain string**, not a fixed enum, on `ErasureRequest`, `ExportRequest`, and
+  read-access-log rows: it takes `user` or any ownership namespace, including one you define. A
+  subject kind is your data, not our list.
+- **`scopes` is a reserved payload field name**, alongside `userId`/`externalId` — it
+  is a first-class top-level field, so it cannot double as a payload key or a schema lookup field.
+- **Schemas bind to `entity`, not to `org` or `client`.** A schema's `allowedSurfaces` takes `record`,
+  `document`, `user`, or `entity`. Identity entities in *every* namespace — the built-in `org` and
+  `client` included, alongside any you register — bind under the single `entity` surface, and the
+  schema's `typeName` tells them apart. `allowedSurfaces: ["org"]` is rejected with a 400 naming the
+  replacement, and `GET /v1/schemas?surface=` filters on the same set. There cannot be a per-namespace
+  bind surface: the list is fixed, so a namespace you register tomorrow would have nowhere to bind.
+- **`GET /v1/usage` reports one `identity.entities` line** in place of `identity.orgs` and
+  `identity.clients` — the same fold, on the billing side. This also closes a gap: identity-entity
+  writes were being metered but were missing from the usage breakdown entirely.
+- **A schema reference can point at any entity namespace.** A `reference` field's `targetSurface` takes
+  `record`, `document`, `user`, or the name of an identity namespace — `org`, `client`, or one you
+  registered, such as `team`. It is no longer a fixed enum, since the namespaces are yours to define.
+  Referencing an `org` or a `client` is unchanged; referencing a namespace of your own is new. The
+  namespace must already be registered and entity-backed, or the schema is rejected — a reference that
+  could never resolve now fails when you define it, rather than on every write against it.
+- **More reserved namespace names.** `record`, `document`, and `entity` join `user`, `self`, `tenant`,
+  `context`, and `scope` as names a namespace may not take, and `versions` and `lookup` are reserved
+  too. The first three would collide with a reference `targetSurface`; the last two with the
+  `/v1/entities/{namespace}/...` sub-paths.
+
+### Removed
+
+The dedicated `org`/`client` vocabulary, in favour of the generic forms above. If you are upgrading
+from 0.34.0, every one of these is a compile error or a `400` that names its replacement — there is no
+silent behaviour change to hunt for:
+
+- `/v1/orgs` and `/v1/clients` (use `/v1/entities/org` and `/v1/entities/client`), and the
+  `orgs:<verb>` / `clients:<verb>` action scopes.
+- The `org` and `client` schema surfaces (use `entity`), and the `identity.orgs` / `identity.clients`
+  sections of `GET /v1/usage` (use `identity.entities`).
+- The `orgId` / `clientId` request-body fields, response fields, list filters, lookup `field=` values,
+  and search/RAG filters.
+- The `orgId` / `clientId` keys in `dataScope`, `identity`, and `identityOverrides`; the
+  `${{ self.orgId }}` / `${{ self.clientId }}` placeholders; and `dataScope.orgId` on `/v1/ping`.
+
+One narrowing is deliberately not carried over: `?scope=` takes a single entry, so filtering on two
+scope dimensions at once is no longer expressible (`?userId=` plus one `?scope=` still is). Repeated
+`?scope=` is additive and may land later.
+
+### Fixed
+
+- **A declared `number` is returned as a number, not a string.** Reading a record,
+  document, user, or identity entity returned `"priority": "30"` where it
+  should have returned `"priority": 30` — on every read: fetch by id, list, and
+  lookup. Nothing needs to be re-saved; your existing data returns the declared
+  type immediately.
+
+  If you worked around this by parsing the string form, you can drop the
+  workaround. **In Java it must go:** code that cast the value to `String` will
+  now fail against a number.
+
+- **Updating an item no longer fails on a number field you did not send.**
+  Renaming a record, archiving it, moving it to another folder, or changing its
+  owner could be rejected with `400 Field 'priority' must be a Number` even though
+  the request never mentioned `priority`. Sending a string for a declared `number`
+  is still rejected, as before.
+
+- **Version history returns declared numbers as numbers.** Entries from
+  `GET /v1/records/{id}/versions` (and the document, user, and entity
+  equivalents) could carry the string form of a number field inside
+  `previousContent` and `changedFields` for history written before this
+  release. All entries — old and new — now serve the declared types. Values are
+  typed against the item's current schema; an entry written under a schema
+  whose field types have since changed reports its values in the current types.
+
+- **Re-pointing a document to a compatible schema works.** A `PATCH` that
+  changes a document's `schemaId` to a schema declaring the same field types
+  (the common v1-to-v2 migration) was rejected with a `400` on an untouched
+  number field. It now succeeds. Re-pointing to a schema that declares
+  DIFFERENT types for stored fields is validated honestly: include the
+  re-typed values in the same request, or the response names the fields to fix.
+
+- **Identical re-applied writes are no-ops again.** Re-sending an unchanged
+  item with `?upsert=true`, or re-applying the same update, could bump the
+  version, write an audit entry, and re-index — every time — when the payload
+  contained a declared `number`. An unchanged write is now recognized as
+  unchanged: no version bump, no audit entry, no re-index, no write fee.
+
+- **Search indexing status no longer sticks in `PENDING_INDEX`.** An update to
+  a record with a numeric payload field could leave `indexStatus` reporting
+  `PENDING_INDEX` after indexing had in fact completed.
+
+- **A storage outage can no longer truncate a large item.** For items whose
+  payload is stored externally (large payloads), an internal storage failure
+  during an update, upsert, or re-upload could silently persist only the small
+  indexed subset of the payload — permanently losing the rest. Such writes now
+  fail whole with a `500` and leave the stored item untouched; retry when the
+  incident clears. Reads are unaffected: they keep returning the indexed subset
+  with `payloadExternalized: true` until the payload is reachable again.
+
 ## 0.34.0 — 2026-07-10
 
 Custom ownership scopes: organize records, documents, and folders under your own

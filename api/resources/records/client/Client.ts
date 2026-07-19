@@ -241,7 +241,7 @@ export class RecordsClient {
     }
 
     /**
-     * Returns a paginated list of records in your account as a `{data, nextCursor}` page. Supply exactly one of `type`, `folderId`, or `recent=true` to choose the mode: `type` lists all records of a single type; `folderId` lists all records in a folder (any type); and `recent=true` returns the account-wide recently-updated feed across all types, newest first. You may combine `type` with `folderId` to list a single type within a folder. The owner filters (`userId`, `orgId`, `clientId`, `scope`) further narrow the type and folder modes; the `recent` feed is standalone and ignores all filters. Each token only sees the record types it is scoped to read. Requires the `records:r` scope. By default the response returns the indexed projection of each record; set `includePayload=true` to include full payloads.
+     * Returns a paginated list of records in your account as a `{data, nextCursor}` page. Supply exactly one of `type`, `folderId`, or `recent=true` to choose the mode: `type` lists all records of a single type; `folderId` lists all records in a folder (any type); and `recent=true` returns the account-wide recently-updated feed across all types, newest first. You may combine `type` with `folderId` to list a single type within a folder. The owner filters (`userId`, `scope`) further narrow the type and folder modes; the `recent` feed is standalone and ignores all filters. Each token only sees the record types it is scoped to read. Requires the `records:r` scope. By default the response returns the indexed projection of each record; set `includePayload=true` to include full payloads.
      *
      * @param {Vectros.ListRecordsRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -251,8 +251,6 @@ export class RecordsClient {
      *         type: "intake_form",
      *         folderId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
      *         userId: "550e8400-e29b-41d4-a716-446655440000",
-     *         orgId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-     *         clientId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
      *         scope: "group:eng-team",
      *         startFrom: "550e8400-e29b-41d4-a716-446655440000"
      *     })
@@ -268,24 +266,11 @@ export class RecordsClient {
         request: Vectros.ListRecordsRequest = {},
         requestOptions?: RecordsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.RecordPage>> {
-        const {
-            type: type_,
-            folderId,
-            userId,
-            orgId,
-            clientId,
-            scope,
-            startFrom,
-            limit,
-            includePayload,
-            recent,
-        } = request;
+        const { type: type_, folderId, userId, scope, startFrom, limit, includePayload, recent } = request;
         const _queryParams: Record<string, unknown> = {
             type: type_,
             folderId,
             userId,
-            orgId,
-            clientId,
             scope,
             startFrom,
             limit,
@@ -645,7 +630,7 @@ export class RecordsClient {
     }
 
     /**
-     * Partially updates a record using an RFC 7386 JSON Merge Patch. The `payload` object is deep-merged into the existing payload: keys you send overwrite (recursing into nested objects), a key set to null is deleted, and keys you omit are left unchanged — so you can change a single field without re-sending the rest (unlike the full-replacement PUT). Top-level fields (`status`, `folderId`, `userId`, `orgId`, `clientId`) are set when present and left unchanged when omitted; sending a top-level field as null is rejected (clearing a top-level field is not supported in this release — omit it instead). `typeName`, `schemaId`, `externalId`, and `indexMode` are immutable and rejected if present. The merged result is validated against the schema. Pass `expectedVersion` to make the patch conditional (optimistic concurrency, 409 on conflict). Requires the `records:u:<type>` scope.
+     * Partially updates a record using an RFC 7386 JSON Merge Patch. The `payload` object is deep-merged into the existing payload: keys you send overwrite (recursing into nested objects), a key set to null is deleted, and keys you omit are left unchanged — so you can change a single field without re-sending the rest (unlike the full-replacement PUT). Top-level fields (`status`, `folderId`, `userId`, `scopes`) are set when present and left unchanged when omitted; sending a top-level field as null is rejected (clearing a top-level field is not supported in this release — omit it instead). `typeName`, `schemaId`, `externalId`, and `indexMode` are immutable and rejected if present. The merged result is validated against the schema. Pass `expectedVersion` to make the patch conditional (optimistic concurrency, 409 on conflict). Requires the `records:u:<type>` scope.
      *
      * @param {Vectros.PatchRecordRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.

@@ -3,11 +3,11 @@
 import type * as Vectros from "../index.js";
 
 /**
- * A page of organizations as a `{data, nextCursor}` envelope. `nextCursor` is an opaque cursor — pass it back as `startFrom` to fetch the next page, or null when no more pages remain.
+ * A page of scope-namespace registrations as a `{data, nextCursor}` envelope. `nextCursor` is an opaque cursor — pass it back as `startFrom` to fetch the next page, or null when no more pages remain.
  */
-export interface OrgPage {
+export interface NamespacePage {
     /** The items on this page, in the endpoint's natural order. Empty when there are no results. */
-    data?: Vectros.OrgResponse[] | undefined;
+    data?: Vectros.NamespaceResponse[] | undefined;
     /** An opaque cursor for the next page. Pass it back as the `startFrom` query parameter to continue paging; null when there are no more results. Treat it as opaque — do not parse or construct it. */
     nextCursor?: (string | null) | undefined;
 }

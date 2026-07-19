@@ -28,7 +28,7 @@ export interface SchemaResponse {
     storageProfile?: SchemaResponse.StorageProfile | undefined;
     /** Default search-index mode for this type's records: HYBRID, SEMANTIC, TEXT, or NONE (store-only, not searchable). */
     indexMode?: SchemaResponse.IndexMode | undefined;
-    /** Which typed surfaces may bind this schema (record, document, user, org, or client). Always present (it is required at write time). */
+    /** Which typed surfaces may bind this schema: `record`, `document`, `user`, or `entity` — identity entities in ANY namespace (`org`, `client`, or one you registered) bind under the single `entity` surface. Always present (it is required at write time). */
     allowedSurfaces?: SchemaResponse.AllowedSurfaces.Item[] | undefined;
     /** Whether this schema is active. */
     active?: boolean | undefined;
@@ -59,13 +59,12 @@ export namespace SchemaResponse {
     export type AllowedSurfaces = AllowedSurfaces.Item[];
 
     export namespace AllowedSurfaces {
-        /** Which typed surfaces may bind this schema (record, document, user, org, or client). Always present (it is required at write time). */
+        /** Which typed surfaces may bind this schema: `record`, `document`, `user`, or `entity` — identity entities in ANY namespace (`org`, `client`, or one you registered) bind under the single `entity` surface. Always present (it is required at write time). */
         export const Item = {
             Record: "record",
             Document: "document",
             User: "user",
-            Org: "org",
-            Client: "client",
+            Entity: "entity",
         } as const;
         export type Item = (typeof Item)[keyof typeof Item];
     }

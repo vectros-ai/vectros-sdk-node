@@ -25,40 +25,32 @@ export class IdentityClient {
     }
 
     /**
-     * Returns a paginated list of clients in your account. Narrow the results with `orgId` or `userId`, or use `externalId` for an exact lookup by your own identifier. For schema-bound clients, you can also query by a schema-declared lookup field using `type`, `field`, and one lookup mode (`value` for equality, `from`/`to` for a range, or `prefix`). The response is a `{data, nextCursor}` envelope; pass `nextCursor` back as `startFrom` to fetch the next page. Requires the `clients:r` scope.
+     * Returns a paginated list of entities in a namespace. Filter by `userId` (entities owned by a user), by `externalId` (exact lookup by your own identifier), or by `scope` (`scope=<namespace>:<value>` — entities that have that value as a parent, e.g. `scope=org:6ba7...`). Naming this namespace's own name in `scope` resolves the entity itself (`scope=team:6ba7...` on `/v1/entities/team` returns that team), since an entity is always in its own scope. `userId` and `scope` can be combined to narrow on both dimensions at once; `externalId` identifies a single entity and cannot be combined with either. Requires the `entities:r:<namespace>` scope.
      *
-     * @param {Vectros.ListClientsRequest} request
+     * @param {Vectros.ListEntitiesRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @example
-     *     await client.identity.listClients({
-     *         orgId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-     *         userId: "550e8400-e29b-41d4-a716-446655440000",
-     *         externalId: "patient_789",
-     *         startFrom: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-     *         type: "client_v1",
-     *         field: "industry",
-     *         value: "healthcare",
-     *         prefix: "health"
+     *     await client.identity.listEntities({
+     *         namespace: "team"
      *     })
      */
-    public listClients(
-        request: Vectros.ListClientsRequest = {},
+    public listEntities(
+        request: Vectros.ListEntitiesRequest,
         requestOptions?: IdentityClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.ClientPage> {
-        return core.HttpResponsePromise.fromPromise(this.__listClients(request, requestOptions));
+    ): core.HttpResponsePromise<Vectros.EntityPage> {
+        return core.HttpResponsePromise.fromPromise(this.__listEntities(request, requestOptions));
     }
 
-    private async __listClients(
-        request: Vectros.ListClientsRequest = {},
+    private async __listEntities(
+        request: Vectros.ListEntitiesRequest,
         requestOptions?: IdentityClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.ClientPage>> {
+    ): Promise<core.WithRawResponse<Vectros.EntityPage>> {
         const {
-            orgId,
+            namespace,
             userId,
             externalId,
-            startFrom,
-            limit,
+            scope,
             type: type_,
             field,
             value,
@@ -66,13 +58,13 @@ export class IdentityClient {
             to,
             prefix,
             order,
-        } = request;
-        const _queryParams: Record<string, unknown> = {
-            orgId,
-            userId,
-            externalId,
             startFrom,
             limit,
+        } = request;
+        const _queryParams: Record<string, unknown> = {
+            userId,
+            externalId,
+            scope,
             type: type_,
             field,
             value,
@@ -80,6 +72,8 @@ export class IdentityClient {
             to,
             prefix,
             order: order != null ? order : undefined,
+            startFrom,
+            limit,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -91,7 +85,7 @@ export class IdentityClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                "v1/clients",
+                `v1/entities/${core.url.encodePathParam(namespace)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -107,7 +101,7 @@ export class IdentityClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as Vectros.ClientPage, rawResponse: _response.rawResponse };
+            return { data: _response.body as Vectros.EntityPage, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
@@ -118,13 +112,13 @@ export class IdentityClient {
             });
         }
 
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/clients");
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/entities/{namespace}");
     }
 
     /**
-     * Creates a new client identity in your account. This call is idempotent on `externalId`: if a client with the same `externalId` already exists, the existing record is returned instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing client was returned) tells the two apart. To overwrite an existing client's content instead of returning it unchanged, set `?upsert=true` (this also requires the `clients:u` scope). Requires the `clients:c` scope.
+     * Creates a new entity in the given namespace. This call is idempotent on `externalId` within the namespace: if an entity with the same `externalId` already exists, the existing record is returned instead of creating a duplicate (`created: false`, HTTP 200). To overwrite an existing entity's content instead of returning it unchanged, set `?upsert=true` (also requires the `entities:u:<namespace>` scope). The namespace must be entity-backed (`org`/`client`, or registered via `POST /v1/namespaces`). Requires the `entities:c:<namespace>` scope.
      *
-     * @param {Vectros.CreateClientRequest} request
+     * @param {Vectros.CreateEntityRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
@@ -132,24 +126,25 @@ export class IdentityClient {
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
-     *     await client.identity.createClient({
+     *     await client.identity.createEntity({
+     *         namespace: "team",
      *         body: {
-     *             externalId: "patient_789"
+     *             externalId: "team_eng_platform"
      *         }
      *     })
      */
-    public createClient(
-        request: Vectros.CreateClientRequest,
+    public createEntity(
+        request: Vectros.CreateEntityRequest,
         requestOptions?: IdentityClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.ClientResponse> {
-        return core.HttpResponsePromise.fromPromise(this.__createClient(request, requestOptions));
+    ): core.HttpResponsePromise<Vectros.EntityResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__createEntity(request, requestOptions));
     }
 
-    private async __createClient(
-        request: Vectros.CreateClientRequest,
+    private async __createEntity(
+        request: Vectros.CreateEntityRequest,
         requestOptions?: IdentityClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.ClientResponse>> {
-        const { upsert, body: _body } = request;
+    ): Promise<core.WithRawResponse<Vectros.EntityResponse>> {
+        const { namespace, upsert, body: _body } = request;
         const _queryParams: Record<string, unknown> = {
             upsert,
         };
@@ -163,7 +158,7 @@ export class IdentityClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                "v1/clients",
+                `v1/entities/${core.url.encodePathParam(namespace)}`,
             ),
             method: "POST",
             headers: _headers,
@@ -182,7 +177,7 @@ export class IdentityClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as Vectros.ClientResponse, rawResponse: _response.rawResponse };
+            return { data: _response.body as Vectros.EntityResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
@@ -202,567 +197,35 @@ export class IdentityClient {
             }
         }
 
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/clients");
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/entities/{namespace}");
     }
 
     /**
-     * Returns a single client by its Vectros-assigned UUID. Requires the `clients:r` scope.
+     * Retrieves a single entity by its namespace and Vectros-assigned ID. Requires the `entities:r:<namespace>` scope.
      *
-     * @param {Vectros.GetClientRequest} request
+     * @param {Vectros.GetEntityRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
      *
      * @example
-     *     await client.identity.getClient({
-     *         id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
-     *     })
-     */
-    public getClient(
-        request: Vectros.GetClientRequest,
-        requestOptions?: IdentityClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.ClientResponse> {
-        return core.HttpResponsePromise.fromPromise(this.__getClient(request, requestOptions));
-    }
-
-    private async __getClient(
-        request: Vectros.GetClientRequest,
-        requestOptions?: IdentityClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.ClientResponse>> {
-        const { id } = request;
-        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
-        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
-            _authRequest.headers,
-            this._options?.headers,
-            requestOptions?.headers,
-        );
-        const _response = await core.fetcher({
-            url: core.url.join(
-                (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
-                `v1/clients/${core.url.encodePathParam(id)}`,
-            ),
-            method: "GET",
-            headers: _headers,
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
-            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
-            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
-            abortSignal: requestOptions?.abortSignal,
-            fetchFn: this._options?.fetch,
-            logging: this._options.logging,
-        });
-        if (_response.ok) {
-            return { data: _response.body as Vectros.ClientResponse, rawResponse: _response.rawResponse };
-        }
-
-        if (_response.error.reason === "status-code") {
-            switch (_response.error.statusCode) {
-                case 404:
-                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
-                default:
-                    throw new errors.VectrosError({
-                        statusCode: _response.error.statusCode,
-                        body: _response.error.body,
-                        rawResponse: _response.rawResponse,
-                    });
-            }
-        }
-
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/clients/{id}");
-    }
-
-    /**
-     * Updates mutable fields on an existing client. Omitted fields are preserved (a null does not clear a field); when `payload` is supplied it replaces the stored payload in full rather than being deep-merged. Requires the `clients:u` scope.
-     *
-     * @param {Vectros.UpdateClientRequest} request
-     * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
-     *
-     * @throws {@link Vectros.NotFoundError}
-     * @throws {@link Vectros.TooManyRequestsError}
-     *
-     * @example
-     *     await client.identity.updateClient({
-     *         id: "id",
-     *         body: {
-     *             externalId: "patient_789"
-     *         }
-     *     })
-     */
-    public updateClient(
-        request: Vectros.UpdateClientRequest,
-        requestOptions?: IdentityClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.ClientResponse> {
-        return core.HttpResponsePromise.fromPromise(this.__updateClient(request, requestOptions));
-    }
-
-    private async __updateClient(
-        request: Vectros.UpdateClientRequest,
-        requestOptions?: IdentityClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.ClientResponse>> {
-        const { id, body: _body } = request;
-        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
-        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
-            _authRequest.headers,
-            this._options?.headers,
-            requestOptions?.headers,
-        );
-        const _response = await core.fetcher({
-            url: core.url.join(
-                (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
-                `v1/clients/${core.url.encodePathParam(id)}`,
-            ),
-            method: "PUT",
-            headers: _headers,
-            contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
-            requestType: "json",
-            body: _body,
-            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
-            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
-            abortSignal: requestOptions?.abortSignal,
-            fetchFn: this._options?.fetch,
-            logging: this._options.logging,
-        });
-        if (_response.ok) {
-            return { data: _response.body as Vectros.ClientResponse, rawResponse: _response.rawResponse };
-        }
-
-        if (_response.error.reason === "status-code") {
-            switch (_response.error.statusCode) {
-                case 404:
-                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
-                case 429:
-                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
-                default:
-                    throw new errors.VectrosError({
-                        statusCode: _response.error.statusCode,
-                        body: _response.error.body,
-                        rawResponse: _response.rawResponse,
-                    });
-            }
-        }
-
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "PUT", "/v1/clients/{id}");
-    }
-
-    /**
-     * Permanently deletes the client. This action cannot be undone. Requires the `clients:d` scope.
-     *
-     * @param {Vectros.DeleteClientRequest} request
-     * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
-     *
-     * @throws {@link Vectros.NotFoundError}
-     * @throws {@link Vectros.TooManyRequestsError}
-     *
-     * @example
-     *     await client.identity.deleteClient({
-     *         id: "id"
-     *     })
-     */
-    public deleteClient(
-        request: Vectros.DeleteClientRequest,
-        requestOptions?: IdentityClient.RequestOptions,
-    ): core.HttpResponsePromise<void> {
-        return core.HttpResponsePromise.fromPromise(this.__deleteClient(request, requestOptions));
-    }
-
-    private async __deleteClient(
-        request: Vectros.DeleteClientRequest,
-        requestOptions?: IdentityClient.RequestOptions,
-    ): Promise<core.WithRawResponse<void>> {
-        const { id } = request;
-        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
-        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
-            _authRequest.headers,
-            this._options?.headers,
-            requestOptions?.headers,
-        );
-        const _response = await core.fetcher({
-            url: core.url.join(
-                (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
-                `v1/clients/${core.url.encodePathParam(id)}`,
-            ),
-            method: "DELETE",
-            headers: _headers,
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
-            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
-            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
-            abortSignal: requestOptions?.abortSignal,
-            fetchFn: this._options?.fetch,
-            logging: this._options.logging,
-        });
-        if (_response.ok) {
-            return { data: undefined, rawResponse: _response.rawResponse };
-        }
-
-        if (_response.error.reason === "status-code") {
-            switch (_response.error.statusCode) {
-                case 404:
-                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
-                case 429:
-                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
-                default:
-                    throw new errors.VectrosError({
-                        statusCode: _response.error.statusCode,
-                        body: _response.error.body,
-                        rawResponse: _response.rawResponse,
-                    });
-            }
-        }
-
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "DELETE", "/v1/clients/{id}");
-    }
-
-    /**
-     * Body-based equivalent of the `type`/`field`/`value` lookup on `GET /v1/clients`. Use this when looking up by a sensitive (blind-indexed) field: the value travels in the request body rather than the URL. The `GET` list rejects a sensitive field's value and directs you here. The response is a `{data, nextCursor}` envelope. Requires the `clients:r` scope.
-     *
-     * @param {Vectros.IdentityLookupRequest} request
-     * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
-     *
-     * @throws {@link Vectros.BadRequestError}
-     * @throws {@link Vectros.TooManyRequestsError}
-     *
-     * @example
-     *     await client.identity.lookupClients({
-     *         type: "person_v1",
-     *         field: "ssn"
-     *     })
-     */
-    public lookupClients(
-        request: Vectros.IdentityLookupRequest,
-        requestOptions?: IdentityClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.ClientPage> {
-        return core.HttpResponsePromise.fromPromise(this.__lookupClients(request, requestOptions));
-    }
-
-    private async __lookupClients(
-        request: Vectros.IdentityLookupRequest,
-        requestOptions?: IdentityClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.ClientPage>> {
-        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
-        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
-            _authRequest.headers,
-            this._options?.headers,
-            requestOptions?.headers,
-        );
-        const _response = await core.fetcher({
-            url: core.url.join(
-                (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
-                "v1/clients/lookup",
-            ),
-            method: "POST",
-            headers: _headers,
-            contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
-            requestType: "json",
-            body: request,
-            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
-            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
-            abortSignal: requestOptions?.abortSignal,
-            fetchFn: this._options?.fetch,
-            logging: this._options.logging,
-        });
-        if (_response.ok) {
-            return { data: _response.body as Vectros.ClientPage, rawResponse: _response.rawResponse };
-        }
-
-        if (_response.error.reason === "status-code") {
-            switch (_response.error.statusCode) {
-                case 400:
-                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
-                case 429:
-                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
-                default:
-                    throw new errors.VectrosError({
-                        statusCode: _response.error.statusCode,
-                        body: _response.error.body,
-                        rawResponse: _response.rawResponse,
-                    });
-            }
-        }
-
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/clients/lookup");
-    }
-
-    /**
-     * Returns the audit trail of changes to a client, newest first. Identity auditing is always on, so this history is always available; sensitive field values are redacted in each version. The response is a `{data, nextCursor}` envelope. Requires the `clients:r` scope.
-     *
-     * @param {Vectros.GetClientVersionsRequest} request
-     * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
-     *
-     * @throws {@link Vectros.NotFoundError}
-     *
-     * @example
-     *     await client.identity.getClientVersions({
-     *         id: "id"
-     *     })
-     */
-    public getClientVersions(
-        request: Vectros.GetClientVersionsRequest,
-        requestOptions?: IdentityClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.ModelDataVersionPage> {
-        return core.HttpResponsePromise.fromPromise(this.__getClientVersions(request, requestOptions));
-    }
-
-    private async __getClientVersions(
-        request: Vectros.GetClientVersionsRequest,
-        requestOptions?: IdentityClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.ModelDataVersionPage>> {
-        const { id, startFrom } = request;
-        const _queryParams: Record<string, unknown> = {
-            startFrom,
-        };
-        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
-        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
-            _authRequest.headers,
-            this._options?.headers,
-            requestOptions?.headers,
-        );
-        const _response = await core.fetcher({
-            url: core.url.join(
-                (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
-                `v1/clients/${core.url.encodePathParam(id)}/versions`,
-            ),
-            method: "GET",
-            headers: _headers,
-            queryString: core.url
-                .queryBuilder()
-                .addMany(_queryParams)
-                .mergeAdditional(requestOptions?.queryParams)
-                .build(),
-            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
-            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
-            abortSignal: requestOptions?.abortSignal,
-            fetchFn: this._options?.fetch,
-            logging: this._options.logging,
-        });
-        if (_response.ok) {
-            return { data: _response.body as Vectros.ModelDataVersionPage, rawResponse: _response.rawResponse };
-        }
-
-        if (_response.error.reason === "status-code") {
-            switch (_response.error.statusCode) {
-                case 404:
-                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
-                default:
-                    throw new errors.VectrosError({
-                        statusCode: _response.error.statusCode,
-                        body: _response.error.body,
-                        rawResponse: _response.rawResponse,
-                    });
-            }
-        }
-
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/clients/{id}/versions");
-    }
-
-    /**
-     * Returns a paginated list of organizations in your account. Filter by `userId` to return only the organizations owned by a specific user, or by `externalId` for an exact lookup using your own identifier. You can also query schema-declared lookup fields by supplying `type` and `field` together with one lookup mode (`value` for equality, `from`/`to` for a range, or `prefix`). Requires the `orgs:r` scope.
-     *
-     * @param {Vectros.ListOrgsRequest} request
-     * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
-     *
-     * @example
-     *     await client.identity.listOrgs({
-     *         userId: "550e8400-e29b-41d4-a716-446655440000",
-     *         externalId: "clinic_001",
-     *         startFrom: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-     *         type: "org_v1",
-     *         field: "region",
-     *         value: "us-east",
-     *         prefix: "us-"
-     *     })
-     */
-    public listOrgs(
-        request: Vectros.ListOrgsRequest = {},
-        requestOptions?: IdentityClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.OrgPage> {
-        return core.HttpResponsePromise.fromPromise(this.__listOrgs(request, requestOptions));
-    }
-
-    private async __listOrgs(
-        request: Vectros.ListOrgsRequest = {},
-        requestOptions?: IdentityClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.OrgPage>> {
-        const {
-            userId,
-            externalId,
-            startFrom,
-            limit,
-            type: type_,
-            field,
-            value,
-            from: from_,
-            to,
-            prefix,
-            order,
-        } = request;
-        const _queryParams: Record<string, unknown> = {
-            userId,
-            externalId,
-            startFrom,
-            limit,
-            type: type_,
-            field,
-            value,
-            from: from_,
-            to,
-            prefix,
-            order: order != null ? order : undefined,
-        };
-        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
-        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
-            _authRequest.headers,
-            this._options?.headers,
-            requestOptions?.headers,
-        );
-        const _response = await core.fetcher({
-            url: core.url.join(
-                (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
-                "v1/orgs",
-            ),
-            method: "GET",
-            headers: _headers,
-            queryString: core.url
-                .queryBuilder()
-                .addMany(_queryParams)
-                .mergeAdditional(requestOptions?.queryParams)
-                .build(),
-            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
-            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
-            abortSignal: requestOptions?.abortSignal,
-            fetchFn: this._options?.fetch,
-            logging: this._options.logging,
-        });
-        if (_response.ok) {
-            return { data: _response.body as Vectros.OrgPage, rawResponse: _response.rawResponse };
-        }
-
-        if (_response.error.reason === "status-code") {
-            throw new errors.VectrosError({
-                statusCode: _response.error.statusCode,
-                body: _response.error.body,
-                rawResponse: _response.rawResponse,
-            });
-        }
-
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/orgs");
-    }
-
-    /**
-     * Creates a new organization in your account. This call is idempotent on `externalId`: if an organization with the same `externalId` already exists, the existing record is returned instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing organization was returned) tells the two apart. To overwrite an existing organization's content instead of returning it unchanged, set `?upsert=true` (this also requires the `orgs:u` scope). Requires the `orgs:c` scope.
-     *
-     * @param {Vectros.CreateOrgRequest} request
-     * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
-     *
-     * @throws {@link Vectros.BadRequestError}
-     * @throws {@link Vectros.ForbiddenError}
-     * @throws {@link Vectros.TooManyRequestsError}
-     *
-     * @example
-     *     await client.identity.createOrg({
-     *         body: {
-     *             externalId: "clinic_001"
-     *         }
-     *     })
-     */
-    public createOrg(
-        request: Vectros.CreateOrgRequest,
-        requestOptions?: IdentityClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.OrgResponse> {
-        return core.HttpResponsePromise.fromPromise(this.__createOrg(request, requestOptions));
-    }
-
-    private async __createOrg(
-        request: Vectros.CreateOrgRequest,
-        requestOptions?: IdentityClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.OrgResponse>> {
-        const { upsert, body: _body } = request;
-        const _queryParams: Record<string, unknown> = {
-            upsert,
-        };
-        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
-        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
-            _authRequest.headers,
-            this._options?.headers,
-            requestOptions?.headers,
-        );
-        const _response = await core.fetcher({
-            url: core.url.join(
-                (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
-                "v1/orgs",
-            ),
-            method: "POST",
-            headers: _headers,
-            contentType: "application/json",
-            queryString: core.url
-                .queryBuilder()
-                .addMany(_queryParams)
-                .mergeAdditional(requestOptions?.queryParams)
-                .build(),
-            requestType: "json",
-            body: _body,
-            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
-            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
-            abortSignal: requestOptions?.abortSignal,
-            fetchFn: this._options?.fetch,
-            logging: this._options.logging,
-        });
-        if (_response.ok) {
-            return { data: _response.body as Vectros.OrgResponse, rawResponse: _response.rawResponse };
-        }
-
-        if (_response.error.reason === "status-code") {
-            switch (_response.error.statusCode) {
-                case 400:
-                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
-                case 403:
-                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
-                case 429:
-                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
-                default:
-                    throw new errors.VectrosError({
-                        statusCode: _response.error.statusCode,
-                        body: _response.error.body,
-                        rawResponse: _response.rawResponse,
-                    });
-            }
-        }
-
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/orgs");
-    }
-
-    /**
-     * Retrieves a single organization by its Vectros-assigned ID, returning its current name, status, payload, and schema binding. Requires the `orgs:r` scope.
-     *
-     * @param {Vectros.GetOrgRequest} request
-     * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
-     *
-     * @throws {@link Vectros.NotFoundError}
-     *
-     * @example
-     *     await client.identity.getOrg({
+     *     await client.identity.getEntity({
+     *         namespace: "team",
      *         id: "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
      *     })
      */
-    public getOrg(
-        request: Vectros.GetOrgRequest,
+    public getEntity(
+        request: Vectros.GetEntityRequest,
         requestOptions?: IdentityClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.OrgResponse> {
-        return core.HttpResponsePromise.fromPromise(this.__getOrg(request, requestOptions));
+    ): core.HttpResponsePromise<Vectros.EntityResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__getEntity(request, requestOptions));
     }
 
-    private async __getOrg(
-        request: Vectros.GetOrgRequest,
+    private async __getEntity(
+        request: Vectros.GetEntityRequest,
         requestOptions?: IdentityClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.OrgResponse>> {
-        const { id } = request;
+    ): Promise<core.WithRawResponse<Vectros.EntityResponse>> {
+        const { namespace, id } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -773,7 +236,7 @@ export class IdentityClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/orgs/${core.url.encodePathParam(id)}`,
+                `v1/entities/${core.url.encodePathParam(namespace)}/${core.url.encodePathParam(id)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -785,7 +248,7 @@ export class IdentityClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as Vectros.OrgResponse, rawResponse: _response.rawResponse };
+            return { data: _response.body as Vectros.EntityResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
@@ -801,38 +264,39 @@ export class IdentityClient {
             }
         }
 
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/orgs/{id}");
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/entities/{namespace}/{id}");
     }
 
     /**
-     * Updates the mutable fields of an organization. Omitted fields are preserved (a null value does not clear a field), and the `payload` object is replaced in full when supplied rather than deep-merged. Requires the `orgs:u` scope.
+     * Updates the mutable fields of an entity. Omitted fields are preserved (a null value does not clear a field), and the `payload` object is replaced in full when supplied. Providing `scopes` replaces the entity's parent edges. Requires the `entities:u:<namespace>` scope.
      *
-     * @param {Vectros.UpdateOrgRequest} request
+     * @param {Vectros.UpdateEntityRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
-     *     await client.identity.updateOrg({
+     *     await client.identity.updateEntity({
+     *         namespace: "team",
      *         id: "id",
      *         body: {
-     *             externalId: "clinic_001"
+     *             externalId: "team_eng_platform"
      *         }
      *     })
      */
-    public updateOrg(
-        request: Vectros.UpdateOrgRequest,
+    public updateEntity(
+        request: Vectros.UpdateEntityRequest,
         requestOptions?: IdentityClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.OrgResponse> {
-        return core.HttpResponsePromise.fromPromise(this.__updateOrg(request, requestOptions));
+    ): core.HttpResponsePromise<Vectros.EntityResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__updateEntity(request, requestOptions));
     }
 
-    private async __updateOrg(
-        request: Vectros.UpdateOrgRequest,
+    private async __updateEntity(
+        request: Vectros.UpdateEntityRequest,
         requestOptions?: IdentityClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.OrgResponse>> {
-        const { id, body: _body } = request;
+    ): Promise<core.WithRawResponse<Vectros.EntityResponse>> {
+        const { namespace, id, body: _body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -843,7 +307,7 @@ export class IdentityClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/orgs/${core.url.encodePathParam(id)}`,
+                `v1/entities/${core.url.encodePathParam(namespace)}/${core.url.encodePathParam(id)}`,
             ),
             method: "PUT",
             headers: _headers,
@@ -858,7 +322,7 @@ export class IdentityClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as Vectros.OrgResponse, rawResponse: _response.rawResponse };
+            return { data: _response.body as Vectros.EntityResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
@@ -876,35 +340,36 @@ export class IdentityClient {
             }
         }
 
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "PUT", "/v1/orgs/{id}");
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "PUT", "/v1/entities/{namespace}/{id}");
     }
 
     /**
-     * Permanently deletes an organization. This action cannot be undone. Requires the `orgs:d` scope.
+     * Permanently deletes an entity. This action cannot be undone. Requires the `entities:d:<namespace>` scope.
      *
-     * @param {Vectros.DeleteOrgRequest} request
+     * @param {Vectros.DeleteEntityRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
-     *     await client.identity.deleteOrg({
+     *     await client.identity.deleteEntity({
+     *         namespace: "team",
      *         id: "id"
      *     })
      */
-    public deleteOrg(
-        request: Vectros.DeleteOrgRequest,
+    public deleteEntity(
+        request: Vectros.DeleteEntityRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): core.HttpResponsePromise<void> {
-        return core.HttpResponsePromise.fromPromise(this.__deleteOrg(request, requestOptions));
+        return core.HttpResponsePromise.fromPromise(this.__deleteEntity(request, requestOptions));
     }
 
-    private async __deleteOrg(
-        request: Vectros.DeleteOrgRequest,
+    private async __deleteEntity(
+        request: Vectros.DeleteEntityRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<void>> {
-        const { id } = request;
+        const { namespace, id } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -915,7 +380,7 @@ export class IdentityClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/orgs/${core.url.encodePathParam(id)}`,
+                `v1/entities/${core.url.encodePathParam(namespace)}/${core.url.encodePathParam(id)}`,
             ),
             method: "DELETE",
             headers: _headers,
@@ -945,35 +410,44 @@ export class IdentityClient {
             }
         }
 
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "DELETE", "/v1/orgs/{id}");
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "DELETE",
+            "/v1/entities/{namespace}/{id}",
+        );
     }
 
     /**
-     * Looks up organizations by a schema-declared field value, with the search criteria sent in the request body instead of the URL. Use this when looking up by a sensitive field: the value travels in the body and is never exposed in the URL. This is the body-based equivalent of the `type`/`field`/`value` lookup on `GET /v1/orgs`, which rejects sensitive-field values and directs you here. Returns a `{data, nextCursor}` envelope. Requires the `orgs:r` scope.
+     * Looks up entities in a namespace by a schema-declared field value, with the criteria in the request body instead of the URL. Use this for a sensitive field: the value travels in the body and never appears in the URL. Body equivalent of the `type`/`field`/`value` lookup on `GET /v1/entities/{namespace}`, which rejects sensitive-field values and directs you here. Requires the `entities:r:<namespace>` scope.
      *
-     * @param {Vectros.IdentityLookupRequest} request
+     * @param {Vectros.LookupEntitiesRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
-     *     await client.identity.lookupOrgs({
-     *         type: "person_v1",
-     *         field: "ssn"
+     *     await client.identity.lookupEntities({
+     *         namespace: "team",
+     *         body: {
+     *             type: "person_v1",
+     *             field: "ssn"
+     *         }
      *     })
      */
-    public lookupOrgs(
-        request: Vectros.IdentityLookupRequest,
+    public lookupEntities(
+        request: Vectros.LookupEntitiesRequest,
         requestOptions?: IdentityClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.OrgPage> {
-        return core.HttpResponsePromise.fromPromise(this.__lookupOrgs(request, requestOptions));
+    ): core.HttpResponsePromise<Vectros.EntityPage> {
+        return core.HttpResponsePromise.fromPromise(this.__lookupEntities(request, requestOptions));
     }
 
-    private async __lookupOrgs(
-        request: Vectros.IdentityLookupRequest,
+    private async __lookupEntities(
+        request: Vectros.LookupEntitiesRequest,
         requestOptions?: IdentityClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.OrgPage>> {
+    ): Promise<core.WithRawResponse<Vectros.EntityPage>> {
+        const { namespace, body: _body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -984,14 +458,14 @@ export class IdentityClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                "v1/orgs/lookup",
+                `v1/entities/${core.url.encodePathParam(namespace)}/lookup`,
             ),
             method: "POST",
             headers: _headers,
             contentType: "application/json",
             queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
             requestType: "json",
-            body: request,
+            body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -999,7 +473,7 @@ export class IdentityClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as Vectros.OrgPage, rawResponse: _response.rawResponse };
+            return { data: _response.body as Vectros.EntityPage, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
@@ -1017,34 +491,40 @@ export class IdentityClient {
             }
         }
 
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/orgs/lookup");
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/entities/{namespace}/lookup",
+        );
     }
 
     /**
-     * Returns the audit trail of changes made to an organization, newest first. Version history is always recorded for identity entities, and sensitive field values are redacted in the history. Requires the `orgs:r` scope.
+     * Returns the audit trail of changes made to an entity, newest first. Sensitive field values are redacted in the history. Requires the `entities:r:<namespace>` scope.
      *
-     * @param {Vectros.GetOrgVersionsRequest} request
+     * @param {Vectros.GetEntityVersionsRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
      *
      * @example
-     *     await client.identity.getOrgVersions({
+     *     await client.identity.getEntityVersions({
+     *         namespace: "team",
      *         id: "id"
      *     })
      */
-    public getOrgVersions(
-        request: Vectros.GetOrgVersionsRequest,
+    public getEntityVersions(
+        request: Vectros.GetEntityVersionsRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): core.HttpResponsePromise<Vectros.ModelDataVersionPage> {
-        return core.HttpResponsePromise.fromPromise(this.__getOrgVersions(request, requestOptions));
+        return core.HttpResponsePromise.fromPromise(this.__getEntityVersions(request, requestOptions));
     }
 
-    private async __getOrgVersions(
-        request: Vectros.GetOrgVersionsRequest,
+    private async __getEntityVersions(
+        request: Vectros.GetEntityVersionsRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.ModelDataVersionPage>> {
-        const { id, startFrom } = request;
+        const { namespace, id, startFrom } = request;
         const _queryParams: Record<string, unknown> = {
             startFrom,
         };
@@ -1058,7 +538,7 @@ export class IdentityClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/orgs/${core.url.encodePathParam(id)}/versions`,
+                `v1/entities/${core.url.encodePathParam(namespace)}/${core.url.encodePathParam(id)}/versions`,
             ),
             method: "GET",
             headers: _headers,
@@ -1090,7 +570,367 @@ export class IdentityClient {
             }
         }
 
-        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/orgs/{id}/versions");
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "GET",
+            "/v1/entities/{namespace}/{id}/versions",
+        );
+    }
+
+    /**
+     * Retrieves a single scope-namespace registration by name. The reserved built-ins `org` and `client` are always resolvable.
+     *
+     * @param {Vectros.GetNamespaceRequest} request
+     * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.NotFoundError}
+     *
+     * @example
+     *     await client.identity.getNamespace({
+     *         namespace: "team"
+     *     })
+     */
+    public getNamespace(
+        request: Vectros.GetNamespaceRequest,
+        requestOptions?: IdentityClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.NamespaceResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__getNamespace(request, requestOptions));
+    }
+
+    private async __getNamespace(
+        request: Vectros.GetNamespaceRequest,
+        requestOptions?: IdentityClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.NamespaceResponse>> {
+        const { namespace } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/namespaces/${core.url.encodePathParam(namespace)}`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.NamespaceResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/namespaces/{namespace}");
+    }
+
+    /**
+     * Updates the mutable fields (`entityBacked`, `defaultSchemaId`) of a registered namespace. The namespace name itself is immutable. Requires a root API key. The reserved built-ins cannot be updated.
+     *
+     * @param {Vectros.UpdateNamespaceRequest} request
+     * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     *
+     * @example
+     *     await client.identity.updateNamespace({
+     *         namespace: "team",
+     *         body: {
+     *             namespace: "team"
+     *         }
+     *     })
+     */
+    public updateNamespace(
+        request: Vectros.UpdateNamespaceRequest,
+        requestOptions?: IdentityClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.NamespaceResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__updateNamespace(request, requestOptions));
+    }
+
+    private async __updateNamespace(
+        request: Vectros.UpdateNamespaceRequest,
+        requestOptions?: IdentityClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.NamespaceResponse>> {
+        const { namespace, body: _body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/namespaces/${core.url.encodePathParam(namespace)}`,
+            ),
+            method: "PUT",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: _body,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.NamespaceResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "PUT", "/v1/namespaces/{namespace}");
+    }
+
+    /**
+     * Deletes a registered scope namespace. Requires a root API key. The reserved built-ins cannot be deleted. A namespace that still has entities cannot be deleted (409) — delete its entities first; this keeps them reachable by the account-teardown and erasure sweeps.
+     *
+     * @param {Vectros.DeleteNamespaceRequest} request
+     * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     *
+     * @example
+     *     await client.identity.deleteNamespace({
+     *         namespace: "team"
+     *     })
+     */
+    public deleteNamespace(
+        request: Vectros.DeleteNamespaceRequest,
+        requestOptions?: IdentityClient.RequestOptions,
+    ): core.HttpResponsePromise<void> {
+        return core.HttpResponsePromise.fromPromise(this.__deleteNamespace(request, requestOptions));
+    }
+
+    private async __deleteNamespace(
+        request: Vectros.DeleteNamespaceRequest,
+        requestOptions?: IdentityClient.RequestOptions,
+    ): Promise<core.WithRawResponse<void>> {
+        const { namespace } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/namespaces/${core.url.encodePathParam(namespace)}`,
+            ),
+            method: "DELETE",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: undefined, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "DELETE", "/v1/namespaces/{namespace}");
+    }
+
+    /**
+     * Returns the scope namespaces registered in your account, with the reserved built-ins `org` and `client` listed first. Returns a `{data, nextCursor}` envelope.
+     *
+     * @param {Vectros.ListNamespacesRequest} request
+     * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @example
+     *     await client.identity.listNamespaces()
+     */
+    public listNamespaces(
+        request: Vectros.ListNamespacesRequest = {},
+        requestOptions?: IdentityClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.NamespacePage> {
+        return core.HttpResponsePromise.fromPromise(this.__listNamespaces(request, requestOptions));
+    }
+
+    private async __listNamespaces(
+        request: Vectros.ListNamespacesRequest = {},
+        requestOptions?: IdentityClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.NamespacePage>> {
+        const { startFrom, limit } = request;
+        const _queryParams: Record<string, unknown> = {
+            startFrom,
+            limit,
+        };
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                "v1/namespaces",
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.NamespacePage, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            throw new errors.VectrosError({
+                statusCode: _response.error.statusCode,
+                body: _response.error.body,
+                rawResponse: _response.rawResponse,
+            });
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/namespaces");
+    }
+
+    /**
+     * Registers a new scope namespace and declares whether its values resolve to identity entities (`entityBacked`). Requires a root API key. The reserved names `org` and `client` are built in and cannot be registered.
+     *
+     * @param {Vectros.NamespaceRequest} request
+     * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     *
+     * @example
+     *     await client.identity.registerNamespace({
+     *         namespace: "team"
+     *     })
+     */
+    public registerNamespace(
+        request: Vectros.NamespaceRequest,
+        requestOptions?: IdentityClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.NamespaceResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__registerNamespace(request, requestOptions));
+    }
+
+    private async __registerNamespace(
+        request: Vectros.NamespaceRequest,
+        requestOptions?: IdentityClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.NamespaceResponse>> {
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                "v1/namespaces",
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: request,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.NamespaceResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/namespaces");
     }
 
     /**

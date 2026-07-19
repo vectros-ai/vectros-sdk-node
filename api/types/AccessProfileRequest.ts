@@ -12,7 +12,7 @@ export interface AccessProfileRequest {
     scopes?: Vectros.ScopeClause[] | undefined;
     /** Reference to a role within the same context that supplies this principal's scopes. Provide exactly one of `scopes` or `roleId` — setting both, or neither, returns a 400. Changes to the role's scopes take effect for all referencing profiles. */
     roleId?: string | undefined;
-    /** Optional per-context identity overrides. Only `orgId` and `clientId` may be overridden; any other key is rejected. An empty or omitted map applies no overrides — the base identity from the user or key record is used as-is. */
+    /** Optional per-context identity overrides, keyed by ownership namespace in `scope:<namespace>` form — `scope:org` and `scope:client` for the reserved namespaces, or any namespace you have registered (for example `scope:group`). At most two namespaces may be overridden; any other key is rejected. An empty or omitted map applies no overrides — the base identity from the user or key record is used as-is. */
     identityOverrides?: Record<string, unknown> | undefined;
     /** Profile lifecycle status. `active` permits token minting; `suspended` denies it (minting returns a uniform 403). Defaults to `active` when omitted. */
     status?: AccessProfileRequest.Status | undefined;

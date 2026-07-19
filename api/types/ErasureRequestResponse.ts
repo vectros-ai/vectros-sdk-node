@@ -10,8 +10,8 @@ export interface ErasureRequestResponse {
     requestId?: string | undefined;
     /** Current status of the job. `accepted` immediately after submission, then `processing` while the erasure runs, then either `completed` (the certificate is populated) or `failed` (see `failureReason`). */
     status?: ErasureRequestResponse.Status | undefined;
-    /** The kind of subject that was erased (`user`, `client`, or `org`), echoed back from your request. */
-    subjectType?: ErasureRequestResponse.SubjectType | undefined;
+    /** The kind of subject that was erased (`user`, or an ownership namespace such as `org` or `client`), echoed back from your request. */
+    subjectType?: string | undefined;
     /** The resolved platform id of the erased subject, echoed back once it has been resolved. */
     subjectId?: string | undefined;
     /** When the request was accepted, as an ISO-8601 UTC timestamp. */
@@ -32,11 +32,4 @@ export namespace ErasureRequestResponse {
         Failed: "failed",
     } as const;
     export type Status = (typeof Status)[keyof typeof Status];
-    /** The kind of subject that was erased (`user`, `client`, or `org`), echoed back from your request. */
-    export const SubjectType = {
-        User: "user",
-        Client: "client",
-        Org: "org",
-    } as const;
-    export type SubjectType = (typeof SubjectType)[keyof typeof SubjectType];
 }

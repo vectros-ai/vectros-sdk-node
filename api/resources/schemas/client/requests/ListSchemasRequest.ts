@@ -4,7 +4,7 @@
  * @example
  *     {
  *         userId: "550e8400-e29b-41d4-a716-446655440000",
- *         orgId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+ *         scope: "org:6ba7b810-9dad-11d1-80b4-00c04fd430c8",
  *         surface: "document",
  *         recordType: "intake_form",
  *         startFrom: "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
@@ -13,11 +13,11 @@
 export interface ListSchemasRequest {
     /** Filter to schemas owned by this user — the Vectros-assigned UUID of a user in your account. Use `GET /v1/users?externalId=` to resolve a UUID from your own external id. */
     userId?: string;
-    /** Filter to schemas owned by this organization — the Vectros-assigned UUID of an organization in your account. Use `GET /v1/orgs?externalId=` to resolve a UUID from your own external id. */
-    orgId?: string;
-    /** Filter to schemas bindable to this surface: record, document, user, org, or client. Returns only schemas whose allowed surfaces include the given one — useful for listing, say, document types separately from record types. The identity surfaces (user, org, client) are account-wide: filtering by one lists your account's identity schemas regardless of the calling context, whereas record and document list within the calling context. */
+    /** Filter to schemas carrying this scope value, as a single `namespace:value` entry — for example `org:6ba7b810-9dad-11d1-80b4-00c04fd430c8` or `group:eng-team`. `org` and `client` are built-in namespaces; others are custom scopes you define. Resolve a namespace's UUID from your own identifier with `GET /v1/entities/{namespace}?externalId=`. */
+    scope?: string;
+    /** Filter to schemas bindable to this surface: `record`, `document`, `user`, or `entity` — identity entities in any namespace (`org`, `client`, or one you registered) bind under the single `entity` surface. Returns only schemas whose allowed surfaces include the given one — useful for listing, say, document types separately from record types. The identity surfaces (`user`, `entity`) are account-wide: filtering by one lists your account's identity schemas regardless of the calling context, whereas `record` and `document` list within the calling context. */
     surface?: string;
-    /** Resolve the single schema for this record type — the natural handle for a schema, and the direct alternative to remembering its opaque id. Returns a one-element page, or an empty page if no such schema exists. Resolved in the calling context for record and document types; combine with `surface=user`, `org`, or `client` to resolve an account-wide identity schema. Mutually exclusive with `userId`/`orgId` — when supplied, `recordType` takes precedence. */
+    /** Resolve the single schema for this record type — the natural handle for a schema, and the direct alternative to remembering its opaque id. Returns a one-element page, or an empty page if no such schema exists. Resolved in the calling context for record and document types; combine with `surface=user` or `surface=entity` to resolve an account-wide identity schema. Takes precedence over `userId`; a `scope` filter still applies, so a resolved schema outside that scope returns an empty page. */
     recordType?: string;
     /** Pagination cursor. Pass the `nextCursor` from the previous page to fetch the next page; omit it for the first page. */
     startFrom?: string;

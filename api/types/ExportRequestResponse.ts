@@ -12,8 +12,8 @@ export interface ExportRequestResponse {
     status?: ExportRequestResponse.Status | undefined;
     /** Echoes the scope you requested: `tenant` for a full export of your account, or `subject` for a single end-subject's data. */
     scope?: ExportRequestResponse.Scope | undefined;
-    /** For a `subject`-scoped export, the kind of subject that was exported (echoed back). Null for a `tenant`-scoped export. */
-    subjectType?: ExportRequestResponse.SubjectType | undefined;
+    /** For a `subject`-scoped export, the kind of subject that was exported — `user`, or an ownership namespace such as `org` or `client` (echoed back). Null for a `tenant`-scoped export. */
+    subjectType?: string | undefined;
     /** For a `subject`-scoped export, the resolved platform id of the exported subject (echoed back). Null for a `tenant`-scoped export. */
     subjectId?: string | undefined;
     /** When the job was accepted, as an ISO-8601 UTC timestamp. */
@@ -44,11 +44,4 @@ export namespace ExportRequestResponse {
         Subject: "subject",
     } as const;
     export type Scope = (typeof Scope)[keyof typeof Scope];
-    /** For a `subject`-scoped export, the kind of subject that was exported (echoed back). Null for a `tenant`-scoped export. */
-    export const SubjectType = {
-        User: "user",
-        Client: "client",
-        Org: "org",
-    } as const;
-    export type SubjectType = (typeof SubjectType)[keyof typeof SubjectType];
 }

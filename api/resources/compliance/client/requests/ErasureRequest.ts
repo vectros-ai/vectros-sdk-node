@@ -7,9 +7,9 @@
  *     }
  */
 export interface ErasureRequest {
-    /** The kind of end-subject to erase: `user`, `client`, or `org`. */
-    subjectType: ErasureRequest.SubjectType;
-    /** The platform id of the subject to erase (the userId, clientId, or orgId returned when the subject was created). Provide exactly one of `subjectId` or `externalId`. */
+    /** The kind of end-subject to erase: `user` for a person, or an ownership namespace such as `org` or `client` — including a custom namespace you have defined. */
+    subjectType: string;
+    /** The platform id of the subject to erase (the Vectros-assigned id returned when the subject was created). Provide exactly one of `subjectId` or `externalId`. */
     subjectId?: string;
     /** Your own externalId for the subject, as an alternative to `subjectId`. Provide exactly one of `subjectId` or `externalId`. */
     externalId?: string;
@@ -20,13 +20,6 @@ export interface ErasureRequest {
 }
 
 export namespace ErasureRequest {
-    /** The kind of end-subject to erase: `user`, `client`, or `org`. */
-    export const SubjectType = {
-        User: "user",
-        Client: "client",
-        Org: "org",
-    } as const;
-    export type SubjectType = (typeof SubjectType)[keyof typeof SubjectType];
     /** How to handle the subject's audit and version-history trail. This governs only the audit data — the subject's records and documents are always erased regardless. `retain-redacted` (the default) keeps the compliance audit trail with sensitive data redacted; `purge` additionally hard-removes the audit history itself (subject to your legal obligations). */
     export const AuditDisposition = {
         RetainRedacted: "retain-redacted",

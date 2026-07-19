@@ -7,8 +7,8 @@
 export interface ExportRequest {
     /** What to export. `tenant` (the default) exports all of your account's data across the requested contexts; `subject` exports a single end-subject's data (for example, to satisfy a one-person data-portability request). Additional scopes may be added in the future. */
     scope?: ExportRequest.Scope;
-    /** The kind of subject to export: `user`, `client`, or `org`. Required only when `scope` is `subject`. */
-    subjectType?: ExportRequest.SubjectType;
+    /** The kind of subject to export: `user` for a person, or an ownership namespace such as `org` or `client` — including a custom namespace you have defined. Required only when `scope` is `subject`. */
+    subjectType?: string;
     /** The platform id of the subject to export. Used only when `scope` is `subject`. Provide exactly one of `subjectId` or `externalId`. */
     subjectId?: string;
     /** Your own externalId for the subject, as an alternative to `subjectId` (only when `scope` is `subject`). Provide exactly one of `subjectId` or `externalId`. */
@@ -28,13 +28,6 @@ export namespace ExportRequest {
         Subject: "subject",
     } as const;
     export type Scope = (typeof Scope)[keyof typeof Scope];
-    /** The kind of subject to export: `user`, `client`, or `org`. Required only when `scope` is `subject`. */
-    export const SubjectType = {
-        User: "user",
-        Client: "client",
-        Org: "org",
-    } as const;
-    export type SubjectType = (typeof SubjectType)[keyof typeof SubjectType];
     /** Serialization format of the export payload. NDJSON (newline-delimited JSON, one row per line) is currently the only supported format; more may be added in the future. The manifest carries a `formatVersion` so you can parse the payload in a forward-compatible way. */
     export const Format = {
         Ndjson: "ndjson",

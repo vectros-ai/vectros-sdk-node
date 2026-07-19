@@ -25,7 +25,7 @@ export class FoldersClient {
     }
 
     /**
-     * Returns a paginated list of your folders. Pass `parentFolderId` to list the direct children of a specific folder (tree navigation); omit it for a flat list across your account. You can also filter by owner using `userId`, `orgId`, or `clientId`. Results are returned as a `{data, nextCursor}` envelope — pass `nextCursor` as `startFrom` to fetch the next page. Requires the `folders:r` scope.
+     * Returns a paginated list of your folders. Pass `parentFolderId` to list the direct children of a specific folder (tree navigation); omit it for a flat list across your account. You can also filter by owner using `userId` or `scope`. Results are returned as a `{data, nextCursor}` envelope — pass `nextCursor` as `startFrom` to fetch the next page. Requires the `folders:r` scope.
      *
      * @param {Vectros.ListFoldersRequest} request
      * @param {FoldersClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -33,9 +33,8 @@ export class FoldersClient {
      * @example
      *     await client.folders.listFolders({
      *         parentFolderId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-     *         orgId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
      *         userId: "550e8400-e29b-41d4-a716-446655440000",
-     *         clientId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+     *         scope: "group:eng-team",
      *         startFrom: "fld_prev123"
      *     })
      */
@@ -50,12 +49,11 @@ export class FoldersClient {
         request: Vectros.ListFoldersRequest = {},
         requestOptions?: FoldersClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.FolderPage>> {
-        const { parentFolderId, orgId, userId, clientId, startFrom, limit } = request;
+        const { parentFolderId, userId, scope, startFrom, limit } = request;
         const _queryParams: Record<string, unknown> = {
             parentFolderId,
-            orgId,
             userId,
-            clientId,
+            scope,
             startFrom,
             limit,
         };
@@ -397,7 +395,7 @@ export class FoldersClient {
     }
 
     /**
-     * Partially updates a folder using an RFC 7386 JSON Merge Patch. The `name`, `description`, and ownership fields (`userId`, `orgId`, `clientId`) are applied when present and left unchanged when omitted; sending any of these as null is rejected, because clearing a field is not supported in this release (omit it instead). `slug` and `parentFolderId` are immutable — a folder cannot be re-slugged or moved via the API — and the request is rejected if either is present. Pass `expectedVersion` for optimistic concurrency (you get a 409 if the folder changed since you last read it). Requires the `folders:u` scope.
+     * Partially updates a folder using an RFC 7386 JSON Merge Patch. The `name`, `description`, and ownership fields (`userId`, `scopes`) are applied when present and left unchanged when omitted; sending any of these as null is rejected, because clearing a field is not supported in this release (omit it instead). `slug` and `parentFolderId` are immutable — a folder cannot be re-slugged or moved via the API — and the request is rejected if either is present. Pass `expectedVersion` for optimistic concurrency (you get a 409 if the folder changed since you last read it). Requires the `folders:u` scope.
      *
      * @param {Vectros.PatchFolderRequest} request
      * @param {FoldersClient.RequestOptions} requestOptions - Request-specific configuration.

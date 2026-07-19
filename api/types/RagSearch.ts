@@ -14,11 +14,7 @@ export interface RagSearch {
     filters?: Record<string, Vectros.FilterValue> | undefined;
     /** Restrict retrieval to content owned by this user id. */
     userId?: string | undefined;
-    /** Restrict retrieval to content owned by this organization id. */
-    orgId?: string | undefined;
-    /** Restrict retrieval to content tagged with this client id. */
-    clientId?: string | undefined;
-    /** Restrict retrieval to content carrying this scope value, in `namespace:value` form — for example `group:eng-team`. `scope=org:<id>` and `scope=client:<id>` are equivalent to the `orgId` and `clientId` filters. */
+    /** Restrict retrieval to content carrying this scope value, in `namespace:value` form — for example `group:eng-team`, `org:<id>`, or `client:<id>`. Resolve an entity's UUID from your own identifier via `GET /v1/entities/{namespace}?externalId=`. */
     scope?: string | undefined;
     /** Narrow retrieval to specific content types. When omitted, both documents and records are searched — records are valid grounding content too (for example, structured patient data or intake forms). Pass ["documents"] for documents only or ["records"] for records only. Each retrieved result carries a `sourceType` field indicating which type it is. */
     contentTypes?: RagSearch.ContentTypes.Item[] | undefined;

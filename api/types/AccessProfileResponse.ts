@@ -18,7 +18,7 @@ export interface AccessProfileResponse {
     scopes?: Vectros.ScopeClause[] | undefined;
     /** Reference to a role that supplies this principal's scopes. Mutually exclusive with `scopes` — exactly one of the two is present. */
     roleId?: string | undefined;
-    /** Per-context identity overrides. Only `orgId` and `clientId` may be overridden. */
+    /** Per-context identity overrides, keyed by ownership namespace in `scope:<namespace>` form (for example `scope:org`, `scope:client`, `scope:group`). Read back exactly as authored. */
     identityOverrides?: Record<string, unknown> | undefined;
     /** Profile lifecycle status: `active` or `suspended`. */
     status?: string | undefined;

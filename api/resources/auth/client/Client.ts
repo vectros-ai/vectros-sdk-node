@@ -83,7 +83,7 @@ export class AuthClient {
     }
 
     /**
-     * Returns a page of per-subject PHI read-access rows: who read which subject's PHI, when, against which record, and whether any sensitive value was actually revealed in plaintext. Metadata only — never the PHI itself. This is the disclosure-accounting surface from which a covered entity derives its HIPAA §164.528 accounting of disclosures. Provide at least one query axis: a subject (`subjectType` + `subjectId`, plus optional `clientId`) within a `contextId` for the primary accounting query; `resourceId` within a `contextId` for 'who read this record'; `callerKeyId` for 'what did this credential read' (account-wide forensic); or `contextId` alone to enumerate a whole context. `from`/`to` bound the time window. Results are scoped to your account, derived from your token — never from input. Requires the `access-log:r` scope.
+     * Returns a page of per-subject PHI read-access rows: who read which subject's PHI, when, against which record, and whether any sensitive value was actually revealed in plaintext. Metadata only — never the PHI itself. This is the disclosure-accounting surface from which a covered entity derives its HIPAA §164.528 accounting of disclosures. Provide at least one query axis: a subject (`subjectType` + `subjectId`) within a `contextId` for the primary accounting query; `resourceId` within a `contextId` for 'who read this record'; `callerKeyId` for 'what did this credential read' (account-wide forensic); or `contextId` alone to enumerate a whole context. `from`/`to` bound the time window. Results are scoped to your account, derived from your token — never from input. Requires the `access-log:r` scope.
      *
      * @param {Vectros.GetAccessLogRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -96,7 +96,6 @@ export class AuthClient {
      *         subjectType: "user",
      *         subjectId: "user_abc123",
      *         contextId: "ctx_intake",
-     *         clientId: "client_xyz789",
      *         action: "read",
      *         callerKeyId: "key_abc123",
      *         resourceType: "intake_form",
@@ -118,7 +117,6 @@ export class AuthClient {
             subjectType,
             subjectId,
             contextId,
-            clientId,
             from: from_,
             to,
             action,
@@ -133,7 +131,6 @@ export class AuthClient {
             subjectType,
             subjectId,
             contextId,
-            clientId,
             from: from_,
             to,
             action,
@@ -645,7 +642,7 @@ export class AuthClient {
     }
 
     /**
-     * Creates a new access profile under the given app context. This call is idempotent by `principalId`: if a profile with the same `principalId` already exists, the existing profile is returned (with status 200) instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing profile was returned) tells the two apart. To overwrite an existing profile's `scopes`/`roleId`, `identityOverrides`, and `status` instead of returning it unchanged, set `?upsert=true` (this also requires the `profiles:u` scope). You must provide exactly one of `scopes` (an inline list of scopes) or `roleId` (a reference to a role); supplying both, or neither, is rejected. `identityOverrides` may set only `orgId` and `clientId`; any other key (including the account identifier or `userId`) is rejected. If you use a scoped credential, the profile's effective scopes may not exceed your own; a root API key (`sk_`) is exempt. Requires the `profiles:c` scope.
+     * Creates a new access profile under the given app context. This call is idempotent by `principalId`: if a profile with the same `principalId` already exists, the existing profile is returned (with status 200) instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing profile was returned) tells the two apart. To overwrite an existing profile's `scopes`/`roleId`, `identityOverrides`, and `status` instead of returning it unchanged, set `?upsert=true` (this also requires the `profiles:u` scope). You must provide exactly one of `scopes` (an inline list of scopes) or `roleId` (a reference to a role); supplying both, or neither, is rejected. `identityOverrides` is keyed by ownership namespace in `scope:<namespace>` form — `scope:org` and `scope:client` for the reserved namespaces, or any namespace you have registered — and may name at most two; any other key (including the account identifier or `userId`) is rejected. If you use a scoped credential, the profile's effective scopes may not exceed your own; a root API key (`sk_`) is exempt. Requires the `profiles:c` scope.
      *
      * @param {Vectros.CreateAccessProfileRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2180,7 +2177,7 @@ export class AuthClient {
      *                 "userId": "550e8400-e29b-41d4-a716-446655440000"
      *             },
      *             dataScope: {
-     *                 "orgId": ["6ba7b810-9dad-11d1-80b4-00c04fd430c8"]
+     *                 "scope:org": ["6ba7b810-9dad-11d1-80b4-00c04fd430c8"]
      *             }
      *         },
      *         expiresInSeconds: 3600
