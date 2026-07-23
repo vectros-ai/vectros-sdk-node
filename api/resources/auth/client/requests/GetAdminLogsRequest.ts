@@ -15,7 +15,7 @@ export interface GetAdminLogsRequest {
     startTime: string;
     /** End of the time window (ISO-8601 UTC; defaults to now). */
     endTime?: string;
-    /** Filter by resource type. One of `documents`, `records`, `search`, `schemas`, `folders`, `clients`, `orgs`, `users`, `usage`, `auth`, `models`, `ping`, `rag`, `chat`, `ask`, `erasure-requests`, or `export`. */
+    /** Filter by resource type. One of `documents`, `records`, `search`, `schemas`, `folders`, `entities`, `namespaces`, `clients`, `orgs`, `users`, `usage`, `auth`, `models`, `ping`, `rag`, `chat`, `ask`, `erasure-requests`, or `export`. (`clients` and `orgs` match log rows written before the identity surfaces were folded into `entities`.) */
     resource?: string;
     /** Filter by HTTP method (`GET`, `POST`, `PUT`, or `DELETE`). */
     method?: string;

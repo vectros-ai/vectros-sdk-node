@@ -8,7 +8,7 @@ export interface LogEntry {
     timestamp: string;
     /** HTTP method of the request. */
     method: string;
-    /** Top-level resource the call targeted (one of `documents`, `records`, `search`, `schemas`, `folders`, `clients`, `orgs`, `users`, `usage`, `auth`, `models`, `ping`, `rag`, `chat`, `ask`, `erasure-requests`, or `export`), derived from the request path. */
+    /** Top-level resource the call targeted, derived from the request path — for example `documents`, `records`, `search`, `schemas`, `folders`, `entities`, `namespaces`, `users`, `usage`, `auth`, `models`, `ping`, `rag`, `chat`, `ask`, `erasure-requests`, or `export`. Rows may also carry values that are not filterable via the `resource` query parameter, and `clients`/`orgs` appear on rows written before those identity surfaces were folded into `entities`. */
     resource: string;
     /** The app context the request operated under — the context partition the credential carried. `*` for a root/cross-context caller. Null for older log lines or for entry points that are not context-scoped. */
     contextId?: (string | null) | undefined;
@@ -20,4 +20,8 @@ export interface LogEntry {
     durationMs?: number | undefined;
     /** Full request path. */
     path?: string | undefined;
+    /** Correlation id for this call. Quote it when contacting support so the call can be traced. Most useful on failures, but recorded for successful calls too. Where an error response body carries a `requestId`, it is this same id. */
+    requestId?: (string | null) | undefined;
+    /** Error code explaining WHY a failed call was rejected, when the failure had a typed code — one of `RATE_LIMITED`, `SUBSCRIPTION_LIMIT_EXCEEDED`, `INSUFFICIENT_BALANCE`, `RESOURCE_IN_USE`, `VERSION_CONFLICT`, `SESSION_REFRESH_REQUIRED`. Null for successful calls, for failures that carry only a message, and for calls recorded before this release that are still within your log retention window. Request and response bodies are never logged, so no further detail is available here by design. */
+    errorCode?: (string | null) | undefined;
 }

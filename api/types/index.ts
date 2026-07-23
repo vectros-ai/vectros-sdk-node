@@ -57,6 +57,7 @@ export * from "./FolderResponse.js";
 export * from "./IdentityLookupRequest.js";
 export * from "./IdentitySection.js";
 export * from "./IdentitySurface.js";
+export * from "./IndexFailure.js";
 export * from "./InferenceCallStats.js";
 export * from "./InferenceEndpoints.js";
 export * from "./InferenceSection.js";

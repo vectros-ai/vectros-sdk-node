@@ -30,6 +30,8 @@ export class SchemasClient {
      * @param {Vectros.ListSchemasRequest} request
      * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link Vectros.BadRequestError}
+     *
      * @example
      *     await client.schemas.listSchemas({
      *         userId: "550e8400-e29b-41d4-a716-446655440000",
@@ -89,18 +91,23 @@ export class SchemasClient {
         }
 
         if (_response.error.reason === "status-code") {
-            throw new errors.VectrosError({
-                statusCode: _response.error.statusCode,
-                body: _response.error.body,
-                rawResponse: _response.rawResponse,
-            });
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
         }
 
         return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/schemas");
     }
 
     /**
-     * Defines a new record type with optional field definitions, validation rules, and lookup indexes. Idempotent by `typeName` within the same ownership scope: re-creating an existing `typeName` returns the existing schema rather than failing. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing schema was returned) tells the two apart. To reconcile an existing schema to the submitted shape instead of returning it unchanged, set `?upsert=true` (this also requires the `schemas:w` scope; only legal schema changes are applied — migration-locked changes are rejected). Requires the `schemas:w` scope.
+     * Defines a new record type with optional field definitions, validation rules, and lookup indexes. Idempotent by `typeName` within the same ownership scope: re-creating an existing `typeName` returns the existing schema rather than failing. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing schema was returned) tells the two apart. To reconcile an existing schema to the submitted shape instead of returning it unchanged, set `?upsert=true` (this also requires the `schemas:u` scope; only legal schema changes are applied — migration-locked changes are rejected). Requires the `schemas:c` scope to create. Being returned the existing schema on a collision is a read of that schema's data and additionally requires the `schemas:r` scope — a credential holding `schemas:c` alone receives a `400` ("already in use") on collision instead of the schema.
      *
      * @param {Vectros.CreateSchemaRequest} request
      * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -270,7 +277,7 @@ export class SchemasClient {
     }
 
     /**
-     * Updates a record schema. Fields you omit are preserved; `typeName` is immutable and cannot be changed. Collection fields (`fields`, `lookupFields`, `renderHints`, `capabilities`) are replaced in full when supplied. Requires the `schemas:w` scope.
+     * Updates a record schema. Fields you omit are preserved; `typeName` is immutable and cannot be changed. Collection fields (`fields`, `lookupFields`, `renderHints`, `capabilities`) are replaced in full when supplied. Requires the `schemas:u` scope.
      *
      * @param {Vectros.UpdateSchemaRequest} request
      * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -350,7 +357,7 @@ export class SchemasClient {
     }
 
     /**
-     * Permanently deletes a record schema. The request is refused with 409 if records of this type still exist — delete those records first, since every record must reference a live schema. Requires the `schemas:w` scope.
+     * Permanently deletes a record schema. The request is refused with 409 if records of this type still exist — delete those records first, since every record must reference a live schema. Requires the `schemas:d` scope.
      *
      * @param {Vectros.DeleteSchemaRequest} request
      * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.

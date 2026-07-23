@@ -9,7 +9,146 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
-## 0.35.0 — unreleased
+## 0.36.0 — 2026-07-23
+
+### Added
+
+- **`requestId` and `errorCode` on activity-log entries.** Each `GET /v1/admin/logs` entry carries
+  the call's `requestId` — the same id returned in an error response body, and the one to quote to
+  support. A failure rejected with a typed code also carries that `errorCode`: `RATE_LIMITED`,
+  `SUBSCRIPTION_LIMIT_EXCEEDED`, `INSUFFICIENT_BALANCE`, `RESOURCE_IN_USE`, `VERSION_CONFLICT`, or
+  `SESSION_REFRESH_REQUIRED`. Request and response bodies are never logged, so a failure carrying
+  only a message reports no `errorCode`.
+- **Inference error responses carry an `errorCode`.** A `402` from `/v1/chat`, `/v1/rag`, or
+  `/v1/documents/{id}/ask` now includes the typed code in its body, so you can branch on the cause —
+  `INSUFFICIENT_BALANCE` (top up your pre-paid balance) versus `SUBSCRIPTION_LIMIT_EXCEEDED` (upgrade
+  your plan or raise your cap) — without matching the message text.
+- **`indexFailure` on record and document responses.** Present when `indexStatus` is `FAILED`, and
+  absent otherwise. It carries a stable `code` you can branch on and a human-readable `message`
+  suitable for showing to an end user:
+  - `SOURCE_UNAVAILABLE` — the underlying item could not be loaded and may have been deleted.
+  - `TEXT_INDEX_FAILED` — keyword indexing failed; the content may still be findable by semantic search.
+  - `EMBEDDING_FAILED` — semantic indexing failed; the content may still be findable by keyword search.
+  - `INDEXING_FAILED` — no index leg is serving this content, so it is not findable by search at all.
+  - `VECTOR_LIMIT_EXCEEDED` — your vector storage limit was reached, so semantic indexing was skipped;
+    keyword search is still serving this content.
+  - `INTERNAL` — an error on our side; retry, and contact support if it persists.
+
+  Branch on `code`, not on `message` — the wording may change between releases. Several codes mean
+  the content is still partly findable, which is the practical difference between "retry this" and
+  "this one needs attention".
+- **`indexFailure` on the `record.failed` and `document.failed` webhook payloads**, in the envelope's
+  `data` block, with the same `code` and `message`.
+- **`AMBIGUOUS_RECORD_TYPE` errorCode.** `GET /v1/schemas?recordType=`, `POST /v1/records` by
+  `typeName` alone, and the record/document lookup-by-field endpoints now return a `400` with this
+  errorCode when more than one schema in the context shares that type name under different owners,
+  instead of guessing one. Resolve by `id` (schemas) or `schemaId` (records) instead.
+
+### Changed
+
+- **Every number must fall within the signed 64-bit range**, `-9223372036854775808` to
+  `9223372036854775807` — whole or fractional, in any field, whether or not your schema declares it,
+  and in a search request body as well as a record or document payload. A value outside the range is
+  refused with a `400` naming the field, as are values carrying more than 38 significant digits,
+  magnitudes below roughly `1e-130`, and values that are not finite. Send large whole numbers as
+  strings: a field declared as `string` stores them exactly and supports exact-match lookup.
+
+  **A record written before this release may hold an out-of-range value.** A whole number beyond the
+  64-bit range was lost at write — the create returned `201` and echoed the value back, but the record
+  reads back as not found and is absent from lists. A value written in exponent or decimal notation
+  was stored, but a field your schema declares as `number` returns it as a string rather than a
+  number. Updating either is refused with a `400` until the field is brought into range or changed to
+  a string.
+- **Ownership placement is authorized against a single scope clause.** A create or update that sets
+  `scopes` succeeds only if **one** clause of the credential permits the operation, matches the
+  resulting ownership, and — on update — is confined to every namespace the change touches, **including
+  one it removes**. Removing a label moves the item out of that compartment and widens who can read it,
+  so it is authorized exactly like adding one: a credential with no grant over a namespace can neither
+  add nor clear a label in it.
+
+  `scopes` on a `PUT` is a complete declaration, so a client that round-trips an item re-sends labels
+  it did not change. If one of those is in a namespace the granting clause does not cover, the `PUT`
+  is rejected with a `403` naming the namespace. Send only the labels the credential is scoped for,
+  or use `PATCH`.
+- **`userId` is authorized as a placement, on create as well as update.** A credential may attribute
+  an item to a user other than its own only if the clause authorizing the write constrains the user
+  dimension. If a credential now returns a `403`, list the user ids it may write in that clause's
+  `userId` values — do not remove its `dataScope`, which would grant it strictly more.
+- **A credential with a `dataScope` but no `identity` must state ownership on create.** Omitting
+  `scopes` is refused rather than producing an account-wide item. To create account-wide items
+  deliberately, include `null` in the `dataScope` value list.
+- **Access-profile identity overrides are authorized like scopes.** Setting `identityOverrides` on a
+  profile is subject to the same authority check as `scopes` and `roleId`, even when the request body
+  contains *only* `identityOverrides`. A scoped credential may set an override only to an identity
+  value it holds itself (a `403` otherwise); a root key's override values must reference entities that
+  exist in your account (a `400` naming the value otherwise).
+- **An idempotent create returns the existing item only if your credential can read it.** A `POST` that
+  collides with an existing item by `externalId` (or, for folders, by slug) returns that item — `200`
+  with `created: false` — only when a single clause of your credential permits reading it *and* matches
+  its ownership. A credential that can create but not read the colliding item — or that holds a read
+  grant only on a *different* resource or namespace — now receives the uniform `already in use` `400`
+  instead of the item's id, ownership, and contents, so a create grant can no longer reveal items in
+  compartments you cannot read. This applies uniformly to records, documents, folders, identity
+  entities, schemas, users, roles, and access profiles, and to the file upload-init re-issue — for a
+  role or access profile the read grant is `profiles:r` (a create-only credential colliding on an
+  existing `roleId`/`principalId` receives `already exists` rather than the existing scopes or grant).
+  Full-authority API keys are unchanged.
+- **Referencing a folder requires read access to it.** Creating a record or document with a `folderId`,
+  or a sub-folder with a `parentFolderId`, now requires a single clause of your credential to grant
+  `folders:r` and match that folder's ownership. Previously any clause whose `dataScope` matched the
+  folder was accepted — even a grant on a different resource, or one with an empty `dataScope` — so a
+  credential that could not read a folder could still file into it and probe whether it exists. A folder
+  your credential cannot read now returns the uniform `Folder not found` `400`, the same response as a
+  folder that does not exist. Filing into your context's default folder (omitting `folderId`) is
+  unchanged, and full-authority API keys are unaffected.
+- **A qualifier is rejected on an op that doesn't correlate it.** `allowed_actions` entries in the
+  `resource:ops:qualifier` form correlate their qualifier on two independent axes: `records`/`entities`
+  correlate it for **every** op (c/r/u/d/s — qualified by record type / namespace); `documents`/`users`
+  correlate it **only for the `s` (sensitive-reveal) op** (qualified by record type). An entry whose
+  qualifier is inert on **every** op it names — e.g. `folders:c:bar`, `schemas:r:baz`, or `documents:r:foo`
+  (read has no qualifier axis on documents) — was previously accepted at authoring but silently ignored
+  at read/write time, granting the unqualified action on **every** item, not the named subset.
+  `POST /v1/auth/token`, and access-profile/role authoring, now reject such an entry with a `400` naming
+  the resource and op(s). **Remediation depends on which op(s) are inert — read carefully, this is not
+  always "drop the qualifier":**
+  - `folders:c:bar`, `schemas:r:baz` (resource has no qualifier axis at all): drop the qualifier — no
+    capability is lost, it was never narrowing anything.
+  - `documents:r:foo`, `users:c:foo` (op has no qualifier axis on this resource, but `s` does): drop the
+    qualifier from this entry, but if you intended to narrow **sensitive-field reveal** specifically,
+    author a **separate** `documents:s:foo` / `users:s:foo` entry instead — do not simply widen a
+    sensitive-reveal grant to match the (already-unrestricted) read grant.
+  - `documents:rs:foo`, `users:crs:foo` (a **mixed** entry — `s` correlates the qualifier here, the other
+    op(s) don't): split it into two entries, e.g. `documents:r` + `documents:s:foo` — the combined form
+    can't express "unrestricted read, reveal-restricted-to-foo" with one qualifier segment, and is
+    rejected rather than silently doing the wrong thing for one of the two ops.
+  This validation runs at authoring only: a token or stored access-profile/role scope minted before this
+  release that already carries a rejected-shape entry keeps working exactly as before. If you have one,
+  re-author it per the remediation above — check whether any of its ops were `s` before deciding a
+  qualifier is safe to drop.
+
+### Fixed
+
+- **The activity-log `resource` filter accepts the identity surfaces.** `GET /v1/admin/logs` filters
+  on `entities` and `namespaces`, which have been accepted since 0.35.0 but were not listed among the
+  documented values, so there was no way to discover that the identity surface is filterable at all.
+  `clients` and `orgs` remain accepted, and match log rows written before those surfaces were folded
+  into `entities`.
+- **`requestId` identifies a single call.** One `requestId` could be repeated across many different
+  calls, in both error responses and activity-log entries, so quoting it to support did not identify
+  the request. Each call now reports its own.
+- **Activity-log entries report the app context the call actually ran in.** An entry could carry the
+  context of an earlier call, so filtering by `contextId` could return calls that never ran in that
+  context.
+- **Ownership parents are validated on update.** Updating an item to reference a non-existent entity
+  in an entity-backed namespace fails with a `400` naming the missing parent, matching the
+  create-time validation.
+- **The bootstrap CLI's own credential can complete an idempotent create-or-get on retry.** Per the
+  read-requirement described above, re-running `vectros bootstrap` (or `--rotate`) against an
+  already-provisioned tenant collided on the existing user/entity and received `already in use`
+  instead of the existing record, so a bootstrap re-run that used to converge could fail. The
+  bootstrap token now also carries the paired read scope on the surfaces it creates.
+
+## 0.35.0 — 2026-07-19
 
 **One ownership vocabulary.** Organizations and clients are no longer special-cased types with their
 own endpoints, fields, and scopes — they are ordinary namespaces alongside the ones you define. The

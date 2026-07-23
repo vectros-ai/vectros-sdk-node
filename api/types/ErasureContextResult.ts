@@ -12,6 +12,6 @@ export interface ErasureContextResult {
     documentsDeleted?: number | undefined;
     /** Number of folders deleted in this context. */
     foldersDeleted?: number | undefined;
-    /** Number of identity rows deleted (the subject's user, organization, or client record plus its lookup rows). Because the subject's identity is account-wide rather than per-context, it is counted only once here — against the context in which it was resolved. */
+    /** Number of identity rows deleted (the subject's user or identity-entity record plus its lookup rows). Because the subject's identity is account-wide rather than per-context, it is counted only once here — against the context in which it was resolved. */
     identityRowsDeleted?: number | undefined;
 }

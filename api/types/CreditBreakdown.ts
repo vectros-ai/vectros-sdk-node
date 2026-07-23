@@ -20,7 +20,7 @@ export interface CreditBreakdown {
     records?: number | undefined;
     /** records in milli-credit precision (exact) */
     recordsMilli?: number | undefined;
-    /** Credits consumed by identity (user/org/client) writes */
+    /** Credits consumed by identity (user and entity) writes */
     identity?: number | undefined;
     /** identity in milli-credit precision (exact) */
     identityMilli?: number | undefined;

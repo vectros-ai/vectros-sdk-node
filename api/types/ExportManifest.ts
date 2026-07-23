@@ -18,7 +18,7 @@ export interface ExportManifest {
     totalDocuments?: number | undefined;
     /** Total number of folders included across all exported contexts. */
     totalFolders?: number | undefined;
-    /** Total number of identity rows included (users, organizations, and clients). */
+    /** Total number of identity rows included (users and identity entities, in any namespace). */
     totalIdentities?: number | undefined;
 }
 
