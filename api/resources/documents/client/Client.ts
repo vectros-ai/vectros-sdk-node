@@ -487,7 +487,7 @@ export class DocumentsClient {
     }
 
     /**
-     * Finds documents of a given type by field value. Supported fields: `externalId` (the document's first-class external identifier — no schema declaration required) and any field declared as a lookup field on the bound schema. A lookup on a sensitive field is rejected here because the value would appear in the URL query string; use POST /v1/documents/lookup (the request-body variant) for a sensitive field instead. Results are paginated: set `limit` for the page size and feed the returned `nextCursor` back as `startFrom` to fetch the next page. The response is a `{data, nextCursor}` envelope. Requires the `documents:r` scope.
+     * Finds documents of a given type by field value. Supported fields: `externalId` (the document's first-class external identifier — no schema declaration required) and any field declared as a lookup field on the bound schema. A lookup on a sensitive field is rejected here because the value would appear in the URL query string; use POST /v1/documents/lookup (the request-body variant) for a sensitive field instead. `type`'s schema resolves with basedOn-aware shadowing: your own `userId`- or `scope`-owned variant if you have one, otherwise the shared base — for a scoped credential the owner is always your own token identity; `userId`/`scope` here only apply as an explicit owner selector for a root API key. Results are paginated: set `limit` for the page size and feed the returned `nextCursor` back as `startFrom` to fetch the next page. The response is a `{data, nextCursor}` envelope. Requires the `documents:r` scope.
      *
      * @param {Vectros.LookupDocumentsRequest} request
      * @param {DocumentsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -500,7 +500,9 @@ export class DocumentsClient {
      *         field: "po_number",
      *         value: "PO-1001",
      *         prefix: "PO-2024",
-     *         startFrom: "550e8400-e29b-41d4-a716-446655440000"
+     *         startFrom: "550e8400-e29b-41d4-a716-446655440000",
+     *         userId: "550e8400-e29b-41d4-a716-446655440000",
+     *         scope: "org:6ba7b810-9dad-11d1-80b4-00c04fd430c8"
      *     })
      */
     public lookupDocuments(
@@ -514,7 +516,7 @@ export class DocumentsClient {
         request: Vectros.LookupDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.DocumentLookupPage>> {
-        const { type: type_, field, value, from: from_, to, prefix, startFrom, limit, order } = request;
+        const { type: type_, field, value, from: from_, to, prefix, startFrom, limit, order, userId, scope } = request;
         const _queryParams: Record<string, unknown> = {
             type: type_,
             field,
@@ -525,6 +527,8 @@ export class DocumentsClient {
             startFrom,
             limit,
             order: order != null ? order : undefined,
+            userId,
+            scope,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(

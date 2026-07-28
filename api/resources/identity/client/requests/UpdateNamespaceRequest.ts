@@ -7,7 +7,8 @@ import type * as Vectros from "../../../../index.js";
  *     {
  *         namespace: "team",
  *         body: {
- *             namespace: "team"
+ *             namespace: "team",
+ *             specificityRank: 1500
  *         }
  *     }
  */

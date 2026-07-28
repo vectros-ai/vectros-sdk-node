@@ -16,4 +16,6 @@ export interface SearchResponse {
     degraded?: boolean | undefined;
     /** Which search engines were unavailable for this response: `text` (keyword) and/or `vector` (semantic). Empty when the search was not degraded. */
     degradedLegs?: string[] | undefined;
+    /** True when more matching results are available past this page. Raise `limit` or advance `offset` (up to its max of 200) to fetch them; false also once `offset` is at its max, since no further page is reachable regardless of how many results exist. */
+    hasMore?: boolean | undefined;
 }

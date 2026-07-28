@@ -9,6 +9,69 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.37.0 — 2026-07-27
+
+### Added
+
+- **`contextId` on `POST /v1/auth/token`.** A root API key can now mint a scoped token targeting any
+  app context that already exists in your account, not just the one your own key operates in — omit
+  it to keep minting into your key's own context as before. Must reference an existing context; an
+  unrecognized value returns a uniform `404 not found`.
+- **`basedOn` on record schemas.** A schema can now declare `basedOn: <schemaId>` to mark itself as a
+  customization of another schema sharing its `typeName` — a team or user tweaking a context-wide type
+  (an added field, a stricter validation) while remaining the same conceptual type for references,
+  listings, and blueprints. The first schema created under a name has no `basedOn` and becomes that
+  name's shared base; every other schema of that name must declare it. `basedOn` is immutable once set
+  and must point directly at the base (one hop). See `POST /v1/schemas`.
+- **`specificityRank` on scope namespaces.** `POST /v1/namespaces` now requires an explicit, account-unique
+  `specificityRank` for every custom namespace — an integer position in your account's specificity order,
+  used to break a tie when a caller holds two scope dimensions at once during `basedOn` schema resolution
+  (see below). `PUT /v1/namespaces/{namespace}` accepts it too; omit to leave it unchanged.
+- **`userId`/`scope` selectors on document lookup.** `GET`/`POST /v1/documents/lookup` accept `userId`
+  and `scope` (root API key only) to resolve the looked-up type's schema as a specific owner would,
+  mirroring the selector already on `GET /v1/schemas?recordType=`.
+- **`externalId` on search hits.** `POST /v1/search` results and `POST /v1/rag` citations now carry the
+  matched item's `externalId` alongside `documentId`, so you can correlate a hit back to your own record
+  identity without a follow-up lookup. Null when the item was ingested without one, or when it was
+  indexed before this field existed and hasn't been updated or reindexed since.
+- **`hasMore` on search responses.** `POST /v1/search` now returns an explicit `hasMore` boolean — true
+  when more matching results are available past this page, false once you've reached the last page or
+  the `offset` maximum (200) — so you no longer need to infer it yourself from `totalResults`, which
+  reports an approximate matching-pool size and is not a reliable paging signal on its own.
+
+### Changed
+
+- **`POST /v1/search` `limit` now honors its full advertised range (1–100).** Previously a `limit` above
+  50 was silently capped to 50 with no error and no signal that results were incomplete, even though the
+  documented maximum was always 100. Requests with `limit` in 51–100 now return up to that many results,
+  matching the OpenAPI contract. Pair with the new `hasMore` field to detect when more results remain.
+- **Search-index status docs clarify semantic-search timing.** The `indexStatus` description on record
+  and document responses now states plainly that `INDEXED` means keyword (TEXT) matching is immediate,
+  while the semantic (vector) index is eventually consistent for queries — typically queryable a second
+  or two later, longer under heavy indexing load. A HYBRID or RAG query that shares keywords with a
+  freshly indexed item still surfaces it immediately via the keyword leg; a query that can only match it
+  semantically (a `mode: SEMANTIC` search, or a HYBRID/RAG query sharing no words with the item) may not
+  return it for those first few seconds. No behavior changed; this documents an existing, previously
+  unstated timing characteristic.
+- **`textScore` in TEXT mode is no longer always `0`.** `POST /v1/search`'s TEXT-mode results now carry a
+  real, descending-by-relevance `textScore` for each hit (previously hardcoded to `0` for every TEXT-mode
+  result, which also made the keyword-relevance guidance surfaced by AI-agent clients spuriously trigger
+  on every non-empty TEXT-mode search). It reflects the result's rank, not a normalized BM25 magnitude —
+  treat it as meaningful for ordering within one response, not as a value comparable across requests or
+  against HYBRID/SEMANTIC scores. `/v1/rag`'s `RagSearchResult.textScore` carries the same clarification.
+- **`recordType` resolution now shadows by ownership instead of failing loud on cross-owner ambiguity.**
+  `GET /v1/schemas?recordType=`, `POST /v1/records`/`POST /v1/documents` by `typeName` alone, and the
+  record/document lookup-by-field endpoints resolve a same-named type to the caller's own `basedOn`
+  variant when one exists, otherwise the shared base — replacing the `400 AMBIGUOUS_RECORD_TYPE` these
+  endpoints returned when more than one owner had defined the type name (0.36.0). That errorCode is now
+  reserved for a should-be-impossible data-integrity state, not a normal multi-owner situation.
+- **Creating a second schema with an already-used `typeName` now requires `basedOn`.** Previously any
+  owner could freely define a schema under a name another owner already used, with no relationship
+  between the two. A create that omits `basedOn` when the name already exists is now rejected with a
+  `400`; the first schema under a name must additionally be created by a root/unscoped credential with
+  no `userId`/`scopes` (it becomes that name's shared base). This is a breaking change for a caller that
+  relied on same-name schemas coexisting with no declared relationship.
+
 ## 0.36.0 — 2026-07-23
 
 ### Added

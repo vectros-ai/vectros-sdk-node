@@ -6,9 +6,11 @@
 export interface SearchResult {
     /** The ID of the source document or record this chunk belongs to. Use it with `GET /v1/documents/{id}` or `GET /v1/records/{id}` (depending on `sourceType`) to retrieve the full item. */
     documentId?: string | undefined;
+    /** The `externalId` you supplied for the source item at ingestion, if any. Null when the item was ingested without one, or when the source item was indexed before this field existed and hasn't been updated or reindexed since. */
+    externalId?: string | undefined;
     /** The combined relevance score that fuses the text and semantic signals (reciprocal rank fusion). This is the primary sort key — a higher value means a more relevant result. */
     score?: number | undefined;
-    /** The keyword (BM25) relevance component of the score. It is non-zero in HYBRID mode when the keyword engine contributes to the match. It is always 0 in TEXT mode, because that path does not expose per-hit scores — in TEXT mode the order of the results array is the ranking signal, not this field. */
+    /** The keyword (BM25) relevance component of the score. Non-zero in HYBRID mode when the keyword engine contributes to the match. In TEXT mode this is a rank-derived value reflecting the result's relative position, not a raw BM25 magnitude — treat it as meaningful for ordering within this response, not as a score comparable across requests or against other modes. */
     textScore?: number | undefined;
     /** The semantic (vector similarity) component of the score. Non-zero when the search mode is SEMANTIC or HYBRID. */
     semanticScore?: number | undefined;

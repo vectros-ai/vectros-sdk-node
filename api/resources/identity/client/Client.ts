@@ -645,7 +645,7 @@ export class IdentityClient {
     }
 
     /**
-     * Updates the mutable fields (`entityBacked`, `defaultSchemaId`) of a registered namespace. The namespace name itself is immutable. Requires a root API key. The reserved built-ins cannot be updated.
+     * Updates the mutable fields (`entityBacked`, `defaultSchemaId`, `specificityRank`) of a registered namespace. The namespace name itself is immutable. Requires a root API key. The reserved built-ins cannot be updated.
      *
      * @param {Vectros.UpdateNamespaceRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -658,7 +658,8 @@ export class IdentityClient {
      *     await client.identity.updateNamespace({
      *         namespace: "team",
      *         body: {
-     *             namespace: "team"
+     *             namespace: "team",
+     *             specificityRank: 1500
      *         }
      *     })
      */
@@ -860,7 +861,7 @@ export class IdentityClient {
     }
 
     /**
-     * Registers a new scope namespace and declares whether its values resolve to identity entities (`entityBacked`). Requires a root API key. The reserved names `org` and `client` are built in and cannot be registered.
+     * Registers a new scope namespace and declares whether its values resolve to identity entities (`entityBacked`). Also requires `specificityRank`, an explicit, account-unique position in the specificity order used to break recordType schema-resolution ties. Requires a root API key. The reserved names `org` and `client` are built in and cannot be registered.
      *
      * @param {Vectros.NamespaceRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -871,7 +872,8 @@ export class IdentityClient {
      *
      * @example
      *     await client.identity.registerNamespace({
-     *         namespace: "team"
+     *         namespace: "team",
+     *         specificityRank: 1500
      *     })
      */
     public registerNamespace(

@@ -357,7 +357,7 @@ export class SchemasClient {
     }
 
     /**
-     * Permanently deletes a record schema. The request is refused with 409 if records of this type still exist — delete those records first, since every record must reference a live schema. Requires the `schemas:d` scope.
+     * Permanently deletes a record schema. The request is refused with 409 if records of this type still exist — delete those records first, since every record must reference a live schema. A lineage base (a schema other schemas declare `basedOn`) also cannot be deleted while any such variant still exists — delete the variant schema(s) first. Requires the `schemas:d` scope.
      *
      * @param {Vectros.DeleteSchemaRequest} request
      * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.

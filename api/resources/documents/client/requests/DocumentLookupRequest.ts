@@ -26,6 +26,10 @@ export interface DocumentLookupRequest {
     limit?: number;
     /** Sort direction for the returned results: `asc` (default) or `desc`. */
     order?: DocumentLookupRequest.Order;
+    /** Root API key ONLY: resolve `type`'s schema as this user would (basedOn-aware shadowing) instead of the shared base — mirrors `GET /v1/schemas?recordType=`'s `userId` selector. Ignored for a scoped credential, which always resolves via its own token identity. */
+    userId?: string;
+    /** Root API key ONLY: resolve `type`'s schema as this scope would (basedOn-aware shadowing), as a single `namespace:value` entry — mirrors `GET /v1/schemas?recordType=`'s `scope` selector. Ignored for a scoped credential. */
+    scope?: string;
 }
 
 export namespace DocumentLookupRequest {

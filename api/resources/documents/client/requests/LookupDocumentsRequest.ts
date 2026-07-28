@@ -9,7 +9,9 @@ import type * as Vectros from "../../../../index.js";
  *         field: "po_number",
  *         value: "PO-1001",
  *         prefix: "PO-2024",
- *         startFrom: "550e8400-e29b-41d4-a716-446655440000"
+ *         startFrom: "550e8400-e29b-41d4-a716-446655440000",
+ *         userId: "550e8400-e29b-41d4-a716-446655440000",
+ *         scope: "org:6ba7b810-9dad-11d1-80b4-00c04fd430c8"
  *     }
  */
 export interface LookupDocumentsRequest {
@@ -31,4 +33,8 @@ export interface LookupDocumentsRequest {
     limit?: number;
     /** Sort direction for the returned documents: `asc` (the default) or `desc`. */
     order?: Vectros.LookupDocumentsRequestOrder;
+    /** Root API key ONLY: resolve `type`'s schema as this user would (basedOn-aware shadowing) instead of the shared base — mirrors `GET /v1/schemas?recordType=`'s `userId` selector. Ignored for a scoped credential. */
+    userId?: string;
+    /** Root API key ONLY: resolve `type`'s schema as this scope would, as a single `namespace:value` entry — mirrors `GET /v1/schemas?recordType=`'s `scope` selector. Ignored for a scoped credential. */
+    scope?: string;
 }

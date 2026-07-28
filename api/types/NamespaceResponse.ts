@@ -12,6 +12,8 @@ export interface NamespaceResponse {
     reserved?: boolean | undefined;
     /** ID of the default record schema bound to entities in this namespace, or null. */
     defaultSchemaId?: string | undefined;
+    /** This namespace's position in your account's specificity order (higher = more specific), used to break a tie when a caller holds two scope dimensions at once during recordType schema resolution. */
+    specificityRank?: number | undefined;
     /** Timestamp when the namespace was registered, as an ISO-8601 UTC timestamp. Absent for the reserved built-ins. */
     createdAt?: string | undefined;
 }
