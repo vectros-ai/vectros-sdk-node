@@ -10,16 +10,26 @@
 export interface RecordLookupRequest {
     /** The record type to look up (for example, `intake_form`). */
     type: string;
-    /** Name of the lookup field declared on the schema. For a field marked sensitive, this body variant is required (the GET variant rejects looking up by a sensitive value). */
+    /** Name of the lookup field declared on the schema. For a field marked sensitive, this body variant is required (the GET variant rejects looking up by a sensitive value). For a lookup declared over several fields, give those field names joined with commas (`status,area`) and put the values in `values`. */
     field: string;
-    /** Exact value to match. Mutually exclusive with `from`/`to` and `prefix`. Sensitive fields can only be looked up by exact value, and only through this body variant. */
+    /** Exact value to match. Mutually exclusive with `from`/`to`, `prefix` and `values`. Sensitive fields can only be looked up by exact value, and only through this body variant. For a lookup over several fields, use `values` instead. */
     value?: string;
+    /**
+     * Exact values to match, for a lookup declared over several fields — one value per field, in the order the lookup declares them. Mutually exclusive with `value`; a single-element list is exactly `value` written uniformly.
+     *
+     * You may supply fewer values than the lookup declares, as long as they are a leading run of its fields: on a lookup over `[status, area, owner]` you can match `status`, or `status` and `area`, but never `area` alone. Supplying fewer values returns the records grouped by the fields you left unspecified; `sortFrom`/`sortTo` then need every value, because sorting is only continuous within one fully specified combination.
+     */
+    values?: string[];
     /** Inclusive lower bound for a range lookup (requires `to`; non-sensitive fields only). Mutually exclusive with `value` and `prefix`. */
     from?: string;
     /** Inclusive upper bound for a range lookup (requires `from`). */
     to?: string;
     /** Prefix to match (string, non-sensitive fields only). Mutually exclusive with `value` and `from`/`to`. */
     prefix?: string;
+    /** Inclusive lower bound on the lookup field's sort key, narrowing a `value` match to records whose sort key is at or after this point. Use with `value`; may be combined with `sortTo` to bound both ends. Give the bound in the same form as the sorted field's own values — epoch milliseconds when the lookup sorts by `createdAt` or `lastUpdated`. Records with no value for the sorted field are never included in a bounded window. */
+    sortFrom?: string;
+    /** Inclusive upper bound on the lookup field's sort key, narrowing a `value` match to records whose sort key is at or before this point. Use with `value`; may be combined with `sortFrom`. */
+    sortTo?: string;
     /** Pagination cursor — pass the `nextCursor` returned by the previous page. */
     startFrom?: string;
     /** Maximum number of records to return per page (1–100; defaults to 20). */

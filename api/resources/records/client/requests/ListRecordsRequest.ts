@@ -7,7 +7,7 @@
  *         folderId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
  *         userId: "550e8400-e29b-41d4-a716-446655440000",
  *         scope: "group:eng-team",
- *         startFrom: "550e8400-e29b-41d4-a716-446655440000"
+ *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl"
  *     }
  */
 export interface ListRecordsRequest {
@@ -17,9 +17,9 @@ export interface ListRecordsRequest {
     folderId?: string;
     /** Filter to records owned by this user. The value is the Vectros-assigned UUID of a user; resolve one from your own ID via `GET /v1/users?externalId=`. */
     userId?: string;
-    /** Filter to records carrying this scope value, in `namespace:value` form — for example `group:eng-team`, `org:<id>`, or `client:<id>`. Resolve an entity's UUID from your own identifier via `GET /v1/entities/{namespace}?externalId=`. Combine with `type` or `folderId`. */
+    /** Filter to records carrying this scope value, in `namespace:value` form (a value is 1-128 chars: a letter or digit first, then letters, digits, `_` or `-`) — for example `group:eng-team`, `org:<id>`, or `client:<id>`. Resolve an entity's UUID from your own identifier via `GET /v1/entities/{namespace}?externalId=`. Combine with `type` or `folderId`. */
     scope?: string;
-    /** Pagination cursor. Pass the `nextCursor` returned by the previous page to fetch the next page; omit it for the first page. */
+    /** Pagination cursor. Pass the `nextCursor` returned by the previous page to fetch the next page; omit it for the first page. The cursor is **opaque** — echo it back unchanged, and do not parse it or construct one. Keep every other query parameter identical while paging: a cursor is valid only for the exact query that returned it, and reusing one against a different query is rejected with a 400. */
     startFrom?: string;
     /** Maximum number of records to return per page. Allowed range 1–100; defaults to 20. */
     limit?: number;

@@ -189,7 +189,7 @@ export class AuthClient {
     }
 
     /**
-     * Lists all of your scoped API keys (`ssk_*`) across both your live and test environments. Revoked keys are excluded. Requires the `keys:r` scope.
+     * Lists your scoped API keys (`ssk_*`) in your credential's own environment — a live key lists live keys, a test key lists test keys. Revoked keys are excluded. Requires the `keys:r` scope.
      *
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
      *
@@ -642,7 +642,7 @@ export class AuthClient {
     }
 
     /**
-     * Creates a new access profile under the given app context. This call is idempotent by `principalId`: if a profile with the same `principalId` already exists, the existing profile is returned (with status 200) instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing profile was returned) tells the two apart. To overwrite an existing profile's `scopes`/`roleId`, `identityOverrides`, and `status` instead of returning it unchanged, set `?upsert=true` (this also requires the `profiles:u` scope). You must provide exactly one of `scopes` (an inline list of scopes) or `roleId` (a reference to a role); supplying both, or neither, is rejected. `identityOverrides` is keyed by ownership namespace in `scope:<namespace>` form — `scope:org` and `scope:client` for the reserved namespaces, or any namespace you have registered — and may name at most two; any other key (including the account identifier or `userId`) is rejected. If you use a scoped credential, the profile's effective scopes may not exceed your own; a root API key (`sk_`) is exempt. Requires the `profiles:c` scope.
+     * Creates a new access profile under the given app context. This call is idempotent by `principalId`: if a profile with the same `principalId` already exists, the existing profile is returned (with status 200) instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing profile was returned) tells the two apart. To overwrite an existing profile's `scopes`/`roleId`, `identityOverrides`, and `status` instead of returning it unchanged, set `?upsert=true` (this also requires the `profiles:u` scope, and applies the same `identityOverrides` bounds the update endpoint documents — a scoped credential may not repoint or clear an identity value it does not itself hold). You must provide exactly one of `scopes` (an inline list of scopes) or `roleId` (a reference to a role); supplying both, or neither, is rejected. `identityOverrides` is keyed by ownership namespace in `scope:<namespace>` form — `scope:org` and `scope:client` for the reserved namespaces, or any namespace you have registered — and may name at most two; any other key (including the account identifier or `userId`) is rejected. If you use a scoped credential, the profile's effective scopes may not exceed your own; a root API key (`sk_`) is exempt. Requires the `profiles:c` scope.
      *
      * @param {Vectros.CreateAccessProfileRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -1146,7 +1146,7 @@ export class AuthClient {
     }
 
     /**
-     * Updates an access profile. This is a partial update: any field you omit (or send as null) keeps its existing value. A profile must reference either inline `scopes` or a `roleId`, never both — so setting `scopes` clears any `roleId`, and setting `roleId` clears any inline `scopes`. The `contextId` and `principalId` are immutable. Status changes (for example active to suspended) take effect within about five minutes. If you use a scoped credential, the profile's effective scopes may not exceed your own; a root API key (`sk_`) is exempt. Requires the `profiles:u` scope.
+     * Updates an access profile. This is a partial update: any field you omit (or send as null) keeps its existing value. A profile must reference either inline `scopes` or a `roleId`, never both — so setting `scopes` clears any `roleId`, and setting `roleId` clears any inline `scopes`. The `contextId` and `principalId` are immutable. Status changes (for example active to suspended) take effect within about five minutes. If you use a scoped credential, the profile's effective scopes may not exceed your own, and its `identityOverrides` are bounded twice: you may only set a value your own identity holds, and you may only change or clear a value the profile already holds if that value is yours as well. Repointing or clearing another principal's established identity therefore returns 403. A root API key (`sk_`) is exempt. Requires the `profiles:u` scope.
      *
      * @param {Vectros.UpdateAccessProfileRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -1230,7 +1230,7 @@ export class AuthClient {
     }
 
     /**
-     * Deletes an access profile. Within about five minutes (the access-profile cache lifetime), token minting for this principal in this context will be denied. Requires the `profiles:d` scope.
+     * Deletes an access profile. Within about five minutes (the access-profile cache lifetime), token minting for this principal in this context will be denied. If you use a scoped credential and the profile carries `identityOverrides`, you may only delete it when you hold those values yourself — deleting a profile removes its identity, so the same bound applies as when clearing it. A profile with no `identityOverrides` is unaffected, and a root API key (`sk_`) is exempt. Requires the `profiles:d` scope.
      *
      * @param {Vectros.DeleteAccessProfileRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2243,7 +2243,7 @@ export class AuthClient {
     }
 
     /**
-     * Invite a new member to one of your app contexts by email. Creates a pending user with a pre-resolved access profile (their permissions on accept) and signs an invitation token. This call is idempotent on the combination of context and email: re-inviting the same email in the same context rotates the token and resends the invitation rather than creating a duplicate. Returns HTTP 201 on a new invite or a successful resend. Returns 409 if that email already belongs to an active or suspended member of the app context, or already has an identity elsewhere in your account (an email can currently belong to only one tenant per account, i.e. your test and live environments cannot share an email). When `sendEmail` is false, the response includes the raw token and a ready-to-use accept link so you can deliver the invitation through your own email provider. Requires the `admin:users` scope.
+     * Invite a new member to one of your app contexts by email. Creates a pending user with a pre-resolved access profile (their permissions on accept) and signs an invitation token. This call is idempotent on the combination of context and email: re-inviting the same email in the same context rotates the token and resends the invitation rather than creating a duplicate — this requires the `users:r` and `users:u` scopes in addition to `users:c`, because resending rotates a credential on an existing invitation and invalidates any link already sent. Without them the collision returns 409 instead, with no invitation details and no change to the outstanding invitation. Returns HTTP 201 on a new invite or a successful resend. Returns 409 if that email already belongs to an active or suspended member of the app context, or already has an identity elsewhere in your account (an email can currently belong to only one tenant per account, i.e. your test and live environments cannot share an email). When `sendEmail` is false, the response includes the raw token and a ready-to-use accept link so you can deliver the invitation through your own email provider. Requires the `users:c` scope.
      *
      * @param {Vectros.CreateInviteRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2325,7 +2325,7 @@ export class AuthClient {
     }
 
     /**
-     * Resend an outstanding invitation, identified by its email and app context. Rotates the invitation token and extends its expiry, then (when `sendEmail` is true) re-delivers the email. Rotating the token invalidates any previously issued link for this invitation, so only the newest link works. The invitee's pending permissions are left unchanged. Requires the `admin:users` scope.
+     * Resend an outstanding invitation, identified by its email and app context. Rotates the invitation token and extends its expiry, then (when `sendEmail` is true) re-delivers the email. Rotating the token invalidates any previously issued link for this invitation, so only the newest link works. The invitee's pending permissions are left unchanged. Because this rotates a credential on an existing invitation, it requires the `users:c`, `users:r` and `users:u` scopes.
      *
      * @param {Vectros.CreateInviteRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.

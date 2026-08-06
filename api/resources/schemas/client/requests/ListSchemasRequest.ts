@@ -7,7 +7,7 @@
  *         scope: "org:6ba7b810-9dad-11d1-80b4-00c04fd430c8",
  *         surface: "document",
  *         recordType: "intake_form",
- *         startFrom: "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+ *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl"
  *     }
  */
 export interface ListSchemasRequest {
@@ -19,7 +19,7 @@ export interface ListSchemasRequest {
     surface?: string;
     /** Resolve the single schema for this record type — the natural handle for a schema, and the direct alternative to remembering its opaque id. Returns a one-element page, or an empty page if no such schema exists. Resolved in the calling context for record and document types; combine with `surface=user` or `surface=entity` to resolve an account-wide identity schema. A type name may have several schemas in one context — a shared base, plus per-owner variants declared via `basedOn` — and resolution shadows by ownership: your own `userId`- or `scope`-owned variant wins if you have one, otherwise the shared base. For a scoped credential the owner is always your own token identity; `userId`/`scope` here only apply as an explicit owner selector for a root API key (a scoped credential's own identity always governs resolution, and a `scope` filter still narrows the result afterward regardless of credential type). */
     recordType?: string;
-    /** Pagination cursor. Pass the `nextCursor` from the previous page to fetch the next page; omit it for the first page. */
+    /** Pagination cursor. Pass the `nextCursor` returned by the previous page to fetch the next page; omit it for the first page. The cursor is **opaque** — echo it back unchanged, and do not parse it or construct one. Keep every other query parameter identical while paging: a cursor is valid only for the exact query that returned it, and reusing one against a different query is rejected with a 400. */
     startFrom?: string;
     /** Maximum number of schemas to return per page (1–100; defaults to 20). */
     limit?: number;

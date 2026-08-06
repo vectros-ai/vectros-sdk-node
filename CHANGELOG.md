@@ -9,6 +9,275 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.38.0 — 2026-07-29
+
+**Upgrading — three things need action; everything else is additive.**
+
+1. **Page on the cursor, not the page size.** Keep requesting while `nextCursor` is non-null and stop
+   only when it is null. A short or empty page does **not** mean you are done. If you built a
+   `startFrom` yourself from a record id, that now returns `400` — echo back `nextCursor` verbatim.
+2. **`lookupFields[].fieldName` is now optional**, so typed SDK clients that read it must handle its
+   absence. It is the only change in this release that can stop a client compiling.
+3. **A cursor issued before this release is refused** with `400`; start the query again. This affects
+   only a page turn that straddles the deploy.
+
+### Added
+
+- **Look records up by several fields at once.** A schema's `lookupFields` entry can now name two or
+  three fields together instead of one, and the lookup then matches all of them — *"every record where
+  `status` is `open` **and** `area` is `billing`"*, exact, completely, in a stable order, with the same
+  cursor pagination every other lookup has. Declare it with `fieldNames` in place of `fieldName`:
+
+  ```json
+  { "lookupFields": [{ "fieldNames": ["status", "area"] }] }
+  ```
+
+  Query it by joining the field names with commas as `field`, plus one value per field in the new
+  `values` parameter — repeated on `GET`, or an array in the body on `POST`:
+
+  ```
+  GET /v1/records/lookup?type=ticket&field=status,area&values=open&values=billing
+  ```
+
+  `values` is a **new, optional** parameter that sits alongside `value`; supply one or the other. A
+  single-element `values` is exactly `value`, so nothing you already send changes meaning.
+
+  **The order of `fieldNames` matters, and it is not something you can change later.** Re-declaring the
+  same fields in a different order creates a *separate* lookup, indexed independently and at its own
+  index cost, matching only records written after you declare it — it does not reorder the original. So
+  choose the order deliberately: you can match on the first field alone, the first two together, and so
+  on — any leading run of the list — but never on a later field by itself. Declare a separate lookup for
+  that.
+
+  **Supplying fewer values than the lookup declares is allowed, and returns the records grouped by the
+  fields you left unspecified.** Matching only `status` on a `[status, area]` lookup returns every `open`
+  record, ordered so that records sharing an `area` come out together. `sortBy` orders records *within*
+  each group, not across them — so if you need a single overall ordering, or a `sortFrom`/`sortTo`
+  window, supply a value for every field.
+
+  Available on record lookups. A lookup over several fields cannot set `unique` (tuple-uniqueness is not
+  enforceable) or `rangeEnabled` (it is an exact-match index — declare the range lookup separately), and
+  its schema must list `record` as its only entry in `allowedSurfaces`. Document, user and entity lookups
+  match a single field and are unchanged.
+- `users:crud` to the standard scope-action catalog, so the `users` verbs are selectable in the
+  developer portal's scope editor.
+- **`Vectros-Version` request header — pin the response shape your client expects.** Send
+  `Vectros-Version: 2026-08-01` to lock the shape of what you get back: fields, envelope, pagination,
+  enum values, error bodies. It never affects behaviour — authorization, tenant isolation, quota
+  enforcement and security fixes are identical under every version.
+
+  **Sending nothing changes nothing.** Requests without the header are served exactly as they are today.
+  Responses echo `Vectros-Version` so you can confirm which shape you received; a version we do not
+  publish returns `400` with `errorCode: UNSUPPORTED_WIRE_VERSION` and the list of supported versions.
+
+  `2026-08-01` is the only published version and describes the API as it behaves today. Versions are
+  supported for 12 months after a successor is published, and deprecated versions carry `Deprecation`
+  (RFC 9745) and `Sunset` (RFC 8594) headers first.
+
+  Two limits to know: the streaming endpoints (`POST /v1/rag`, `POST /v1/chat`,
+  `POST /v1/documents/{id}/ask`) ignore the header for now — note `POST /v1/documents` honours it while
+  `POST /v1/documents/{id}/ask` does not — and the SDKs do not send it yet, so SDK calls use your
+  account's default. Both land before a second version is published.
+
+  **`Vectros-Version` is not the SDK version.** The SDK version moves on any change to the API surface,
+  including additive ones like a new endpoint or field. A new `Vectros-Version` is published only when
+  the shape of an existing response changes in a way that would break a client. Upgrading your SDK
+  therefore does not change the response shape you are served — this header does.
+- **`sortFrom` / `sortTo` on record lookup.** An exact-`value` lookup on `GET` or
+  `POST /v1/records/lookup` can now be narrowed to a window of the lookup field's sort key — for
+  example, one session's records from a given timestamp onward — instead of paging the whole match.
+  Both bounds are inclusive, either may be given on its own, and they are expressed in the sort
+  field's own units (epoch milliseconds when the lookup sorts by `createdAt` or `lastUpdated`).
+  Records with no value for the sorted field are never included in a bounded window — they sort
+  ahead of every record that has one — so the sorted field does not need to be `required`.
+  Results page with the usual `{data, nextCursor}` envelope — **keep
+  requesting until `nextCursor` is `null`**, since a page can come back empty or shorter than
+  `limit` while further results remain.
+- **Placement matchers in `data_scope`.** A clause can now claim a whole ownership dimension without
+  enumerating its values. `"${{ any }}"` matches any value present in that dimension — deliberately
+  *not* an item with no value there, so combine it with `null` to cover both.
+  `"${{ under.self.userId }}"` and `"${{ under.self.scope.<namespace> }}"` match values whose immediate
+  parent is your credential's own — one level, not a full ancestor walk — so a credential confined to an
+  organization can work with the clients under it without naming each one at mint time. The existing
+  `"${{ self.* }}"` forms are unchanged.
+- **The `"*"` dimension wildcard in `data_scope`.** `{"*": ["${{ any }}", null]}` states a rule for
+  every dimension the clause does not name explicitly; a named dimension always takes precedence over
+  it. Use it to grant across all ownership dimensions without enumerating them.
+- Any other `${{ … }}` spelling in a `data_scope` value is now **rejected when you author it**, rather
+  than being stored as a literal that quietly matched nothing.
+
+### Security
+
+- **A user's `email` can no longer be changed while an invitation to them is outstanding.**
+  `PUT /v1/users/{userId}` and `POST /v1/users?upsert=true` now return `400` for that one
+  case; every other mutable field is unaffected, and the address is editable again once the
+  invitation is accepted or the user is removed. Revoke and re-invite to change where an outstanding
+  invitation goes. Previously the change was accepted, leaving the invitation addressed to one
+  mailbox and the user record pointing at another.
+
+- **An access profile can no longer name a role that does not exist.** A `roleId` naming no role in the
+  app context now returns `400` identifying it — on `POST /v1/users/invite`, on
+  `POST /v1/app-contexts/{contextId}/profiles` (including `?upsert=true`) and
+  `PUT /v1/app-contexts/{contextId}/profiles/{principalId}`, and when creating a scoped key bound to
+  such a profile. Previously the reference was accepted and stored: the profile looked valid, the
+  principal it named could never obtain a scoped token, and nothing indicated why.
+
+- **Changing or clearing an access profile's `identityOverrides` now requires that you hold the value you
+  are replacing.** A scoped credential could already only *set* an identity value it holds itself. It could
+  still point another principal's established identity at its own value, or wipe it by sending an empty
+  map — neither of which is setting a value you do not hold, so neither was refused. Both now return `403`
+  on `PUT /v1/app-contexts/{contextId}/profiles/{principalId}` and on
+  `POST /v1/app-contexts/{contextId}/profiles?upsert=true`.
+
+  **`DELETE /v1/app-contexts/{contextId}/profiles/{principalId}` is covered by the same rule**, because
+  deleting a profile removes its identity just as completely: a scoped credential can no longer delete a
+  profile whose `identityOverrides` hold a value it does not. Deleting a profile that carries no
+  `identityOverrides` — the ordinary case — is unchanged.
+
+  Also unchanged: giving your own identity to a profile that has none, editing or deleting a profile whose
+  identity is already yours, omitting `identityOverrides` to leave it alone, and root API keys, which are
+  exempt throughout. If you manage profiles with a scoped credential that carries no identity of its own,
+  note that it can no longer clear `identityOverrides`, nor delete an identity-bearing profile — use a
+  root key for those.
+- **Minting a scoped API key now requires that you hold the identity it would carry.** `POST
+  /v1/admin/keys/scoped` already refused to mint a key whose *scopes* exceed your own; it did not check the
+  bound access profile's `identityOverrides`, even though a scoped key acts as that identity when it reads
+  and writes. A scoped caller binding a key to a profile whose identity it does not hold now gets `403`.
+  Root API keys are unaffected, and a profile with no `identityOverrides` mints exactly as before.
+- Resending an invitation requires `users:r` and `users:u` in addition to `users:c`. Without them, a
+  re-invite collision returns `409`.
+- An API key administers scoped API keys (`ssk_*`) only in its own environment; a key in your other
+  environment returns `404`.
+- **A clause that says nothing about an ownership dimension no longer authorizes writing data into it.**
+  Previously a clause with no `data_scope` — or one omitting a dimension — could place a record in that
+  dimension. Reading is unaffected: a dimension a clause does not mention still does not narrow reads.
+  If a credential needs to place data in a dimension, name that dimension in `data_scope` (or use `"*"`).
+- **Pagination cursors are now encrypted, so a cursor no longer reveals anything about the row it
+  resumes from.** A cursor has always been documented as opaque — *echo it back, do not parse it* — but
+  it was only encoded, so a determined caller could decode one. What that exposed matters when your
+  credential's data scope narrows what you may read: a listing filters results **after** reading a page,
+  and the cursor necessarily points at the last row *read* rather than the last row *returned*. A caller
+  could therefore decode their own cursor and learn the id — and, for a lookup ordered by a text field,
+  the field value — of a row their scope had just denied them, one row per request and with no entry in
+  the read-access log. Cursors are now sealed: the id and field values a cursor carries can no longer be
+  read out of one.
+
+  **Nothing changes for a conforming client.** If you echo the cursor back unmodified, as the contract has
+  always required, you will notice only that the token looks different. If you have code that inspects,
+  parses, stores long-term, or **compares** cursors, it will stop working — comparison in particular, since
+  the same resume position now encrypts to a different token every time.
+
+### Changed
+
+- **`lookupFields[].fieldName` is now optional.** This is the one change in this release that can stop a
+  typed SDK client compiling, so it is worth stating precisely: a lookup now declares either `fieldName`
+  or `fieldNames`, so `fieldName` became optional on `LookupDef` in the TypeScript, Python and Java SDKs.
+  Code that *reads* `fieldName` off a schema response must handle it being absent — a lookup over several
+  fields reports `fieldNames` instead. This affects reading a schema as much as writing one: if you GET a
+  schema, change something, and PUT it back, a lookup over several fields must carry its `fieldNames`
+  through, or the update is rejected.
+
+  Nothing else about lookups changed shape. `values` is a new optional parameter everywhere it appears
+  (`GET`/`POST /v1/records/lookup` and `BatchLookupInput`); no existing parameter changed type, and no
+  request you send today means anything different.
+
+- **Scope values now have a character grammar.** The `<value>` half of a `<namespace>:<value>` pair must
+  be 1–128 characters, start with a letter or digit, and otherwise contain only letters, digits, `_` and
+  `-`. This applies everywhere a scope value is written or filtered on: the `scopes` array on records,
+  documents, folders, schemas and entities; the `?scope=` list filter; an access profile's
+  `identityOverrides`; and the `identity` block of `POST /v1/auth/token`. Entity IDs and identifiers such
+  as `eng-team` or `org_x` are unaffected — but a value containing a colon, a space, or other punctuation
+  is now rejected with `400` where it was previously accepted and stored. A stored value containing a
+  colon could cause scoped list and search requests in your account to fail, so such values are now
+  refused at the point they are written rather than at the point they are read.
+- The scoped-API-key plan limit is counted per environment rather than per account.
+- **A credential's `identity` no longer limits which value it may write into a scope dimension — the
+  clause does.** `identity` supplies the default value stamped when you do not state one, and is what
+  `${{ self.* }}` resolves against. So a credential whose identity is `org:A` and whose clause admits
+  `["A","B"]` may now create *and* update records into `B`; previously it could do neither on update,
+  and the two verbs disagreed. To confine a credential to its own value, write that in the clause as
+  `"${{ self.scope.<namespace> }}"`.
+- **The owning user (`userId`) remains server-attributed**, on create and update alike: a request whose
+  `userId` conflicts with the credential's identity is rejected rather than silently overridden, even
+  when the clause would otherwise admit the value.
+- **An update rejected because its resulting ownership falls outside your `data_scope` now returns `400`
+  consistently.** Some of these previously returned `403` and some `400` — which one you got depended on
+  whether your clause happened to name the dimension you were writing to, not on anything you did
+  differently. The verdict is unchanged; only the status is now predictable, and it matches what the same
+  denial has always returned on create. `403` on an update is now reserved for reassigning the
+  server-attributed `userId`, and a record your credential may not write remains a uniform `404`.
+- **Creating an identity entity no longer matches your clause against the entity's own namespace
+  dimension.** An entity in namespace `team` is always in scope `team:<its own id>`, and that id is
+  generated by the create you are making — so no clause written beforehand could name it, and until now
+  a credential confined to `{"scope:team": ["${{ under.self.userId }}"]}` could read the entities it
+  owned but never create one. That single dimension is now exempt from the match on
+  `POST /v1/entities/{namespace}`, and only there: every other dimension in the same clause still
+  decides, and reads, updates and deletes match it normally. One consequence worth knowing when you
+  write roles — a clause whose `data_scope` names **only** that dimension does not restrict what you may
+  create, and the entity it creates may fall outside it once the id exists.
+- **`startFrom` is now an opaque token on every lookup and list endpoint, and must be echoed back
+  unchanged.** Pass back the `nextCursor` you were given, verbatim. If you built a `startFrom` yourself
+  from a record id — which worked on some endpoints — that now returns `400`.
+
+  The one exception is the `/versions` history reads (on records, documents, folders, schemas, entities,
+  roles and access profiles), which still resume from a row id. Handing one of those a cursor from a
+  list call returns a `400` naming `startFrom`.
+
+- **`RecordLookupResponse` is renamed to `RecordLookupPage`.** SDK type name only — the JSON is
+  byte-identical. **Typed SDK clients that name the class must rename it**; clients reading the JSON
+  need no change.
+- **A cursor is valid only for the exact query that returned it.** Keep every other parameter identical
+  while paging. Changing the lookup mode mid-pagination (dropping `sortTo`, switching from `from`/`to`
+  to `value`) returns a `400` explaining what to do.
+- **A transient storage fault on a listing now returns an error instead of an empty page.** These
+  previously returned `200` with `{data: [], nextCursor: null}` — indistinguishable from "you have no
+  matching records". Retry on `5xx` rather than treating an empty page as authoritative.
+- **In-flight pagination does not survive this release.** A cursor issued before it is refused with
+  `400`; start the query again. Cursors are short-lived by design, so this affects only a page turn
+  that straddles the deploy. **`Vectros-Version` does not shield you from this** — it pins the *shape*
+  of a response, not the validity of a token already issued, and a cursor is a value rather than a
+  shape.
+
+### Fixed
+
+- **A listing or lookup could report itself complete while results remained.** These endpoints decided
+  "there are no more pages" by checking whether a page came back full. A page comes back short for a
+  reason unrelated to being the last one: the storage layer returns at most 1 MB per read, so a page of
+  large records ends early with more behind it. You would receive a handful of records and
+  `nextCursor: null`, and correctly conclude that was all of them. A range lookup reads as exhaustive
+  ("everything between these two values"), so the wrong answer looked right.
+
+  Affected: `GET /v1/records` and `GET /v1/documents` on every filter (`?type=`, `?folderId=`,
+  `?recent=true` and unfiltered); `GET`/`POST /v1/records/lookup` and `/v1/documents/lookup` narrowed by
+  `from`/`to` or `prefix`, and the same modes on `/v1/users` and `/v1/entities/{namespace}`; and
+  `GET /v1/records`, `/v1/documents`, `/v1/folders`, `/v1/schemas` and `/v1/entities/{namespace}`
+  narrowed by `userId` or `scope`. On the range and prefix modes your `limit` never reached the query at
+  all.
+
+  **How exposed you were depended on a setting you chose.** A schema with `storageProfile: LOW_LATENCY`
+  keeps record payloads inline, so on those types as few as **three large records** could fill a read and
+  truncate the listing. `STANDARD` and `LARGE_PAYLOAD` schemas were far less affected. This applied to
+  every credential, including root API keys.
+
+  All of these now page on a cursor, which is the only sound completeness signal. **The affected case is
+  a page that came back SHORTER than your `limit`**, not one that came back full.
+
+- **A schema could be deleted while records of its type still existed.** Deleting a schema checks first
+  that no records reference it, but a transient storage fault during that check was indistinguishable
+  from "no records found", so the delete proceeded and left those records pointing at a schema that no
+  longer existed. The check now fails loudly on a fault, and the delete is refused.
+- **Lookup ordering on text fields is now the field's natural order**, and an item that leaves the sort
+  field empty sorts consistently ahead of the items that fill it rather than being placed among them by
+  creation time. Ordering by a number, date, boolean or timestamp field is unchanged. Applies to every
+  lookup that accepts `order` — records, documents, folders, users and entities.
+
+  **Both apply to items written from this release onward.** Items written earlier keep their previous
+  ordering until they are next updated, so a lookup spanning both can show the two groupings side by
+  side; any update to an item brings it onto the new ordering.
+
+- Ownership-constrained scoped credentials no longer receive a spurious `404` on app contexts, roles and
+  access profiles, for any verb their scope grants. Also affects `POST /v1/admin/keys/scoped` and
+  `POST /v1/users/invite[/resend]`.
 ## 0.37.0 — 2026-07-27
 
 ### Added

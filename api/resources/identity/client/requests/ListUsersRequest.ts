@@ -6,7 +6,7 @@ import type * as Vectros from "../../../../index.js";
  * @example
  *     {
  *         externalId: "usr_12345",
- *         startFrom: "550e8400-e29b-41d4-a716-446655440000",
+ *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl",
  *         type: "person_v1",
  *         field: "team",
  *         value: "engineering",
@@ -16,7 +16,7 @@ import type * as Vectros from "../../../../index.js";
 export interface ListUsersRequest {
     /** Look up a single user by your own `externalId`. Returns a one-element list, or an empty list if no match. Cannot be combined with the `type`/`field`/`value` lookup parameters. */
     externalId?: string;
-    /** Pagination cursor. Pass the `nextCursor` from the previous page to fetch the next page; omit it for the first page. */
+    /** Pagination cursor. Pass the `nextCursor` returned by the previous page to fetch the next page; omit it for the first page. The cursor is **opaque** — echo it back unchanged, and do not parse it or construct one. Keep every other query parameter identical while paging: a cursor is valid only for the exact query that returned it, and reusing one against a different query is rejected with a 400. */
     startFrom?: string;
     /** Maximum number of users to return per page (1–100; defaults to 20). */
     limit?: number;

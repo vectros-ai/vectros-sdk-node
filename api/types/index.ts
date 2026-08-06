@@ -86,7 +86,7 @@ export * from "./ReadAccessLogResponse.js";
 export * from "./ReadAccessSection.js";
 export * from "./ReadCalls.js";
 export * from "./ReadsSection.js";
-export * from "./RecordLookupResponse.js";
+export * from "./RecordLookupPage.js";
 export * from "./RecordPage.js";
 export * from "./RecordRequest.js";
 export * from "./RecordResponse.js";

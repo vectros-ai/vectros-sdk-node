@@ -252,7 +252,7 @@ export class RecordsClient {
      *         folderId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
      *         userId: "550e8400-e29b-41d4-a716-446655440000",
      *         scope: "group:eng-team",
-     *         startFrom: "550e8400-e29b-41d4-a716-446655440000"
+     *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl"
      *     })
      */
     public listRecords(
@@ -481,6 +481,7 @@ export class RecordsClient {
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
@@ -542,6 +543,8 @@ export class RecordsClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
@@ -636,6 +639,7 @@ export class RecordsClient {
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
@@ -695,6 +699,8 @@ export class RecordsClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
@@ -714,7 +720,15 @@ export class RecordsClient {
     }
 
     /**
-     * Finds records by the value of a lookup field declared on the type's schema. Provide exactly one lookup mode: `value` (exact match), `from`+`to` (inclusive range, ascending by value), or `prefix` (string fields only, ascending). Range and prefix lookups are not supported on a sensitive field, because its value is stored as a blind index and has no sortable order. An exact-`value` lookup on a sensitive field is also rejected on this GET endpoint — the value must not appear in the URL — so use the `POST /v1/records/lookup` body variant for sensitive fields. Results are paginated: set `limit` for the page size and pass the returned `nextCursor` back as `startFrom` for the next page. Requires the `records:r:<type>` scope.
+     * Finds records by the value of a lookup field declared on the type's schema. Provide exactly one lookup mode: `value` (exact match), `from`+`to` (inclusive range, ascending by value), or `prefix` (string fields only, ascending). Range and prefix lookups are not supported on a sensitive field, because its value is stored as a blind index and has no sortable order. An exact-`value` lookup on a sensitive field is also rejected on this GET endpoint — the value must not appear in the URL — so use the `POST /v1/records/lookup` body variant for sensitive fields.
+     *
+     * A `value` lookup can additionally be narrowed to a window of the lookup field's **sort key** using `sortFrom` and/or `sortTo` (inclusive) — for example, one session's records created since a timestamp. The sort key is whatever the schema declares as that lookup's `sortBy` (`createdAt` by default, `lastUpdated`, or another field), and bounds are given in that field's own units — epoch milliseconds for the two timestamp options. **Records that have no value for the sorted field are never included in a bounded window** — they are ordered ahead of every record that does have one, and a `sortFrom`/`sortTo` window only ever selects from records carrying a value. The sorted field does not have to be `required`.
+     *
+     * Narrowing is available on any lookup field your schema declares for fast equality lookup, and on `externalId` — which is always ordered by creation time, so its bounds are epoch milliseconds whatever the schema says. It is rejected (`400`) for a field declared with `rangeEnabled`, for a field declared beyond the schema's fast-lookup budget, for a lookup whose `sortBy` names a sensitive field (a sensitive value is stored as a blind index and has no order), and for a window whose start is after its end. Ownership fields are not lookup fields on this endpoint at all — see the `field` parameter.
+     *
+     * While paging a narrowed lookup, keep every other parameter identical. The cursor is valid only for the exact query that returned it — changing `order`, `sortFrom`, `sortTo`, or dropping them altogether, is rejected rather than silently resumed at a position that means something different in the new query.
+     *
+     * Results are paginated: set `limit` for the page size and pass the returned `nextCursor` back as `startFrom` for the next page. **Keep paging until `nextCursor` is null** — a page can come back empty or shorter than `limit` while more results remain, so an empty page is not the end of the results. Requires the `records:r:<type>` scope.
      *
      * @param {Vectros.LookupRecordsRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -726,29 +740,47 @@ export class RecordsClient {
      *         type: "intake_form",
      *         field: "email",
      *         value: "jane@example.com",
+     *         values: ["open"],
      *         prefix: "jane",
-     *         startFrom: "550e8400-e29b-41d4-a716-446655440000"
+     *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl"
      *     })
      */
     public lookupRecords(
         request: Vectros.LookupRecordsRequest,
         requestOptions?: RecordsClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.RecordLookupResponse> {
+    ): core.HttpResponsePromise<Vectros.RecordLookupPage> {
         return core.HttpResponsePromise.fromPromise(this.__lookupRecords(request, requestOptions));
     }
 
     private async __lookupRecords(
         request: Vectros.LookupRecordsRequest,
         requestOptions?: RecordsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.RecordLookupResponse>> {
-        const { type: type_, field, value, from: from_, to, prefix, startFrom, limit, includePayload, order } = request;
+    ): Promise<core.WithRawResponse<Vectros.RecordLookupPage>> {
+        const {
+            type: type_,
+            field,
+            value,
+            values,
+            from: from_,
+            to,
+            prefix,
+            sortFrom,
+            sortTo,
+            startFrom,
+            limit,
+            includePayload,
+            order,
+        } = request;
         const _queryParams: Record<string, unknown> = {
             type: type_,
             field,
             value,
+            values,
             from: from_,
             to,
             prefix,
+            sortFrom,
+            sortTo,
             startFrom,
             limit,
             includePayload,
@@ -780,7 +812,7 @@ export class RecordsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as Vectros.RecordLookupResponse, rawResponse: _response.rawResponse };
+            return { data: _response.body as Vectros.RecordLookupPage, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
@@ -800,7 +832,7 @@ export class RecordsClient {
     }
 
     /**
-     * Body-based equivalent of `GET /v1/records/lookup`. Use this when looking up by a sensitive field: the value travels in the request body (and is blind-indexed server-side) instead of in the URL query string, so it never lands in access, CDN, or proxy logs. The GET variant rejects an exact-value lookup on a sensitive field and directs you here. Non-sensitive exact-value, range (`from`+`to`), and prefix lookups also work here. Returns the same `{data, nextCursor}` envelope and uses the same pagination as the GET variant. Requires the `records:r:<type>` scope.
+     * Body-based equivalent of `GET /v1/records/lookup`. Use this when looking up by a sensitive field: the value travels in the request body (and is blind-indexed server-side) instead of in the URL query string, so it never lands in access, CDN, or proxy logs. The GET variant rejects an exact-value lookup on a sensitive field and directs you here. Non-sensitive exact-value, range (`from`+`to`), and prefix lookups also work here, as does narrowing a `value` lookup by the field's sort key with `sortFrom`/`sortTo` — see the GET variant for what the sort key is and when narrowing by it is available. Returns the same `{data, nextCursor}` envelope and uses the same pagination as the GET variant; keep paging until `nextCursor` is null rather than stopping on an empty page. Requires the `records:r:<type>` scope.
      *
      * @param {Vectros.RecordLookupRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -817,14 +849,14 @@ export class RecordsClient {
     public lookupRecordsByBody(
         request: Vectros.RecordLookupRequest,
         requestOptions?: RecordsClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.RecordLookupResponse> {
+    ): core.HttpResponsePromise<Vectros.RecordLookupPage> {
         return core.HttpResponsePromise.fromPromise(this.__lookupRecordsByBody(request, requestOptions));
     }
 
     private async __lookupRecordsByBody(
         request: Vectros.RecordLookupRequest,
         requestOptions?: RecordsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.RecordLookupResponse>> {
+    ): Promise<core.WithRawResponse<Vectros.RecordLookupPage>> {
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -850,7 +882,7 @@ export class RecordsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as Vectros.RecordLookupResponse, rawResponse: _response.rawResponse };
+            return { data: _response.body as Vectros.RecordLookupPage, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {

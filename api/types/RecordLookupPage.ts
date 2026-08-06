@@ -3,11 +3,11 @@
 import type * as Vectros from "../index.js";
 
 /**
- * A page of access profiles — a `{data, nextCursor}` envelope. `nextCursor` is an opaque cursor, null when no more pages remain; pass it back to fetch the next page.
+ * A page of records matched by a structured-field lookup, as a `{data, nextCursor}` envelope. Records are returned in lookup order: ascending by field value for range and prefix lookups, and lookup-key order for exact-match lookups. `nextCursor` is an opaque cursor — pass it back as `startFrom` to fetch the next page, or null when no more pages remain.
  */
-export interface AccessProfilePage {
+export interface RecordLookupPage {
     /** The items on this page, in the endpoint's natural order. Empty when there are no results. */
-    data?: Vectros.AccessProfileResponse[] | undefined;
+    data?: Vectros.RecordResponse[] | undefined;
     /** An opaque cursor for the next page. Pass it back as the `startFrom` query parameter to continue paging; null when there are no more results. **Treat it as opaque** — echo it back unmodified, and never parse, construct, store long-term or compare it. Its format is unspecified, differs between endpoints, and changes between releases. A cursor is valid only for the exact query that returned it: keep every other parameter identical while paging. */
     nextCursor?: (string | null) | undefined;
 }

@@ -32,7 +32,8 @@ export class IdentityClient {
      *
      * @example
      *     await client.identity.listEntities({
-     *         namespace: "team"
+     *         namespace: "team",
+     *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl"
      *     })
      */
     public listEntities(
@@ -944,7 +945,7 @@ export class IdentityClient {
      * @example
      *     await client.identity.listUsers({
      *         externalId: "usr_12345",
-     *         startFrom: "550e8400-e29b-41d4-a716-446655440000",
+     *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl",
      *         type: "person_v1",
      *         field: "team",
      *         value: "engineering",
@@ -1166,11 +1167,12 @@ export class IdentityClient {
     }
 
     /**
-     * Updates mutable fields on an existing user (such as email, status, payload, or schema binding). The `type` field is immutable after creation. This endpoint also activates an invited user: a PUT that moves a PENDING user to ACTIVE and carries `inviteToken`, `externalSubject`, and `emailVerifiedAttestation=true` completes the invitation. Requires the `users:u` scope.
+     * Updates mutable fields on an existing user (such as email, status, payload, or schema binding). The `type` field is immutable after creation, and `email` cannot be changed while an invitation to that user is still outstanding — revoke the invitation, or invite the new address instead. This endpoint also activates an invited user: a PUT that moves a PENDING user to ACTIVE and carries `inviteToken`, `externalSubject`, and `emailVerifiedAttestation=true` completes the invitation. Requires the `users:u` scope.
      *
      * @param {Vectros.UpdateUserRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
@@ -1224,6 +1226,8 @@ export class IdentityClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 429:

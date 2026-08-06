@@ -8,8 +8,10 @@ export interface BatchLookupInput {
     ref?: string | undefined;
     /** The record type to look up. */
     type?: string | undefined;
-    /** The name of the lookup field to match on, as declared on the record schema. */
+    /** The name of the lookup field to match on, as declared on the record schema. For a lookup declared over several fields, this is those field names joined with commas (`status,area`), and the values go in `values`. */
     field?: string | undefined;
-    /** The exact value to match against the lookup field. */
+    /** The exact value to match against the lookup field. Mutually exclusive with `values`. */
     value?: string | undefined;
+    /** The exact values to match, for a lookup declared over several fields — one value per field, in the order the lookup declares them. Mutually exclusive with `value`; a single-element list is identical to `value`. You may supply fewer values than the lookup declares as long as they are a leading run of its fields. */
+    values?: string[] | undefined;
 }

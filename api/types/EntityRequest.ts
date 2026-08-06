@@ -14,7 +14,7 @@ export interface EntityRequest {
     payload?: Record<string, unknown> | undefined;
     /** Optional ID of a record schema (created via `POST /v1/schemas`) that governs payload validation and lookup indexing for this entity, and must belong to your account. */
     schemaId?: string | undefined;
-    /** The entity's parent ownership edges, each as `<namespace>:<value>` (for example `org:6ba7b810-...`). At most two parents, each in a DIFFERENT namespace from the entity's own. On update, providing `scopes` REPLACES the full set of parents; omit it to leave ownership unchanged. The entity's own reference (`<its namespace>:<its id>`) is accepted and ignored, so you can send back the `scopes` you read from a GET unchanged; any OTHER value in its own namespace is rejected, because a parent edge always crosses namespaces — a value in this entity's own namespace names a peer, not a parent. */
+    /** The entity's parent ownership edges, each as `<namespace>:<value>` (for example `org:6ba7b810-...`). At most two parents, each in a DIFFERENT namespace from the entity's own. A `<value>` is 1-128 characters: a letter or digit first, then letters, digits, `_` or `-`. On update, providing `scopes` REPLACES the full set of parents; omit it to leave ownership unchanged. The entity's own reference (`<its namespace>:<its id>`) is accepted and ignored, so you can send back the `scopes` you read from a GET unchanged; any OTHER value in its own namespace is rejected, because a parent edge always crosses namespaces — a value in this entity's own namespace names a peer, not a parent. */
     scopes?: string[] | undefined;
 }
 

@@ -8,8 +8,9 @@ import type * as Vectros from "../../../../index.js";
  *         type: "intake_form",
  *         field: "email",
  *         value: "jane@example.com",
+ *         values: ["open"],
  *         prefix: "jane",
- *         startFrom: "550e8400-e29b-41d4-a716-446655440000"
+ *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl"
  *     }
  */
 export interface LookupRecordsRequest {
@@ -17,15 +18,25 @@ export interface LookupRecordsRequest {
     type: string;
     /** The name of the lookup field to match on, as declared on the type's schema. */
     field: string;
-    /** Exact value to match. Mutually exclusive with `from`/`to` and `prefix`. Rejected for a sensitive field — use `POST /v1/records/lookup` instead so the value is not exposed in the URL. */
+    /** Exact value to match. Mutually exclusive with `from`/`to`, `prefix` and `values`. Rejected for a sensitive field — use `POST /v1/records/lookup` instead so the value is not exposed in the URL. */
     value?: string;
+    /**
+     * Exact values to match, for a lookup declared over several fields — one value per field, in the order the lookup declares them, given as a repeated parameter (`?field=status,area&values=open&values=billing`). Mutually exclusive with `value`; a single `values` is identical to `value`.
+     *
+     * You may supply fewer values than the lookup declares, as long as they are a leading run of its fields; doing so returns the records grouped by the fields you left unspecified. Narrowing with `sortFrom`/`sortTo` then requires a value for every field, because the ordering is only continuous within one fully specified combination.
+     */
+    values?: string | string[];
     /** Inclusive lower bound of a range lookup (requires `to`; non-sensitive fields only). Mutually exclusive with `value` and `prefix`. */
     from?: string;
     /** Inclusive upper bound of a range lookup (requires `from`). */
     to?: string;
     /** Prefix to match (string, non-sensitive fields only). Mutually exclusive with `value` and `from`/`to`. */
     prefix?: string;
-    /** Pagination cursor. Pass the `nextCursor` from the previous page; omit it for the first page. */
+    /** Inclusive lower bound on the lookup field's sort key, narrowing a `value` match to records at or after this point. Use with `value`; combine with `sortTo` to bound both ends. Give the bound in the same form as the sorted field's own values — epoch milliseconds when the lookup sorts by `createdAt` or `lastUpdated`. Records with no value for the sorted field are never included in a bounded window. */
+    sortFrom?: string;
+    /** Inclusive upper bound on the lookup field's sort key, narrowing a `value` match to records at or before this point. Use with `value`; combine with `sortFrom`. */
+    sortTo?: string;
+    /** Pagination cursor. Pass the `nextCursor` returned by the previous page to fetch the next page; omit it for the first page. The cursor is **opaque** — echo it back unchanged, and do not parse it or construct one. Keep every other query parameter identical while paging: a cursor is valid only for the exact query that returned it, and reusing one against a different query is rejected with a 400. */
     startFrom?: string;
     /** Maximum number of records to return per page. Allowed range 1–100; defaults to 20. */
     limit?: number;

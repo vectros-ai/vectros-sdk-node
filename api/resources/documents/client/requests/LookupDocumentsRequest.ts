@@ -9,7 +9,7 @@ import type * as Vectros from "../../../../index.js";
  *         field: "po_number",
  *         value: "PO-1001",
  *         prefix: "PO-2024",
- *         startFrom: "550e8400-e29b-41d4-a716-446655440000",
+ *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl",
  *         userId: "550e8400-e29b-41d4-a716-446655440000",
  *         scope: "org:6ba7b810-9dad-11d1-80b4-00c04fd430c8"
  *     }
@@ -27,7 +27,7 @@ export interface LookupDocumentsRequest {
     to?: string;
     /** Prefix to match for a prefix lookup (range-enabled string fields only). Mutually exclusive with `value` and `from`/`to`. */
     prefix?: string;
-    /** Pagination cursor — pass the `nextCursor` returned by the previous page. */
+    /** Pagination cursor. Pass the `nextCursor` returned by the previous page to fetch the next page; omit it for the first page. The cursor is **opaque** — echo it back unchanged, and do not parse it or construct one. Keep every other query parameter identical while paging: a cursor is valid only for the exact query that returned it, and reusing one against a different query is rejected with a 400. */
     startFrom?: string;
     /** Maximum number of documents to return per page (1-100; defaults to 20). */
     limit?: number;

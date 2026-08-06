@@ -38,7 +38,7 @@ export class SchemasClient {
      *         scope: "org:6ba7b810-9dad-11d1-80b4-00c04fd430c8",
      *         surface: "document",
      *         recordType: "intake_form",
-     *         startFrom: "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+     *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl"
      *     })
      */
     public listSchemas(
@@ -283,6 +283,7 @@ export class SchemasClient {
      * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
@@ -340,6 +341,8 @@ export class SchemasClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 429:

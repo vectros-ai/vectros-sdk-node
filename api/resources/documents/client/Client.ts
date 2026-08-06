@@ -35,7 +35,7 @@ export class DocumentsClient {
      *         userId: "550e8400-e29b-41d4-a716-446655440000",
      *         scope: "group:eng-team",
      *         folderId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-     *         startFrom: "doc_prev123"
+     *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl"
      *     })
      */
     public listDocuments(
@@ -412,6 +412,7 @@ export class DocumentsClient {
      * @param {DocumentsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
@@ -468,6 +469,8 @@ export class DocumentsClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
@@ -500,7 +503,7 @@ export class DocumentsClient {
      *         field: "po_number",
      *         value: "PO-1001",
      *         prefix: "PO-2024",
-     *         startFrom: "550e8400-e29b-41d4-a716-446655440000",
+     *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl",
      *         userId: "550e8400-e29b-41d4-a716-446655440000",
      *         scope: "org:6ba7b810-9dad-11d1-80b4-00c04fd430c8"
      *     })

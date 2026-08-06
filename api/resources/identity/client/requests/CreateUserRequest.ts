@@ -11,7 +11,7 @@ import type * as Vectros from "../../../../index.js";
  *     }
  */
 export interface CreateUserRequest {
-    /** When `true`, if a user with the same `externalId` already exists its mutable fields (email, status, payload, schemaId) are updated to the submitted values instead of being returned unchanged; the immutable `externalId` and `type` are never changed. Defaults to `false`. Requires the `users:u` scope in addition to `users:c`. */
+    /** When `true`, if a user with the same `externalId` already exists its mutable fields (email, status, payload, schemaId) are updated to the submitted values instead of being returned unchanged; the immutable `externalId` and `type` are never changed, and `email` cannot be changed while an invitation to that user is still outstanding. Defaults to `false`. Requires the `users:u` scope in addition to `users:c`. */
     upsert?: boolean;
     body: Vectros.UserRequest;
 }
