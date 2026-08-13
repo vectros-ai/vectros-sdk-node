@@ -15,3 +15,4 @@ export type { LookupEntitiesRequest } from "./LookupEntitiesRequest.js";
 export type { UpdateEntityRequest } from "./UpdateEntityRequest.js";
 export type { UpdateNamespaceRequest } from "./UpdateNamespaceRequest.js";
 export type { UpdateUserRequest } from "./UpdateUserRequest.js";
+export type { UserExistsByEmailRequest } from "./UserExistsByEmailRequest.js";

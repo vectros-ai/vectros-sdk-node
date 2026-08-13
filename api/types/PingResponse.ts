@@ -14,7 +14,7 @@ export interface PingResponse {
     environment: PingResponse.Environment;
     /** The kind of credential you authenticated with: `root_key` = an unscoped `sk_*` API key; `scoped_key` = an `ssk_*` API key with a bound access profile; `token` = a short-lived `st_*` token (its expiry is in `tokenExpiresAt`). */
     principalType: PingResponse.PrincipalType;
-    /** Stable identifier for your credential. For `sk_*` and `ssk_*` keys this is the key id; for `st_*` tokens it is the token's JWT id (jti). */
+    /** Stable identifier for your credential. For `sk_*` and `ssk_*` keys this is the key id; for `st_*` tokens it is the token's JWT id (`jti`), which is unique per mint — two tokens minted for the same user report different values. */
     principalKeyId: string;
     /** The label you set on the originating `sk_*` or `ssk_*` key. Omitted when no label is set, or when the credential is an `st_*` token. */
     principalLabel?: string | undefined;

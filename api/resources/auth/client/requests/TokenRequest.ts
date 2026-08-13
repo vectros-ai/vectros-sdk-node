@@ -24,6 +24,6 @@ export interface TokenRequest {
     /** The app context to mint the token into. Optional — omit it to inherit your own credential's context (a root API key defaults to `default`). Must reference an app context that already exists in your tenant (create one via `POST /v1/app-contexts`); an unrecognized value returns a uniform `404 not found`. Only meaningful for root API key callers — this endpoint is root-key-only, so there is no confined credential this could let reach a context it doesn't hold. */
     contextId?: string;
     scope: Vectros.ScopeRequest;
-    /** How long the token remains valid, in seconds. Maximum 86400 (24 hours); defaults to 3600 (1 hour). */
+    /** How long the token remains valid, in seconds. Maximum 3600 (1 hour), which is also the default. */
     expiresInSeconds?: number;
 }

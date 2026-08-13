@@ -9,6 +9,133 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.39.0 — 2026-08-07
+
+_This section is still open — further 0.39.0 changes land here until release._
+
+### Added
+
+- **Register a trusted external IdP issuer.** `POST /v1/auth/issuers` registers an
+  `(issuer, audience)` pair your tenant trusts. `GET /v1/auth/issuers/{issuerId}` and
+  `GET /v1/auth/issuers` read back a single registration or the full tenant list (a
+  `{data, nextCursor}` envelope).
+
+  Registration is idempotent by `issuerId` within your tenant — registering the same `issuerId`
+  again returns the existing registration unchanged (`200`) rather than erroring. The
+  `(issuer, audience)` pair itself must be globally unique across tenants; a second registration
+  naming a pair already claimed elsewhere is rejected (`400`).
+
+  This is a provisioning-time operation — it requires a root API key or the credential minted by
+  `vectros bootstrap`, and there is no grantable scope for it.
+
+- **Exchange a third-party identity provider token for a Vectros token.** `POST
+  /v1/auth/token/exchange` implements [RFC 8693 OAuth 2.0 Token
+  Exchange](https://www.rfc-editor.org/rfc/rfc8693): trade a JWT issued by an identity provider
+  you've registered (above) for a Vectros `st_*` scoped bearer token — no Vectros credential
+  required to call it. The exchanged token's permissions are resolved entirely server-side from
+  the matched user's access profile; the endpoint accepts no caller-supplied scope, so a
+  compromised or malicious caller can never request broader access than that user already has.
+
+  This closes the loop opened by issuer registration: once you've registered your identity
+  provider, your own users can authenticate directly against it and exchange their token for a
+  Vectros credential, with no backend service of yours minting tokens on their behalf.
+
+  Uses the standard OAuth error envelope (`{"error": ..., "error_description": ...}`, per [RFC
+  6749 §5.2](https://www.rfc-editor.org/rfc/rfc6749#section-5.2)) rather than this API's usual
+  `{"message": ...}` shape, since its caller is generic OAuth tooling rather than the Vectros SDK.
+
+- **Access profiles now inline the principal's email.** `AccessProfileResponse` (returned by every
+  `/v1/app-contexts/{contextId}/profiles*` read/write, and `GET /v1/principals/{principalId}/profiles`)
+  carries a new `email` field — the `usr_` principal's email when it resolves to a user in your
+  tenant AND your token also holds `users:r`, absent otherwise (a `key_` principal, a `usr_`
+  principal with no matching user, or a token that holds `profiles:r` alone). `GET
+  /v1/app-contexts/{contextId}/profiles` resolves the whole page in one batched lookup, closing the
+  N+1 a "who's on my team" UI previously had to pay per principal.
+
+- **Check whether a user exists by email, scoped to one app context.** `GET /v1/users/exists-by-email`
+  answers "does a user with this email hold an ACTIVE access profile in this app context" — a narrow
+  existence check (`{exists, userId, status}`), not a lookup of the full user record. `exists` is
+  `false` both for an email that was never a member of the context and for one whose access there has
+  been suspended. The answer is scoped to the `contextId` you supply and does not reveal whether the
+  email exists anywhere else in your tenant or account. Useful for resolving an email to a `userId`
+  (for example, before referencing an existing member in another operation) without paging through the
+  full context member list. Requires the `users:r` scope.
+
+- **Self-service signup — let end users create their own account, no invite required.** Registering an
+  issuer (above) can now also declare `selfSignupPolicies`: a list of `{signup_type, role_id}` pairs.
+  When a first-time `POST /v1/auth/token/exchange` caller matches no existing user and presents no
+  invite, but names a configured `signup_type` (or the registration has exactly one policy and the field
+  is omitted), a brand-new active user is created and bound to that policy's role — no admin, no invite
+  email, no separate provisioning step.
+
+  `signup_type` is a plain value the caller supplies; it does not need to come from your identity
+  provider. This is deliberate and safe: every policy entry is, by construction, something you already
+  decided any caller may have — that's what "no invite required" means — so naming a different
+  configured entry than your frontend intended isn't a privilege escalation, only a different (equally
+  pre-approved) role. To enforce that, no `selfSignupPolicies` entry may ever target a role that carries
+  elevated (provisioning, wildcard, or key/profile/user/context-management) scope — checked when you
+  register the policy and always re-checked, unskippable, at the moment a caller actually signs up.
+
+  **Read this before enabling it: "any caller" means literally anyone who can obtain a token from the
+  registered issuer for the registered audience** — not "any employee," regardless of how narrow your
+  frontend UI makes signup_type look. If your issuer is a typical IdP tenant with open or social-login
+  signup, that's the entire internet, not your internal directory. Self-signup is only as narrow as who
+  can authenticate against your identity provider — restrict that there, not here, if you need it
+  narrower. A good fit: an internal tool backed by an IdP tenant only your organization's members can
+  authenticate against, where any successfully-authenticated caller becoming a member is exactly what
+  you want.
+
+- **`DELETE /v1/auth/issuers/{issuerId}`** deregisters a trusted issuer. Requires a root API key or the
+  bootstrap's provisioning capability, same as registering one. Existing user accounts a prior
+  self-signup or invite created via that issuer are not deleted or modified, but they lose the ability
+  to obtain a *new* token this way — every exchange call against the deregistered issuer 404s. Register
+  a replacement issuer (or restore this one) before affected users' current tokens expire if you want
+  their access to continue uninterrupted.
+
+### Changed
+
+- **Scoped tokens (`st_*`) now last at most 1 hour.** `POST /v1/auth/token` previously accepted an
+  `expiresInSeconds` of up to 86400 (24 hours); the maximum is now **3600**, and a larger value is
+  rejected with a `400`.
+
+  **This breaks no caller who did not choose a TTL.** 3600 was already the default on this endpoint,
+  and is the fixed lifetime of a token from `POST /v1/auth/token/exchange` — so the change removes only
+  the ability to opt *above* the default. If you were explicitly passing a value over 3600, lower it to
+  3600 (or omit the field). A scoped token is a bearer credential that carries its permissions inline,
+  and shortening its life is the most direct way to bound what a leaked one can do.
+
+- **`GET /v1/ping` now reports a scoped token's own id in `principalKeyId`.** For an `st_*` credential
+  this field is the token's JWT id (`jti`) — unique per mint, so two tokens issued for the same user
+  report different values. It previously echoed the bound user id (or, for a token minted with no user
+  identity, the id of the API key that minted it), which never matched this field's documented meaning.
+
+  `principalKeyId` is unchanged for `sk_*` and `ssk_*` keys, where it remains the key id. If you are
+  using this value to identify the *user* behind a scoped token, read the user id from your own token
+  claims instead — this field identifies the **credential**. Tokens minted before this release carry no
+  `jti` and continue to report the previous value until they expire; if you minted one with a long
+  `expiresInSeconds` shortly before upgrading, that can be up to 24 hours, since the new cap applies
+  only to tokens minted after it takes effect.
+
+- **Clearer error documentation on three endpoints, with no behaviour change.** Creating or updating an
+  access profile now documents that `roleId` must name a role that already exists in the app context
+  (a `400`), and the update endpoint documents its `400` responses at all. Minting a scoped API key
+  (`POST /v1/admin/keys/scoped`) now documents that `keys:c` alone is not sufficient for a scoped
+  caller: the referenced profile's permissions may not exceed your own, and you may only mint against a
+  profile whose identity values you hold yourself. All three were already enforced; only the
+  descriptions were incomplete.
+
+### Removed
+
+- **The `create_own_scoped_key` literal `allowed_actions` verb has been removed.** It was never wired to
+  any enforcement path — no handler ever checked for it — so authoring a scope with this literal granted
+  no actual capability beyond what was otherwise already true of the credential; the 0.33.1 entry
+  describing it as a valid, working option was inaccurate for the entire time it stood. Correcting the
+  record here rather than editing that historical entry, which stands as released. An `allowed_actions`
+  entry naming `create_own_scoped_key` now fails author-time validation with a 400, same as any other
+  unrecognized colon-less string (e.g. bare `read`); the compact `resource:ops[:qualifier]` form and `*`
+  remain the only grantable shapes. If you were authoring this literal, remove it — it was not doing
+  anything for you regardless.
+
 ## 0.38.0 — 2026-07-29
 
 **Upgrading — three things need action; everything else is additive.**

@@ -1386,6 +1386,84 @@ export class IdentityClient {
     }
 
     /**
+     * Answers "does a user with this email hold an ACTIVE access profile in this app context" — a narrow existence check, not a general lookup. `exists` is false for a member whose access to this context has been suspended, not only for a member who was never granted it. The answer is scoped to the `contextId` you supply: it does not reveal whether the email exists elsewhere in your tenant or account, only whether it belongs to an active member of the named context. Returns `{exists, userId, status}` — never the full user record — so a caller asking "does X exist" cannot receive that user's payload/schema binding/etc. as a side effect. Useful for resolving an email you were handed (for example, by an org-admin adding an existing member to another org) to a `userId`, without paging through the full context membership. Requires the `users:r` scope.
+     *
+     * @param {Vectros.UserExistsByEmailRequest} request
+     * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
+     *
+     * @example
+     *     await client.identity.userExistsByEmail({
+     *         email: "user@example.com",
+     *         contextId: "myapp"
+     *     })
+     */
+    public userExistsByEmail(
+        request: Vectros.UserExistsByEmailRequest = {},
+        requestOptions?: IdentityClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.UserExistsResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__userExistsByEmail(request, requestOptions));
+    }
+
+    private async __userExistsByEmail(
+        request: Vectros.UserExistsByEmailRequest = {},
+        requestOptions?: IdentityClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.UserExistsResponse>> {
+        const { email, contextId } = request;
+        const _queryParams: Record<string, unknown> = {
+            email,
+            contextId,
+        };
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                "v1/users/exists-by-email",
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.UserExistsResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/users/exists-by-email");
+    }
+
+    /**
      * Returns the audit trail of changes to a user, most recent first. Identity history is always recorded and always available. Sensitive field values are redacted in every historical version. Returns a page in the `{data, nextCursor}` envelope. Requires the `users:r` scope.
      *
      * @param {Vectros.GetUserVersionsRequest} request

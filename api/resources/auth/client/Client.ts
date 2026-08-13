@@ -247,7 +247,7 @@ export class AuthClient {
     }
 
     /**
-     * Creates a scoped API key (an `ssk_*` secret) that inherits its permissions from an existing access profile in your account. The call is idempotent on the combination of tenant, context, user, and key name: re-issuing the same request returns the existing key WITHOUT re-disclosing its raw secret. The raw key is returned ONLY in this response — store it securely, as it cannot be retrieved again. Requires the `keys:c` scope.
+     * Creates a scoped API key (an `ssk_*` secret) that inherits its permissions from an existing access profile in your account. The call is idempotent on the combination of tenant, context, user, and key name: re-issuing the same request returns the existing key WITHOUT re-disclosing its raw secret. The raw key is returned ONLY in this response — store it securely, as it cannot be retrieved again. Requires the `keys:c` scope. If you use a scoped credential, `keys:c` alone is not sufficient: because the minted key is durably bound to the profile you name, the profile's effective scopes may not exceed your own, and you may only mint against a profile whose `identityOverrides` values your own identity holds. A root API key (`sk_`) is exempt from both bounds.
      *
      * @param {Vectros.CreateScopedKeyRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -1146,11 +1146,12 @@ export class AuthClient {
     }
 
     /**
-     * Updates an access profile. This is a partial update: any field you omit (or send as null) keeps its existing value. A profile must reference either inline `scopes` or a `roleId`, never both — so setting `scopes` clears any `roleId`, and setting `roleId` clears any inline `scopes`. The `contextId` and `principalId` are immutable. Status changes (for example active to suspended) take effect within about five minutes. If you use a scoped credential, the profile's effective scopes may not exceed your own, and its `identityOverrides` are bounded twice: you may only set a value your own identity holds, and you may only change or clear a value the profile already holds if that value is yours as well. Repointing or clearing another principal's established identity therefore returns 403. A root API key (`sk_`) is exempt. Requires the `profiles:u` scope.
+     * Updates an access profile. This is a partial update: any field you omit (or send as null) keeps its existing value. A profile must reference either inline `scopes` or a `roleId`, never both — so setting `scopes` clears any `roleId`, and setting `roleId` clears any inline `scopes`. The `contextId` and `principalId` are immutable. Status changes (for example active to suspended) take effect within about five minutes. If you use a scoped credential, the profile's effective scopes may not exceed your own, and its `identityOverrides` are bounded twice: you may only set a value your own identity holds, and you may only change or clear a value the profile already holds if that value is yours as well. Repointing or clearing another principal's established identity therefore returns 403. A root API key (`sk_`) is exempt. If you set `roleId`, it must reference a role that already exists in this context. Requires the `profiles:u` scope.
      *
      * @param {Vectros.UpdateAccessProfileRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.TooManyRequestsError}
@@ -1206,6 +1207,8 @@ export class AuthClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
@@ -2026,6 +2029,302 @@ export class AuthClient {
     }
 
     /**
+     * Retrieves a single registered issuer by issuerId. Requires a root API key or the bootstrap's provisioning capability.
+     *
+     * @param {Vectros.GetIssuerRequest} request
+     * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     *
+     * @example
+     *     await client.auth.getIssuer({
+     *         issuerId: "auth0-prod"
+     *     })
+     */
+    public getIssuer(
+        request: Vectros.GetIssuerRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.IssuerResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__getIssuer(request, requestOptions));
+    }
+
+    private async __getIssuer(
+        request: Vectros.GetIssuerRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.IssuerResponse>> {
+        const { issuerId } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/auth/issuers/${core.url.encodePathParam(issuerId)}`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.IssuerResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/auth/issuers/{issuerId}");
+    }
+
+    /**
+     * Deregisters a trusted third-party IdP issuer. Requires a root API key or the bootstrap's provisioning capability. Unconditional — unlike some other registry deletes on this API, this does not check for or block on any downstream reference. Any user account already created via this issuer (by a prior self-signup or accepted invite) is NOT deleted or modified, but that user can no longer obtain a NEW token this way once you deregister the issuer — every `POST /v1/auth/token/exchange` call against it will 404, with no distinction between an unknown issuer and one you just deregistered. Register a replacement issuer, or restore this one, before your users' current tokens expire if you want their access to continue uninterrupted.
+     *
+     * @param {Vectros.DeleteIssuerRequest} request
+     * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     *
+     * @example
+     *     await client.auth.deleteIssuer({
+     *         issuerId: "auth0-prod"
+     *     })
+     */
+    public deleteIssuer(
+        request: Vectros.DeleteIssuerRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): core.HttpResponsePromise<void> {
+        return core.HttpResponsePromise.fromPromise(this.__deleteIssuer(request, requestOptions));
+    }
+
+    private async __deleteIssuer(
+        request: Vectros.DeleteIssuerRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): Promise<core.WithRawResponse<void>> {
+        const { issuerId } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/auth/issuers/${core.url.encodePathParam(issuerId)}`,
+            ),
+            method: "DELETE",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: undefined, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "DELETE",
+            "/v1/auth/issuers/{issuerId}",
+        );
+    }
+
+    /**
+     * Returns the issuers registered in your tenant. Requires a root API key or the bootstrap's provisioning capability. Returns a `{data, nextCursor}` envelope.
+     *
+     * @param {Vectros.ListIssuersRequest} request
+     * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.ForbiddenError}
+     *
+     * @example
+     *     await client.auth.listIssuers()
+     */
+    public listIssuers(
+        request: Vectros.ListIssuersRequest = {},
+        requestOptions?: AuthClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.IssuerPage> {
+        return core.HttpResponsePromise.fromPromise(this.__listIssuers(request, requestOptions));
+    }
+
+    private async __listIssuers(
+        request: Vectros.ListIssuersRequest = {},
+        requestOptions?: AuthClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.IssuerPage>> {
+        const { startFrom, limit } = request;
+        const _queryParams: Record<string, unknown> = {
+            startFrom,
+            limit,
+        };
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                "v1/auth/issuers",
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.IssuerPage, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/auth/issuers");
+    }
+
+    /**
+     * Registers a trusted third-party IdP issuer that BYO-IdP token exchange (`POST /v1/auth/token/exchange`) may accept a `subject_token` from. Requires a root API key or the CLI bootstrap's provisioning capability — never an ordinary partner-grantable scope. Idempotent by `issuerId` within your tenant; the `(issuer, audience)` pair must not already be registered by a different issuerId/tenant.
+     *
+     * @param {Vectros.IssuerRequest} request
+     * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     *
+     * @example
+     *     await client.auth.registerIssuer({
+     *         issuerId: "auth0-prod",
+     *         issuer: "https://your-tenant.us.auth0.com/",
+     *         jwksUri: "https://your-tenant.us.auth0.com/.well-known/jwks.json",
+     *         audience: "https://api.your-app.example.com",
+     *         contextId: "casework"
+     *     })
+     */
+    public registerIssuer(
+        request: Vectros.IssuerRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.IssuerResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__registerIssuer(request, requestOptions));
+    }
+
+    private async __registerIssuer(
+        request: Vectros.IssuerRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.IssuerResponse>> {
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                "v1/auth/issuers",
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: request,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.IssuerResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/auth/issuers");
+    }
+
+    /**
      * Returns the identity bound to your credential — your account, principal type, key id, and scope details — so you can confirm who you are authenticated as and that the credential is valid. MCP clients use this to render "signed in as ..." in a chat UI without a separate identity endpoint.
      *
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2401,5 +2700,82 @@ export class AuthClient {
         }
 
         return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/users/invite/resend");
+    }
+
+    /**
+     * RFC 8693 OAuth 2.0 Token Exchange. Trades a JWT issued by a third-party identity provider you've registered (`POST /v1/auth/issuers`) for a Vectros `st_*` scoped bearer token — no Vectros credential required to call this endpoint. The exchanged token's scope is resolved entirely server-side from the matched user's access profile; this endpoint accepts no caller-supplied scope, resource, or audience parameter (RFC 8693 §2.1's `resource`/`audience`/`scope` are not used in v1 — the registered `(issuer, audience)` pair alone pins the target tenant and app context). On a first-time login (no existing Vectros identity for this subject), two opt-in binding paths exist: `invite_token` (a `PENDING` sub-user invitation), and — if the registration declares one or more self-signup policies — `signup_type` (a brand-new user is created and bound to the policy's configured role). If `invite_token` is present at all, it is the ONLY path tried — a failed invite never falls through to self-signup. Neither field is required for a subject with an existing identity. Uses the OAuth-standard error envelope (`{"error":..., "error_description":...}`, RFC 6749 §5.2), NOT this API's usual `{"message":...}` shape — its client is generic OAuth tooling, not the Vectros SDK.
+     *
+     * @param {Vectros.TokenExchangeRequest} request
+     * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.UnauthorizedError}
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     *
+     * @example
+     *     await client.auth.exchangeToken({
+     *         grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+     *         subject_token: "subject_token",
+     *         subject_token_type: "urn:ietf:params:oauth:token-type:jwt"
+     *     })
+     */
+    public exchangeToken(
+        request: Vectros.TokenExchangeRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.TokenExchangeResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__exchangeToken(request, requestOptions));
+    }
+
+    private async __exchangeToken(
+        request: Vectros.TokenExchangeRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.TokenExchangeResponse>> {
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(this._options?.headers, requestOptions?.headers);
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                "v1/auth/token/exchange",
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: request,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.TokenExchangeResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 401:
+                    throw new Vectros.UnauthorizedError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/auth/token/exchange");
     }
 }
