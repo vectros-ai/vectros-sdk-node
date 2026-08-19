@@ -11,6 +11,6 @@ export interface GetUsageRequest {
     year?: number;
     /** Calendar month, 1-12 (for example, 5 for May). Defaults to the current month. */
     month?: number;
-    /** App context id. When supplied, the `contexts` breakdown is restricted to that single app context; your account-wide totals are unaffected. */
+    /** App context id. For a token with cross-context reach, this only restricts the `contexts` breakdown to that single app context — your account-wide totals are unaffected. For a token confined to one app context, your totals are *already* narrowed to it (see the operation description) regardless of this parameter; supplying it must name your own context or the request is refused. */
     contextId?: string;
 }

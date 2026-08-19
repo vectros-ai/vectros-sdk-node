@@ -6,6 +6,7 @@ import type * as Vectros from "../../../../index.js";
  * @example
  *     {
  *         namespace: "team",
+ *         contextId: "myapp",
  *         body: {
  *             externalId: "team_eng_platform"
  *         }
@@ -16,5 +17,7 @@ export interface CreateEntityRequest {
     namespace: string;
     /** When `true`, overwrite an existing entity's mutable fields instead of returning it unchanged. Requires the `entities:u:<namespace>` scope in addition to `entities:c:<namespace>`. */
     upsert?: boolean;
+    /** Which app context owns the new entity. **Required when the namespace is context-placed** and omitted otherwise: a tenant-placed namespace's entities are shared by every context, so supplying one is rejected. A context-confined credential may only name its own context. An entity's context is fixed at creation and cannot be changed afterwards. */
+    contextId?: string;
     body: Vectros.EntityRequest;
 }

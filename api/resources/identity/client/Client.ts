@@ -33,6 +33,7 @@ export class IdentityClient {
      * @example
      *     await client.identity.listEntities({
      *         namespace: "team",
+     *         contextId: "myapp",
      *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl"
      *     })
      */
@@ -49,6 +50,7 @@ export class IdentityClient {
     ): Promise<core.WithRawResponse<Vectros.EntityPage>> {
         const {
             namespace,
+            contextId,
             userId,
             externalId,
             scope,
@@ -63,6 +65,7 @@ export class IdentityClient {
             limit,
         } = request;
         const _queryParams: Record<string, unknown> = {
+            contextId,
             userId,
             externalId,
             scope,
@@ -129,6 +132,7 @@ export class IdentityClient {
      * @example
      *     await client.identity.createEntity({
      *         namespace: "team",
+     *         contextId: "myapp",
      *         body: {
      *             externalId: "team_eng_platform"
      *         }
@@ -145,9 +149,10 @@ export class IdentityClient {
         request: Vectros.CreateEntityRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.EntityResponse>> {
-        const { namespace, upsert, body: _body } = request;
+        const { namespace, upsert, contextId, body: _body } = request;
         const _queryParams: Record<string, unknown> = {
             upsert,
+            contextId,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -212,7 +217,8 @@ export class IdentityClient {
      * @example
      *     await client.identity.getEntity({
      *         namespace: "team",
-     *         id: "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+     *         id: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+     *         contextId: "myapp"
      *     })
      */
     public getEntity(
@@ -226,7 +232,10 @@ export class IdentityClient {
         request: Vectros.GetEntityRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.EntityResponse>> {
-        const { namespace, id } = request;
+        const { namespace, id, contextId } = request;
+        const _queryParams: Record<string, unknown> = {
+            contextId,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -241,7 +250,11 @@ export class IdentityClient {
             ),
             method: "GET",
             headers: _headers,
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -281,6 +294,7 @@ export class IdentityClient {
      *     await client.identity.updateEntity({
      *         namespace: "team",
      *         id: "id",
+     *         contextId: "myapp",
      *         body: {
      *             externalId: "team_eng_platform"
      *         }
@@ -297,7 +311,10 @@ export class IdentityClient {
         request: Vectros.UpdateEntityRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.EntityResponse>> {
-        const { namespace, id, body: _body } = request;
+        const { namespace, id, contextId, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            contextId,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -313,7 +330,11 @@ export class IdentityClient {
             method: "PUT",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
             body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
@@ -356,7 +377,8 @@ export class IdentityClient {
      * @example
      *     await client.identity.deleteEntity({
      *         namespace: "team",
-     *         id: "id"
+     *         id: "id",
+     *         contextId: "myapp"
      *     })
      */
     public deleteEntity(
@@ -370,7 +392,10 @@ export class IdentityClient {
         request: Vectros.DeleteEntityRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<void>> {
-        const { namespace, id } = request;
+        const { namespace, id, contextId } = request;
+        const _queryParams: Record<string, unknown> = {
+            contextId,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -385,7 +410,11 @@ export class IdentityClient {
             ),
             method: "DELETE",
             headers: _headers,
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -431,6 +460,7 @@ export class IdentityClient {
      * @example
      *     await client.identity.lookupEntities({
      *         namespace: "team",
+     *         contextId: "myapp",
      *         body: {
      *             type: "person_v1",
      *             field: "ssn"
@@ -448,7 +478,10 @@ export class IdentityClient {
         request: Vectros.LookupEntitiesRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.EntityPage>> {
-        const { namespace, body: _body } = request;
+        const { namespace, contextId, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            contextId,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -464,7 +497,11 @@ export class IdentityClient {
             method: "POST",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
             body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
@@ -511,7 +548,8 @@ export class IdentityClient {
      * @example
      *     await client.identity.getEntityVersions({
      *         namespace: "team",
-     *         id: "id"
+     *         id: "id",
+     *         contextId: "myapp"
      *     })
      */
     public getEntityVersions(
@@ -525,8 +563,9 @@ export class IdentityClient {
         request: Vectros.GetEntityVersionsRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.ModelDataVersionPage>> {
-        const { namespace, id, startFrom } = request;
+        const { namespace, id, contextId, startFrom } = request;
         const _queryParams: Record<string, unknown> = {
+            contextId,
             startFrom,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
@@ -580,7 +619,7 @@ export class IdentityClient {
     }
 
     /**
-     * Retrieves a single scope-namespace registration by name. The reserved built-ins `org` and `client` are always resolvable.
+     * Retrieves a single scope-namespace registration by name.
      *
      * @param {Vectros.GetNamespaceRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -603,7 +642,10 @@ export class IdentityClient {
         request: Vectros.GetNamespaceRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.NamespaceResponse>> {
-        const { namespace } = request;
+        const { namespace, contextId } = request;
+        const _queryParams: Record<string, unknown> = {
+            contextId,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -618,7 +660,11 @@ export class IdentityClient {
             ),
             method: "GET",
             headers: _headers,
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -646,7 +692,7 @@ export class IdentityClient {
     }
 
     /**
-     * Updates the mutable fields (`entityBacked`, `defaultSchemaId`, `specificityRank`) of a registered namespace. The namespace name itself is immutable. Requires a root API key. The reserved built-ins cannot be updated.
+     * Updates the mutable fields (`entityBacked`, `defaultSchemaId`, `specificityRank`) of a registered namespace. The namespace name and its `contextId` (which row is selected) are both immutable. Requires a root API key. `org` and `client` are updatable like any other namespace — there is no reserved-built-in exception.
      *
      * @param {Vectros.UpdateNamespaceRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -675,7 +721,10 @@ export class IdentityClient {
         request: Vectros.UpdateNamespaceRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.NamespaceResponse>> {
-        const { namespace, body: _body } = request;
+        const { namespace, contextId, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            contextId,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -691,7 +740,11 @@ export class IdentityClient {
             method: "PUT",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
             body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
@@ -725,7 +778,7 @@ export class IdentityClient {
     }
 
     /**
-     * Deletes a registered scope namespace. Requires a root API key. The reserved built-ins cannot be deleted. A namespace that still has entities cannot be deleted (409) — delete its entities first; this keeps them reachable by the account-teardown and erasure sweeps.
+     * Deletes a registered scope namespace. Requires a root API key. `org` and `client` are deletable like any other namespace — there is no reserved-built-in exception. A namespace that still has entities cannot be deleted (409) — delete its entities first; this keeps them reachable by the account-teardown and erasure sweeps.
      *
      * @param {Vectros.DeleteNamespaceRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -750,7 +803,10 @@ export class IdentityClient {
         request: Vectros.DeleteNamespaceRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<void>> {
-        const { namespace } = request;
+        const { namespace, contextId } = request;
+        const _queryParams: Record<string, unknown> = {
+            contextId,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -765,7 +821,11 @@ export class IdentityClient {
             ),
             method: "DELETE",
             headers: _headers,
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -797,7 +857,7 @@ export class IdentityClient {
     }
 
     /**
-     * Returns the scope namespaces registered in your account, with the reserved built-ins `org` and `client` listed first. Returns a `{data, nextCursor}` envelope.
+     * Returns the scope namespaces registered in your account. Returns a `{data, nextCursor}` envelope.
      *
      * @param {Vectros.ListNamespacesRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -816,10 +876,11 @@ export class IdentityClient {
         request: Vectros.ListNamespacesRequest = {},
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.NamespacePage>> {
-        const { startFrom, limit } = request;
+        const { startFrom, limit, contextId } = request;
         const _queryParams: Record<string, unknown> = {
             startFrom,
             limit,
+            contextId,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -862,9 +923,9 @@ export class IdentityClient {
     }
 
     /**
-     * Registers a new scope namespace and declares whether its values resolve to identity entities (`entityBacked`). Also requires `specificityRank`, an explicit, account-unique position in the specificity order used to break recordType schema-resolution ties. Requires a root API key. The reserved names `org` and `client` are built in and cannot be registered.
+     * Registers a new scope namespace and declares whether its values resolve to identity entities (`entityBacked`). Also requires `specificityRank`, an explicit, account-unique position in the specificity order used to break recordType schema-resolution ties. Requires a root API key or the CLI bootstrap's provisioning capability — never an ordinary partner-grantable scope. `org` and `client` are reserved names, registered the same way as any other namespace.
      *
-     * @param {Vectros.NamespaceRequest} request
+     * @param {Vectros.RegisterNamespaceRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
@@ -873,21 +934,27 @@ export class IdentityClient {
      *
      * @example
      *     await client.identity.registerNamespace({
-     *         namespace: "team",
-     *         specificityRank: 1500
+     *         body: {
+     *             namespace: "team",
+     *             specificityRank: 1500
+     *         }
      *     })
      */
     public registerNamespace(
-        request: Vectros.NamespaceRequest,
+        request: Vectros.RegisterNamespaceRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): core.HttpResponsePromise<Vectros.NamespaceResponse> {
         return core.HttpResponsePromise.fromPromise(this.__registerNamespace(request, requestOptions));
     }
 
     private async __registerNamespace(
-        request: Vectros.NamespaceRequest,
+        request: Vectros.RegisterNamespaceRequest,
         requestOptions?: IdentityClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.NamespaceResponse>> {
+        const { contextId, body: _body } = request;
+        const _queryParams: Record<string, unknown> = {
+            contextId,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -903,9 +970,13 @@ export class IdentityClient {
             method: "POST",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
-            body: request,
+            body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -937,7 +1008,7 @@ export class IdentityClient {
     }
 
     /**
-     * Returns a paginated list of the users in your account. Pass `externalId` to look up a single user by your own identifier. To filter on schema-declared lookup fields, supply `type` and `field` together with one lookup mode: `value` (exact match), `from`+`to` (range), or `prefix`. Requires the `users:r` scope.
+     * Returns a paginated list of the users in your account. Pass `externalId` to look up a single user by your own identifier. To filter on schema-declared lookup fields, supply `type` and `field` together with one lookup mode: `value` (exact match), `from`+`to` (range), or `prefix`. Requires the `users:r` scope. A context-confined credential only sees users who hold an access profile in the credential's own app context — others are silently absent from the page, not an error.
      *
      * @param {Vectros.ListUsersRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -1245,12 +1316,13 @@ export class IdentityClient {
     }
 
     /**
-     * Permanently deletes a user identity. This cannot be undone. If the user is a pending invitation, the associated access profile created for that invitation is also removed. Requires the `users:d` scope.
+     * Permanently deletes a user identity. This cannot be undone. If the user is a pending invitation, the associated access profile created for that invitation is also removed. Requires the `users:d` scope. Deleting your account's last OWNER is refused (409) — an account must always retain at least one owner. Called by a context-confined credential, deletion is also refused (409) when the user holds access in an app context other than the caller's own — remove the user from the caller's own context first, or use a credential with cross-context reach.
      *
      * @param {Vectros.DeleteUserRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -1299,6 +1371,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -1314,7 +1388,7 @@ export class IdentityClient {
     }
 
     /**
-     * Looks up users by a schema lookup field, with the query criteria carried in the request body rather than the URL. Use this when looking up by a sensitive (blind-indexed) field: the value is blind-indexed server-side and never appears in the URL, request logs, or proxies. The query semantics are identical to the GET /v1/users lookup, which rejects sensitive-field values and directs you here. Returns a page in the `{data, nextCursor}` envelope. Requires the `users:r` scope.
+     * Looks up users by a schema lookup field, with the query criteria carried in the request body rather than the URL. Use this when looking up by a sensitive (blind-indexed) field: the value is blind-indexed server-side and never appears in the URL, request logs, or proxies. The query semantics are identical to the GET /v1/users lookup, which rejects sensitive-field values and directs you here. Returns a page in the `{data, nextCursor}` envelope. Requires the `users:r` scope. A context-confined credential only sees users who hold an access profile in the credential's own app context — others are silently absent from the page, not an error.
      *
      * @param {Vectros.IdentityLookupRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.

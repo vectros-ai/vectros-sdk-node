@@ -16,7 +16,7 @@ export interface CreateScopedKeyRequest {
     tenantId: string;
     /** The app context within the tenant. Must reference an app context that already exists (create one via `POST /v1/app-contexts`). */
     contextId: string;
-    /** The user the key binds to. May be a `HUMAN` or a `SERVICE` user (a service user is the typical agent or bot case). An access profile must already exist for this context and user — the key references that profile; it does not create one. */
+    /** The user the key binds to. May be a `HUMAN` or a `SERVICE` user (a service user is the typical agent or bot case). An access profile must already exist for this context and user — the key references that profile; it does not create one. Naming your own principal needs nothing further; naming any OTHER principal additionally requires the `delegate-mint` capability on your credential, or a root API key. */
     userId: string;
     /** Optional display label surfaced through `/v1/ping` as `principalLabel`. The MCP `current_identity` tool uses it to show "signed in as ..." hints to end users (e.g. "Claude Desktop — clinical-notes RO"). Distinct from `keyName`, which is your own identifier for the key. Maximum 80 characters; if present, it must not have leading or trailing whitespace. */
     label?: string;

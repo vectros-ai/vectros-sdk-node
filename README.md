@@ -82,8 +82,9 @@ browser token-minting pattern.
   partial), delete, and look records up by indexed field.
 - **Schemas** — `client.schemas` — define and evolve record/document schemas.
 - **Identity & access** — `client.identity`, `client.auth` — manage users and
-  namespaced identity entities (`org` and `client` are built in, alongside any
-  namespace you register); mint and revoke scoped credentials.
+  namespaced identity entities (`org` and `client` are reserved names,
+  registered the same way as any other namespace); mint and revoke scoped
+  credentials.
 
 ## Rate limits
 

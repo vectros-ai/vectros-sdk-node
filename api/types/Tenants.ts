@@ -3,9 +3,9 @@
 import type * as Vectros from "../index.js";
 
 /**
- * Usage breakdown by environment (your live and test environments). Your account totals at the top of the response equal the sum of live + test for each metric.
+ * Usage breakdown by environment (your live and test environments). For a token with cross-context reach, your account totals at the top of the response equal the sum of live + test for each metric. For a token confined to a single app context, only the environment that context belongs to is populated — the other environment is `null` (you hold no context there, distinct from zero usage) — and the top-level totals already equal that one environment's narrowed figures.
  */
 export interface Tenants {
-    live?: Vectros.TenantDetail | undefined;
-    test?: Vectros.TenantDetail | undefined;
+    live?: (Vectros.TenantDetail | null) | undefined;
+    test?: (Vectros.TenantDetail | null) | undefined;
 }

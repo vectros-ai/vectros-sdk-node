@@ -9,4 +9,6 @@
 export interface DeleteNamespaceRequest {
     /** The namespace name. */
     namespace: string;
+    /** The app context that owns this registration. Omit for the tenant-wide registration. */
+    contextId?: string;
 }

@@ -22,7 +22,7 @@ export interface FolderResponse {
     isProtected?: boolean | undefined;
     /** ID of the user that owns this folder — the Vectros-assigned UUID of a user in your account. Null if the folder is not owned by a specific user. */
     userId?: string | undefined;
-    /** The folder's scope ownership as canonical `namespace:value` entries (at most 2). `org` and `client` are built-in namespaces; any other is a custom scope you define. Set at creation, either explicitly or automatically from the calling token's identity. Empty for a folder owned by a user alone (or unowned). */
+    /** The folder's scope ownership as canonical `namespace:value` entries (at most 2). `org` and `client` are reserved namespace names; any other is one you registered yourself. Set at creation, either explicitly or automatically from the calling token's identity. Empty for a folder owned by a user alone (or unowned). */
     scopes?: string[] | undefined;
     /** When the folder was created, as an ISO-8601 UTC timestamp. */
     createdAt?: string | undefined;

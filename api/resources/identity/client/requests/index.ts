@@ -12,6 +12,7 @@ export type { ListEntitiesRequest } from "./ListEntitiesRequest.js";
 export type { ListNamespacesRequest } from "./ListNamespacesRequest.js";
 export type { ListUsersRequest } from "./ListUsersRequest.js";
 export type { LookupEntitiesRequest } from "./LookupEntitiesRequest.js";
+export type { RegisterNamespaceRequest } from "./RegisterNamespaceRequest.js";
 export type { UpdateEntityRequest } from "./UpdateEntityRequest.js";
 export type { UpdateNamespaceRequest } from "./UpdateNamespaceRequest.js";
 export type { UpdateUserRequest } from "./UpdateUserRequest.js";

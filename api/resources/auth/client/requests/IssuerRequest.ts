@@ -21,7 +21,7 @@ export interface IssuerRequest {
     jwksUri: string;
     /** The `aud` claim value this contract requires a presented subject_token to carry. Must be globally unique in combination with `issuer` — use a distinct audience per environment/context sharing one IdP account (most OIDC providers support this as an ordinary per-API/application default). */
     audience: string;
-    /** Which of your app contexts an exchanged token targets. Must be an existing app context (create it first via `POST /v1/app-contexts`). */
+    /** Which of your app contexts an exchanged token targets. Must be an existing app context (create it first via `POST /v1/app-contexts`). A credential authorized via the CLI bootstrap's provisioning capability may only name the app context it is itself bound to; naming another one is refused. A root API key may name any of its contexts. */
     contextId: string;
     /** The claim in the IdP's token that carries the subject identifier. Defaults to `sub` if omitted. */
     subClaim?: string;

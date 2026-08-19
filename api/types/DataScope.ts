@@ -6,6 +6,6 @@
 export interface DataScope {
     /** Bound user id. The credential can only access records owned by this user. */
     userId?: string | undefined;
-    /** Bound scope values, as `namespace:value` entries — for example `["org:6ba7b810-9dad-11d1-80b4-00c04fd430c8"]`. The credential can only access records carrying these values. `org` and `client` are built-in namespaces; others are custom scopes you define. */
+    /** Bound scope values, as `namespace:value` entries — for example `["org:6ba7b810-9dad-11d1-80b4-00c04fd430c8"]`. The credential can only access records carrying these values. `org` and `client` are reserved namespace names; others are namespaces you registered yourself. */
     scopes?: string[] | undefined;
 }

@@ -9,9 +9,379 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
-## 0.39.0 — 2026-08-07
+## 0.40.0 — 2026-08-19
 
-_This section is still open — further 0.39.0 changes land here until release._
+### Added
+
+- **Scope clauses can grant named platform capabilities.** Every scope clause — in a role, an access
+  profile, or an invitation — accepts an optional `granted_capabilities` array alongside `allowed_actions` and
+  `data_scope`. A capability names a bounded effect that reaches across a partition boundary, which the
+  `resource:ops` verb grammar cannot express.
+
+  Four names are accepted in this release. **`member-lifecycle`** — create and remove identities in your
+  tenant. Adding someone who already has an identity here resolves them by email or `externalId` as part
+  of that operation; it does not let the credential look an identity up on its own.
+  **`forensic-read`** — read the access log across every context in your tenant, by the credential that
+  performed each read (*"what did key K read"*). **`context-directory-read`** — read your tenant's app
+  context directory (which contexts exist, their roles and access profiles, and which contexts a given
+  principal is in) across every context, not just the credential's own; see the `GET
+  /v1/principals/{id}/profiles` entry below for its concrete effect. It confers no data-plane reach —
+  records, documents, folders, schemas and entities are outside it entirely — and no write.
+  **`delegate-mint`** — mint a scoped API key (`ssk_*`) bound to a *different* principal than your own via
+  `POST /v1/admin/keys/scoped`; see the entry below for the behavior it replaces. The list is
+  closed and versioned with the API: a later release may accept further names, and a name this release
+  does not accept is rejected when you author the clause rather than stored inert.
+
+  Three rules govern the field, all fail-closed, and all worth knowing before you author one:
+
+  - An **absent or empty** list grants no capability. Absence is silence, not a wildcard.
+  - An **unrecognized name denies that whole clause** rather than being ignored — so a typo fails loudly
+    at the first request instead of quietly downgrading the grant to its surviving verbs.
+  - A **`"*"` in `allowed_actions` confers zero capabilities.** `"*"` is not a wildcard in this list, and
+    is rejected as a name; name each capability explicitly.
+
+  Each capability's reach is fixed by its own definition and the clause carries names only. Where a
+  capability acts on individual records the clause's `data_scope` narrows it as well — but neither name in
+  this release is per-record, so `data_scope` does not narrow either one.
+
+  `member-lifecycle` is bounded by the app contexts the credential can reach. Grant it deliberately for
+  that reason: its reach is any app context the credential can already administer. That is an ordinary
+  grant where app contexts separate your *apps* — but not where you have modelled your own *customers*
+  as separate app contexts.
+
+  `forensic-read` is bounded by the **tenant**, not by the credential's app context — answering
+  *"what did this key read"* crosses contexts by design, and it confers nothing on its own: the endpoint
+  still requires the `access-log:r` action, so the effective grant is `access-log:r` **plus** this name.
+  Grant it to an audit or support role.
+
+  `context-directory-read` is likewise bounded by the **tenant**, not by the credential's app context —
+  it is tenant-wide by design and not narrowed by the credential's own app context. Grant it only to an
+  admin or support role, for the same reason as `forensic-read`.
+
+  `delegate-mint` is also bounded by the **tenant**, not by the credential's app context: the credential
+  it lets you mint literally *is* another principal, wherever that identity is later used, so it is
+  tenant-wide by design in the same way `forensic-read` and `context-directory-read` are. The target must
+  still already be a member of your own app context, and the minted key's effective scope can never
+  exceed your own — this capability lifts only *who* the minted key may be, not *what* it may do. Grant
+  it to an operator or automation role that provisions credentials on other members' behalf.
+
+  **On self-signup, precisely — and this cuts one way, not all four:** a role carrying
+  `forensic-read`, `context-directory-read`, or `delegate-mint` is refused when a self-signup policy
+  creates a profile, so no *new* self-signup can be created against such a role. `member-lifecycle` is
+  the deliberate exception — it is bounded by app context rather than the tenant, so a self-signup role
+  may carry it; granting it to your default self-signup role is the intended way to let a founder sign
+  up and then invite their own team. For the three refused names, the check runs at profile-creation
+  time rather than continuously — so adding one of them to a role your users can **already** sign up to
+  grants it to those existing members at their next token. Treat re-scoping such a role as the
+  authoring decision it is.
+
+- **`GET /v1/admin/logs` now returns a `delegationChain` field on each entry.** Present only for a
+  request made under a delegate-minted `ssk_*` key (`delegate-mint`, above) — a JSON-encoded record of
+  who delegated the credential. Absent (`null`) for the overwhelming majority of requests, which carry
+  no delegation. Purely additive; no existing field changes shape or meaning. Separately, `?resource=`
+  no longer accepts `clients`/`orgs` as filter values (`400` instead) — the `/v1/orgs` and `/v1/clients`
+  routes were retired in an earlier release and no log row has ever carried either value.
+
+- **`profiles:c`/`u`/`d` now accept an optional qualifier confining WHICH principal the grant may act
+  on** — a literal `usr_<id>`, or the bare `self` sentinel. `self` matches only when the target of the
+  request is the credential's own bound principal; it never widens a grant, and it is a plain literal in
+  the qualifier position, not a `${{ }}` template. A bare, unqualified entry (`profiles:cru`) is
+  unchanged and stays broad — it remains the context-admin grant. `profiles:r` does not accept a
+  qualifier: `GET`/list routes are unaffected by this release. Example:
+  `{"allowed_actions": ["profiles:u:self"], "data_scope": {}}` lets a credential update only its own
+  access profile in a context, never another principal's.
+
+### Changed
+
+- **A namespace registration now declares where its entities — and its membership — live.**
+  `/v1/namespaces` is TENANT-WIDE by default (the behavior you have today: the namespace's entities are
+  shared by every app context, the way `org` and `client` are) and becomes CONTEXT-OWNED when you supply
+  `?contextId=` on `POST /v1/namespaces`. A context-owned registration belongs entirely to that one app
+  context: two different contexts can each register a `team` namespace with no collision, no shared
+  configuration, and no visibility into each other — registering, reading, updating or deleting one
+  context's `team` namespace never touches another context's. **A registration's `contextId` is fixed
+  once set** — an entity's partition is part of its key, so a namespace cannot be re-homed after
+  registration. The response carries `contextId` (`null` for a tenant-wide registration); there is no
+  `placement` field.
+
+  **`?contextId=` applies to every `/v1/entities/{namespace}` operation, not only creation** — `GET`
+  (both the by-id form and every list and lookup mode), `PUT`, `DELETE`, `GET .../versions`, and `POST
+  .../lookup` all take it. It is **required** for a context-owned namespace and **rejected** for a
+  tenant-wide one, and a context-confined credential may only name its own context. A context-owned
+  namespace's entities are invisible from the other contexts: a read naming context A never returns,
+  updates or deletes an entity belonging to context B. **A context-confined credential explicitly
+  naming a context other than its own is refused with `403`** before the lookup ever runs — it can
+  never reach a sibling context's entities to receive a `404` for them. Within its own context
+  (named or omitted), an entity that doesn't exist there answers `404`, same as anywhere else; an
+  unconfined (root) credential naming a context an entity doesn't live in also gets `404`, since only
+  confined credentials are restricted at context selection. Reading a namespace's own registration
+  (`GET /v1/namespaces/{name}`, `GET /v1/namespaces`) is likewise confined: a credential may read only
+  its own context's registration, or the tenant-wide one — never a sibling context's.
+
+  **Writing a namespace registration — create, update, or delete — always requires a root API key.**
+  The CLI bootstrap's provisioning capability may additionally CREATE one, confined to its own bound app
+  context (the same confinement every other provisioning-gated write already has); it may not update or
+  delete any registration, and it may not create one in a context other than its own.
+
+  A schema whose `allowedSurfaces` is `["entity"]` is now written by an ordinary scoped credential in the
+  caller's own context, where it previously required the root API key — so a blueprint can provision one.
+  A schema binding the `user` surface is unchanged and still root-only: partner users are tenant-global,
+  so their schema has one tenant-wide home. `GET /v1/schemas?surface=entity` reads the caller's context
+  and the tenant-wide home together, newest context first, through a single cursor.
+
+  **One naming collision to know about: a credential confined to an app context literally named
+  `default` does not get a private, context-owned entity schema.** `default` is also the name of the
+  tenant-wide home that `user`-surfaced schemas use, so a credential confined to that context writes its
+  entity-surfaced schema into the shared tenant-wide home instead — visible from every other context
+  too, not private to `default`. It is still gated on the ordinary `schemas` scope, so this doesn't widen
+  who can write; it only means `default` can't hold a context-private entity schema of its own. If you
+  need a private entity-schema home, use an app context named anything other than `default`.
+
+- **A namespace registration can declare where its MEMBERSHIP lives, resolved per request.** A
+  registration may additionally carry `membershipRecordType` / `membershipTargetField` (which record
+  type and field name the grant, together, all-or-nothing) and, optionally, `membershipLevelField` +
+  `membershipLevels` (a closed set of tier labels, e.g. `admin`/`viewer`). A tenant-wide registration
+  also needs `membershipContextId` — which app context holds the grant records — since a context-owned
+  registration's grants live in its own context by construction and need no separate field.
+
+  Declaring a membership backing grants nothing by itself. A `data_scope` clause opts in explicitly with
+  `${{ member.scope.<namespace> }}` (every membership, any level) or `${{ member.scope.<namespace>:<level>
+  }}` (one level only) — the bare and level-qualified forms are independent grammar, and authoring a
+  level the namespace has not declared is rejected at write time, before it can ever resolve to an
+  inert, silently-widening clause later. Resolution happens **once per request**, never at mint time, so
+  a revoked membership takes effect on your very next request rather than waiting out the token's
+  lifetime.
+
+- **`org` and `client` are ordinary namespace registrations — reserved names, not built-ins.** They were
+  previously entity-backed by virtue of their names, with no stored row behind them. Now they are real
+  registrations, on the same terms as any namespace you register yourself: they appear in
+  `GET /v1/namespaces`, and can be updated or (once empty) deleted like any other. No request or response
+  shape changes. The retired `/v1/orgs` and `/v1/clients` routes remain retired.
+
+  **Register both explicitly before creating an `org`/`client` entity** — `POST /v1/entities/org`/`client`
+  returns `400` ("not entity-backed") until you do. Register each with a root API key:
+  `POST /v1/namespaces {"namespace": "org", "entityBacked": true, "specificityRank": 1000}` and the same
+  for `client` at `specificityRank: 2000`. This is a one-time step per account; once registered, both
+  behave identically to any other namespace.
+
+- **`GET /v1/principals/{id}/profiles` no longer answers cross-context unconditionally.** Previously any
+  credential holding `profiles:r` received the requested principal's access profiles across every app
+  context in your tenant, regardless of which context the credential itself was confined to. Now:
+  looking up your **own** principal — or holding the new `context-directory-read` capability (see
+  Added, above) — still returns the profiles across every context you administer. A context-confined
+  credential looking up a **different** principal instead sees only that principal's profile in the
+  credential's own context, at most one result. **If you rely on `profiles:r` alone to enumerate another
+  principal's access across contexts, grant `context-directory-read` to the calling role as well.**
+
+- **Reading or deregistering a trusted issuer is now confined to the caller's own app context.**
+  `GET /v1/auth/issuers/{issuerId}`, `GET /v1/auth/issuers`, and `DELETE /v1/auth/issuers/{issuerId}`
+  previously let any credential holding the root API key or the CLI bootstrap's provisioning capability
+  read or deregister an issuer registered in **any** app context in the tenant. A credential confined to
+  one context (the bootstrap token) now sees and may only delete issuers registered in its **own**
+  context; naming or listing a sibling context's issuer now behaves exactly as if it doesn't exist
+  (`404`). A root API key is unaffected. **Separately**, `POST /v1/auth/issuers`'s idempotent-echo no
+  longer returns a sibling context's full issuer configuration when a confined credential's request
+  happens to collide on `issuerId` with a registration it doesn't own — that collision now fails with
+  `400` instead of echoing the other context's `jwksUri`/`audience`.
+
+- **Internal:** most writes on the app-context, access-profile, role, issuer, namespace and user
+  surfaces now pass through a shared partition check before they are persisted. No request or response
+  shape changes — the check confirms, at the moment a row is written, that it belongs to the tenant and
+  app context the caller is already confined to. It changes no outcome on its own; the
+  behaviour changes in this release are called out separately below.
+
+- **Registering a trusted issuer is now confined to the caller's own app context.**
+  `POST /v1/auth/issuers` previously let a credential carrying the CLI bootstrap's provisioning
+  capability register an issuer against *any* app context in the tenant. It now requires `contextId` to
+  be the context that credential is bound to; naming another one returns **403**, exactly as every other
+  context-bound operation already did. A root API key is unaffected and may still register an issuer for
+  any of its contexts.
+
+  This matters because a blueprint's `issuers` block is applied with the bootstrap credential, and a
+  blueprint may come from outside your organization. Without this, a pack could name an app context it
+  had nothing to do with and attach an identity provider to it.
+
+  **If you apply a blueprint whose `issuers` target a context other than the bootstrap credential's,
+  `@vectros-ai/cli` 0.16.0+ handles it transparently** — the bootstrap credential re-mints itself,
+  pinned to the blueprint's own context, specifically to register those issuers; no blueprint authoring
+  change is needed. If you register issuers directly against this endpoint outside the CLI, the
+  restriction is real and by design: the credential `vectros bootstrap` mints is bound to the `default`
+  app context, so a request naming a different context returns `403` — register those issuers with a
+  root API key instead, or apply the blueprint with a credential bound to the target context.
+
+- **A scoped credential can no longer tell *why* an invitation collided on an email address.**
+  `POST /v1/users/invite` returns 409 when the address is already taken. Previously one of the three
+  causes — the address belonging to an identity elsewhere in your account — returned a distinct body
+  carrying an `email_already_associated` code, so a caller could learn whether an arbitrary address
+  belonged to someone in your organization by inviting it and reading the error.
+
+  All three causes now return the **same 409** to a scoped credential (`ssk_*` / `st_*`). A **root API
+  key still receives the structured `email_already_associated` body**, since it can list its own users
+  directly and so learns nothing new from it. If you branch on that error code, do so on a root key, or
+  treat any 409 from this endpoint as "address unavailable".
+
+- **Minting a scoped key no longer reveals whether a user id exists elsewhere in your tenant.**
+  `POST /v1/admin/keys/scoped` requires the named user to have an access profile in the named app
+  context. Previously a user id that existed nowhere returned `404 User not found: …`, while a user id
+  that existed but had no profile in that context returned `404 AccessProfile not found for user …`.
+  A credential confined to one app context could tell those apart, and so could test arbitrary user ids
+  against your whole tenant.
+
+  Both cases now return the **same** `404`, the one naming the access profile — which keeps the
+  actionable part (*create one via `POST /v1/app-contexts/{contextId}/profiles` first*). **If you branch
+  on the text of this 404, match on the access-profile message.** A user id that exists and has a
+  profile in that context is unaffected.
+
+- **Minting a scoped key bound to a *different* principal now requires the `delegate-mint` capability.**
+  `POST /v1/admin/keys/scoped` lets a caller name any `userId` with an access profile in the named app
+  context, and the minted `ssk_*` resolves to that profile's identity — every `${{ self.* }}` clause it
+  carries evaluates as the named user, not the caller. Previously the `keys:c` action plus the existing
+  scope-subset check (the minted key's scope may not exceed the caller's) was sufficient on its own; a
+  scoped credential holding `keys:c` could mint a key that *is* any co-member of its own app context, with
+  no separate authorization for choosing someone other than itself.
+
+  **Minting a key bound to your own principal is unaffected — no capability is needed.** Minting a key
+  bound to someone else now additionally requires `granted_capabilities: ["delegate-mint"]` on the calling
+  credential; without it the request now returns `403` instead of succeeding. A root API key is unaffected
+  and may continue to mint against any principal. **If your integration uses a scoped credential to
+  provision `ssk_*` keys on behalf of other members, grant that credential's role `delegate-mint`.**
+
+- **A context-confined credential's reach on the `users` resource is now mediated by access-profile
+  membership in the credential's own app context.** Previously a scoped credential holding
+  `users:r`/`u`/`d` could read, update, or delete *any* user in your tenant, regardless of app context —
+  `users` had no per-context reach limit, unlike most other resources. Now, for a context-confined
+  credential: `GET`/`PUT`/`DELETE /v1/users/{id}`, `GET /v1/users` (list), `GET /v1/users?externalId=`,
+  and `GET`/`POST /v1/users/lookup` only reach a user who holds an access profile in the credential's own
+  app context. A user who exists but isn't a member of that context answers exactly as if it didn't exist
+  — `404` on the id-addressed routes, silently absent from a list/lookup result — the same
+  uniform-not-found shape used elsewhere on this API. **If your integration uses a context-confined
+  credential to manage users across your whole tenant, this is a live break: grant it cross-context
+  reach, or scope the workflow to per-context member management.** A root API key, or a credential with
+  cross-context reach, is unaffected.
+
+- **`DELETE /v1/users/{id}` now refuses to delete your account's last OWNER.** Deleting the OWNER user
+  that removes your account's only remaining owner access now returns `409` instead of succeeding — an
+  account must always retain at least one owner; contact support if you need to change who holds it. If
+  your account has more than one owner-eligible principal, or you are deleting a non-owner (`SUB_USER`)
+  identity, this change has no effect on you.
+
+  **Separately, called by a context-confined credential, it also refuses when the user has access in an
+  app context other than the caller's own** (`409`) — deleting a user's identity removes it everywhere,
+  so a context-confined credential can no longer delete a user out from under access it can't see.
+  Remove the user from your own context first (`DELETE /v1/app-contexts/{contextId}/profiles/{principalId}`),
+  or use a credential with cross-context reach to delete the identity outright.
+
+- **`POST /v1/auth/token` returns the standard error body on its `404` and `400` responses.** This route
+  assembled those bodies by hand, so they carried only `{"message": …}` with no `requestId`, and the
+  response set no `Content-Type`. Every `404` (app context not found) and `400` (a malformed body, a
+  missing or invalid `scope`, an unrecognized `userId`/entity id, or an `expiresInSeconds` over the
+  1-hour maximum) now returns the same envelope as every other error on the API — `requestId` included,
+  `Content-Type: application/json`. Status codes and message text are unchanged; if you parse these
+  bodies generically, nothing breaks.
+
+- **`POST /v1/auth/issuers` now enforces one active IdP per app context.** Registering a second issuer
+  against a context that already has an active one now returns `400` instead of succeeding — a context
+  has exactly one active IdP at a time. Registering the SAME issuer against several DIFFERENT contexts
+  (each via its own `audience`) is unaffected and remains the supported way to serve more than one
+  context from one IdP. If your integration only ever registers one issuer per context, this change has
+  no effect on you.
+
+- **`DELETE /v1/auth/issuers/{issuerId}` now refuses to deregister an issuer that has ever bound a
+  user.** Previously unconditional — deleting an issuer registration succeeded even if a prior
+  self-signup or accepted invite had already created a user via it, silently orphaning that user's
+  future ability to obtain a new token. It now returns `409` in that case; deactivate the affected users
+  first, or register a replacement issuer, before removing this one. An issuer that has never
+  successfully completed a `POST /v1/auth/token/exchange` can always be deregistered.
+
+- **`POST /v1/auth/token/exchange` accepts an optional `context_id` field.** If your issuer is
+  registered against more than one app context (each via its own audience), `context_id` selects which
+  one to target, disambiguating a `subject_token` whose `aud` claim could otherwise match more than one
+  of your registered contexts. Omit it when your token's `aud` claim matches only one registered context
+  — the common case, and the field's addition changes nothing about that path. Naming a context this
+  issuer is not registered against is refused identically to an unrecognized issuer (`404`, no
+  distinguishing information).
+
+- **`GET /v1/usage` no longer returns account-wide totals to a context-confined credential.**
+  Previously the `credits`, `search`, `documents`, `records`, `identity`, `inference`, `readAccess`, and
+  `tenants` sections always summed your **whole account** — both the live and test environment, every
+  app context — regardless of which app context the calling credential was confined to; only the
+  `contexts` breakdown itself respected `contextId`. A credential confined to one app context now sees
+  every section narrowed to that context alone, and the environment (`tenants.live` / `tenants.test`)
+  its context is **not** bound to is now `null` rather than the other environment's real totals. A root
+  API key, or a scoped credential with cross-context reach, is unaffected — you continue to see your
+  full account-wide totals, and `contextId` continues to work as a display-only filter on the `contexts`
+  breakdown. **If your integration reads top-level usage totals from a context-confined token, those
+  numbers now reflect only that context** — read `contexts[]` if you need the full picture, or use a
+  credential with cross-context reach. Supplying `contextId` on a context-confined credential now
+  requires it to name that credential's own context; naming another one returns `403`.
+
+  **Two narrower exceptions, worth knowing precisely rather than assuming "everything narrows":**
+  `reads.calls.used` and `reads.dataOut.bytes` — the raw call-count and egress-byte counters — have no
+  per-app-context breakdown to narrow to at all (they're metered per account, not per context), so a
+  context-confined credential sees `0` for both rather than a narrowed figure; the corresponding
+  **charge** fields (`reads.calls.overageCredits`, `reads.dataOut.overageCredits`) *do* narrow correctly,
+  since overage is charged per context. Don't read `reads.calls.used == 0` as "this credential made no
+  calls this period" — it means "this dimension isn't visible at context granularity." Separately,
+  `credits.limit` continues to reflect your whole plan's ceiling (a property of your plan, not of any
+  one context's usage); only `credits.used`/`credits.remaining` narrow, so `credits.remaining` may
+  overstate the account's true remaining room for a context-confined credential.
+
+- **`POST /v1/app-contexts/{contextId}/profiles` now requires a `usr_` principal to be a real user.**
+  Previously the endpoint validated only the *format* of `principalId`, so a request naming a user that
+  does not exist — or one that exists in a different tenant — created an access profile anyway. Those
+  profiles conferred no access (a token mint resolves the user before it reads the profile), but they
+  accumulated with no limit and there was no way to notice. A `usr_`-prefixed `principalId` that does not
+  name a live user in your tenant is now rejected with `400`, and no profile is created. **Create the user
+  first, then grant it an access profile.** `key_` principals are unaffected. `?upsert=true` is checked the same way,
+  because it rewrites a grant. The plain idempotent-collision response is NOT: it writes nothing, so an
+  access profile whose user was deleted still returns its existing row rather than an error, and can
+  still be removed with `DELETE`.
+
+  If your credential holds `users:r` the error names the reason; otherwise the response is deliberately
+  indistinguishable from the malformed-`principalId` rejection, so a credential that cannot list your
+  users cannot use this endpoint to discover which user ids exist.
+
+### Fixed
+
+- **The Vectros-hosted admin app and CLI bootstrap credentials can mint a `delegate-mint`-requiring key
+  again.** When `delegate-mint` shipped above, the two first-party credential shapes that fill it out on
+  your behalf — the admin app's session token and the CLI's per-context bootstrap token, both minted
+  through `GET /developer/scoped-token` — were not given the capability, so binding a scoped key to
+  anyone but yourself through either of them returned `403`. Both now carry `delegate-mint` by default,
+  restoring the behavior that existed before this release: minting an `ssk_*` bound to a different
+  member of your own tenant, from either surface, works as it did. **No action needed** — this affects
+  only Vectros's own first-party credentials, never a role or access profile you authored yourself; the
+  entry above (*"grant that credential's role `delegate-mint`"*) still applies unchanged to your own
+  integrations.
+
+- **Revoking a leaked CLI bootstrap token now takes effect immediately on the writes its bootstrap
+  capability gates — issuer registration and namespace registration (see Changed, above), and app-context
+  creation.** The capability check previously read only the token's declared scope, not whether it had
+  since been revoked, so a bootstrap token you revoked in response to a known leak could still succeed at
+  these writes — including registering a trusted issuer with an attacker-controlled `jwksUri` — for the
+  remainder of its normal lifetime (up to one hour) after revocation. Revocation status is checked on
+  every request now, closing that window. No action needed — this only affects what a token could do
+  *after* you had already revoked it.
+
+- **`POST /v1/entities/{namespace}/lookup` and `GET /v1/entities/{namespace}/{id}/versions` now honor
+  their own `?contextId=` reliably.** On a Lambda container reused across requests, either route could
+  read the `contextId` left by a *prior*, unrelated request instead of its own. The effect differed by
+  caller shape and by whether the container had ever served this route before:
+
+  - An **unconfined (root or provisioning) caller** could have a lookup silently resolve against the
+    wrong app context instead of the one actually named.
+  - A **context-confined caller was not immune** — a stale, non-null leftover value could make a
+    request that supplied *no* `contextId` at all fail with
+    a spurious `403` (or, on a tenant-placed namespace, a spurious `400` naming a `contextId` the request
+    never sent), because the stale value was still compared against the caller's own context even though
+    the caller's own context is resolved independently.
+  - On the **very first** request either route ever served on a given container, the field had never been
+    set at all and the request failed with a `500` rather than resolving against the wrong context.
+
+  If you have observed an unexplained `403`/`500` on these routes, or a lookup answer for the wrong app
+  context, this is fixed; no request shape changed.
+
+## 0.39.0 — 2026-08-07
 
 ### Added
 

@@ -4,11 +4,14 @@
  * @example
  *     {
  *         namespace: "team",
- *         id: "id"
+ *         id: "id",
+ *         contextId: "myapp"
  *     }
  */
 export interface DeleteEntityRequest {
     /** The entity namespace. */
     namespace: string;
     id: string;
+    /** Which app context to read from. **Required when the namespace is context-placed** and rejected otherwise: a tenant-placed namespace's entities are shared by every context, so there is nothing to name. A context-placed namespace's entities belong to exactly one context and are invisible from the others — the same `externalId` may name a different entity in each. A context-confined credential may only name its own context. */
+    contextId?: string;
 }

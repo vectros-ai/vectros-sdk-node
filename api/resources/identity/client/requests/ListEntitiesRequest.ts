@@ -6,12 +6,15 @@ import type * as Vectros from "../../../../index.js";
  * @example
  *     {
  *         namespace: "team",
+ *         contextId: "myapp",
  *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl"
  *     }
  */
 export interface ListEntitiesRequest {
     /** The entity namespace. */
     namespace: string;
+    /** Which app context to read from. **Required when the namespace is context-placed** and rejected otherwise: a tenant-placed namespace's entities are shared by every context, so there is nothing to name. A context-placed namespace's entities belong to exactly one context and are invisible from the others — the same `externalId` may name a different entity in each. A context-confined credential may only name its own context. */
+    contextId?: string;
     /** Return only entities owned by this user (Vectros user ID). */
     userId?: string;
     /** Look up an entity by your own identifier. Returns a list with the single match, or empty. */

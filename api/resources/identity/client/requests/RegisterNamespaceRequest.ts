@@ -5,17 +5,14 @@ import type * as Vectros from "../../../../index.js";
 /**
  * @example
  *     {
- *         namespace: "team",
  *         body: {
  *             namespace: "team",
  *             specificityRank: 1500
  *         }
  *     }
  */
-export interface UpdateNamespaceRequest {
-    /** The namespace name. */
-    namespace: string;
-    /** The app context that owns this registration. Omit for the tenant-wide registration. */
+export interface RegisterNamespaceRequest {
+    /** The app context to own this registration. Omit for a TENANT-WIDE registration visible to every context. */
     contextId?: string;
     body: Vectros.NamespaceRequest;
 }

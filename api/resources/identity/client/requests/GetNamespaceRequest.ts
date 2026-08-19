@@ -9,4 +9,6 @@
 export interface GetNamespaceRequest {
     /** The namespace name. */
     namespace: string;
+    /** An app context to resolve this namespace for — its own registration if it has one, else the tenant-wide one. Omit for the tenant-wide registration only. */
+    contextId?: string;
 }

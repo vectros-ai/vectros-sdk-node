@@ -247,7 +247,7 @@ export class AuthClient {
     }
 
     /**
-     * Creates a scoped API key (an `ssk_*` secret) that inherits its permissions from an existing access profile in your account. The call is idempotent on the combination of tenant, context, user, and key name: re-issuing the same request returns the existing key WITHOUT re-disclosing its raw secret. The raw key is returned ONLY in this response — store it securely, as it cannot be retrieved again. Requires the `keys:c` scope. If you use a scoped credential, `keys:c` alone is not sufficient: because the minted key is durably bound to the profile you name, the profile's effective scopes may not exceed your own, and you may only mint against a profile whose `identityOverrides` values your own identity holds. A root API key (`sk_`) is exempt from both bounds.
+     * Creates a scoped API key (an `ssk_*` secret) that inherits its permissions from an existing access profile in your account. The call is idempotent on the combination of tenant, context, user, and key name: re-issuing the same request returns the existing key WITHOUT re-disclosing its raw secret. The raw key is returned ONLY in this response — store it securely, as it cannot be retrieved again. Requires the `keys:c` scope. If you use a scoped credential, `keys:c` alone is not sufficient: because the minted key is durably bound to the profile you name, the profile's effective scopes may not exceed your own, and you may only mint against a profile whose `identityOverrides` values your own identity holds. Minting a key bound to your OWN principal needs nothing further; minting one bound to a DIFFERENT principal additionally requires the `delegate-mint` capability (`granted_capabilities`) on your credential — without it the request is refused. A root API key (`sk_`) is exempt from all three bounds.
      *
      * @param {Vectros.CreateScopedKeyRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -642,7 +642,7 @@ export class AuthClient {
     }
 
     /**
-     * Creates a new access profile under the given app context. This call is idempotent by `principalId`: if a profile with the same `principalId` already exists, the existing profile is returned (with status 200) instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing profile was returned) tells the two apart. To overwrite an existing profile's `scopes`/`roleId`, `identityOverrides`, and `status` instead of returning it unchanged, set `?upsert=true` (this also requires the `profiles:u` scope, and applies the same `identityOverrides` bounds the update endpoint documents — a scoped credential may not repoint or clear an identity value it does not itself hold). You must provide exactly one of `scopes` (an inline list of scopes) or `roleId` (a reference to a role); supplying both, or neither, is rejected. `identityOverrides` is keyed by ownership namespace in `scope:<namespace>` form — `scope:org` and `scope:client` for the reserved namespaces, or any namespace you have registered — and may name at most two; any other key (including the account identifier or `userId`) is rejected. If you use a scoped credential, the profile's effective scopes may not exceed your own; a root API key (`sk_`) is exempt. Requires the `profiles:c` scope.
+     * Creates a new access profile under the given app context. This call is idempotent by `principalId`: if a profile with the same `principalId` already exists, the existing profile is returned (with status 200) instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing profile was returned) tells the two apart. To overwrite an existing profile's `scopes`/`roleId`, `identityOverrides`, and `status` instead of returning it unchanged, set `?upsert=true` (this also requires the `profiles:u` scope, and applies the same `identityOverrides` bounds the update endpoint documents — a scoped credential may not repoint or clear an identity value it does not itself hold). The `principalId` must name a principal that already exists: a `usr_` principal must be a live user in your tenant, so create the user before granting it a profile. A `usr_` id that names no such user is rejected, and no profile is created. `key_` principals are not checked this way. You must provide exactly one of `scopes` (an inline list of scopes) or `roleId` (a reference to a role); supplying both, or neither, is rejected. `identityOverrides` is keyed by ownership namespace in `scope:<namespace>` form — `scope:org` and `scope:client` for the reserved namespaces, or any namespace you have registered — and may name at most two; any other key (including the account identifier or `userId`) is rejected. If you use a scoped credential, the profile's effective scopes may not exceed your own; a root API key (`sk_`) is exempt. Requires the `profiles:c` scope.
      *
      * @param {Vectros.CreateAccessProfileRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -1951,7 +1951,7 @@ export class AuthClient {
     }
 
     /**
-     * Returns full usage detail for the requested calendar month, broken down by category (search, documents, and records) with per-category credit estimates and a split between your live and test environments. Defaults to the current month when `year` and `month` are omitted. Requires the `billing:r` scope on scoped tokens; API keys always have access.
+     * Returns full usage detail for the requested calendar month, broken down by category (search, documents, and records) with per-category credit estimates and a split between your live and test environments. Defaults to the current month when `year` and `month` are omitted. Requires the `billing:r` scope on scoped tokens; API keys always have access. **A token confined to a single app context sees only that context's usage**: totals, the environment split, and the `contexts` breakdown narrow to it, and the environment your context is not bound to is omitted (`null`), not zeroed. Only a token with cross-context reach sees your full account-wide totals. Two exceptions to the narrowing, since they have no per-context breakdown to narrow to: `reads.calls.used`/`reads.dataOut.bytes` (metered per account, not per context) read as `0` for a confined token rather than a narrowed figure — the corresponding overage-credit charge fields narrow correctly; and `credits.limit` stays your whole plan's ceiling, so `credits.remaining` may overstate the account's true remaining room.
      *
      * @param {Vectros.GetUsageRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2029,7 +2029,7 @@ export class AuthClient {
     }
 
     /**
-     * Retrieves a single registered issuer by issuerId. Requires a root API key or the bootstrap's provisioning capability.
+     * Retrieves a single registered issuer by issuerId. Requires a root API key or the bootstrap's provisioning capability. A credential confined to one app context sees only an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId. A root API key sees every context.
      *
      * @param {Vectros.GetIssuerRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2098,13 +2098,14 @@ export class AuthClient {
     }
 
     /**
-     * Deregisters a trusted third-party IdP issuer. Requires a root API key or the bootstrap's provisioning capability. Unconditional — unlike some other registry deletes on this API, this does not check for or block on any downstream reference. Any user account already created via this issuer (by a prior self-signup or accepted invite) is NOT deleted or modified, but that user can no longer obtain a NEW token this way once you deregister the issuer — every `POST /v1/auth/token/exchange` call against it will 404, with no distinction between an unknown issuer and one you just deregistered. Register a replacement issuer, or restore this one, before your users' current tokens expire if you want their access to continue uninterrupted.
+     * Deregisters a trusted third-party IdP issuer. Requires a root API key or the bootstrap's provisioning capability. A credential confined to one app context may only deregister an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId. A root API key may deregister any issuer. Refused if any user account was ever created or matched via this issuer (by a prior self-signup or accepted invite, through `POST /v1/auth/token/exchange`) — that access cannot be silently orphaned. Deactivate the affected users first if you intend to cut off their access, or register a replacement issuer before removing this one. An issuer that has never been used for an exchange (no bound users yet) can always be deregistered.
      *
      * @param {Vectros.DeleteIssuerRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -2155,6 +2156,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -2175,7 +2178,7 @@ export class AuthClient {
     }
 
     /**
-     * Returns the issuers registered in your tenant. Requires a root API key or the bootstrap's provisioning capability. Returns a `{data, nextCursor}` envelope.
+     * Returns the issuers registered in your tenant. Requires a root API key or the bootstrap's provisioning capability. A credential confined to one app context sees only the issuers registered in that context; a root API key sees every context. Returns a `{data, nextCursor}` envelope.
      *
      * @param {Vectros.ListIssuersRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2247,7 +2250,7 @@ export class AuthClient {
     }
 
     /**
-     * Registers a trusted third-party IdP issuer that BYO-IdP token exchange (`POST /v1/auth/token/exchange`) may accept a `subject_token` from. Requires a root API key or the CLI bootstrap's provisioning capability — never an ordinary partner-grantable scope. Idempotent by `issuerId` within your tenant; the `(issuer, audience)` pair must not already be registered by a different issuerId/tenant.
+     * Registers a trusted third-party IdP issuer that BYO-IdP token exchange (`POST /v1/auth/token/exchange`) may accept a `subject_token` from. Requires a root API key or the CLI bootstrap's provisioning capability — never an ordinary partner-grantable scope. A credential authorized only via the provisioning capability may register only against the app context it is bound to; naming a different one returns 403. A root API key is unaffected and may register against any of its contexts. Idempotent by `issuerId` within your tenant; the `(issuer, audience)` pair must not already be registered by a different issuerId/tenant. If `issuerId` collides with a registration owned by a different app context than the one you're confined to, the request fails with 400 rather than returning that context's configuration. An app context may have at most one active issuer — deregister the existing one first if you need to replace it. One issuer MAY serve several contexts today, each via its own registration row with a distinct `audience`.
      *
      * @param {Vectros.IssuerRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2376,7 +2379,7 @@ export class AuthClient {
     }
 
     /**
-     * Returns the access profiles for the given principal across all of your contexts. Use this to answer questions like "which apps does this user have access to?" — for example, to build a member-access summary. Results are confined to your account. Requires the `profiles:r` scope.
+     * Returns the access profiles for the given principal. Looking up your OWN principal — or holding the `context-directory-read` capability — returns the profiles across ALL of your contexts, letting you answer questions like "which apps does this user have access to?". A context-bound credential looking up a DIFFERENT principal instead sees only that principal's profile in your credential's own context (at most one result), never across contexts it has no authority over. Results are always confined to your account. Requires the `profiles:r` scope.
      *
      * @param {Vectros.ListProfilesForPrincipalRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2465,6 +2468,7 @@ export class AuthClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -2527,6 +2531,8 @@ export class AuthClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -2703,7 +2709,7 @@ export class AuthClient {
     }
 
     /**
-     * RFC 8693 OAuth 2.0 Token Exchange. Trades a JWT issued by a third-party identity provider you've registered (`POST /v1/auth/issuers`) for a Vectros `st_*` scoped bearer token — no Vectros credential required to call this endpoint. The exchanged token's scope is resolved entirely server-side from the matched user's access profile; this endpoint accepts no caller-supplied scope, resource, or audience parameter (RFC 8693 §2.1's `resource`/`audience`/`scope` are not used in v1 — the registered `(issuer, audience)` pair alone pins the target tenant and app context). On a first-time login (no existing Vectros identity for this subject), two opt-in binding paths exist: `invite_token` (a `PENDING` sub-user invitation), and — if the registration declares one or more self-signup policies — `signup_type` (a brand-new user is created and bound to the policy's configured role). If `invite_token` is present at all, it is the ONLY path tried — a failed invite never falls through to self-signup. Neither field is required for a subject with an existing identity. Uses the OAuth-standard error envelope (`{"error":..., "error_description":...}`, RFC 6749 §5.2), NOT this API's usual `{"message":...}` shape — its client is generic OAuth tooling, not the Vectros SDK.
+     * RFC 8693 OAuth 2.0 Token Exchange. Trades a JWT issued by a third-party identity provider you've registered (`POST /v1/auth/issuers`) for a Vectros `st_*` scoped bearer token — no Vectros credential required to call this endpoint. The exchanged token's scope is resolved entirely server-side from the matched user's access profile; this endpoint accepts no caller-supplied scope, resource, or audience parameter (RFC 8693 §2.1's `resource`/`audience`/`scope` are not used in v1 — the registered `(issuer, audience)` pair alone pins the target tenant and app context). On a first-time login (no existing Vectros identity for this subject), two opt-in binding paths exist: `invite_token` (a `PENDING` sub-user invitation), and — if the registration declares one or more self-signup policies — `signup_type` (a brand-new user is created and bound to the policy's configured role). If `invite_token` is present at all, it is the ONLY path tried — a failed invite never falls through to self-signup. Neither field is required for a subject with an existing identity. If your issuer is registered against more than one app context (each via its own audience), `context_id` selects which one to target; omit it when your token's `aud` claim matches only one registered context — the common case, unaffected by this field. Uses the OAuth-standard error envelope (`{"error":..., "error_description":...}`, RFC 6749 §5.2), NOT this API's usual `{"message":...}` shape — its client is generic OAuth tooling, not the Vectros SDK.
      *
      * @param {Vectros.TokenExchangeRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.

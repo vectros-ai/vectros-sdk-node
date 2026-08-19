@@ -25,7 +25,7 @@ export class SchemasClient {
     }
 
     /**
-     * Returns a paginated list of the record schemas defined in your account. Filter by `userId` or `scope` to scope to an owner, by `surface` to list the types bindable to one surface, or by `recordType` to resolve the single schema for a type directly. Filtering by an identity surface (`user` or `entity`) lists your account-wide identity schemas regardless of the calling context; filtering by record or document lists within the calling context. Requires the `schemas:r` scope.
+     * Returns a paginated list of the record schemas defined in your account. Filter by `userId` or `scope` to scope to an owner, by `surface` to list the types bindable to one surface, or by `recordType` to resolve the single schema for a type directly. Filtering by `surface=user` lists your account-wide identity schemas regardless of the calling context (a `user`-surfaced schema always has one tenant-wide home). Filtering by `surface=entity` reads your own app context's entity schemas AND the tenant-wide home together, newest first, through a single cursor — an entity schema may live in either home depending on where its namespace is placed (see `POST /v1/namespaces`). Filtering by `record` or `document` lists within the calling context only. Requires the `schemas:r` scope.
      *
      * @param {Vectros.ListSchemasRequest} request
      * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -365,6 +365,7 @@ export class SchemasClient {
      * @param {Vectros.DeleteSchemaRequest} request
      * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
@@ -413,6 +414,8 @@ export class SchemasClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:

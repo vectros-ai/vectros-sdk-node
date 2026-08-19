@@ -9,4 +9,6 @@ export interface ListNamespacesRequest {
     startFrom?: string;
     /** Maximum registrations per page (1-100; defaults to 20). */
     limit?: number;
+    /** List one app context's OWN registrations instead of the tenant-wide ones. Omit for the tenant-wide registrations only — a context's own registrations are never mixed into the unfiltered listing. */
+    contextId?: string;
 }

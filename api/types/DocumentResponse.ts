@@ -39,7 +39,7 @@ export interface DocumentResponse {
     textBytes?: number | undefined;
     /** The owning user — the Vectros-assigned UUID of a user in your account. */
     userId?: string | undefined;
-    /** The document's scope ownership as canonical `namespace:value` entries (at most 2). `org` and `client` are built-in namespaces; any other is a custom scope you define. Set at creation, either explicitly or automatically from the calling token's identity. Empty for a document owned by a user alone (or unowned). Filter lists by these values with `?scope=`. */
+    /** The document's scope ownership as canonical `namespace:value` entries (at most 2). `org` and `client` are reserved namespace names; any other is one you registered yourself. Set at creation, either explicitly or automatically from the calling token's identity. Empty for a document owned by a user alone (or unowned). Filter lists by these values with `?scope=`. */
     scopes?: string[] | undefined;
     /** MIME type of the uploaded file. Present only for file-backed documents. */
     fileType?: string | undefined;
