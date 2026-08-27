@@ -17,6 +17,7 @@ export type { GetRoleVersionsRequest } from "./GetRoleVersionsRequest.js";
 export type { GetScopedKeyRequest } from "./GetScopedKeyRequest.js";
 export type { GetUsageRequest } from "./GetUsageRequest.js";
 export type { IssuerRequest } from "./IssuerRequest.js";
+export type { IssuerUpdateRequest } from "./IssuerUpdateRequest.js";
 export type { ListAccessProfilesRequest } from "./ListAccessProfilesRequest.js";
 export type { ListAppContextsRequest } from "./ListAppContextsRequest.js";
 export type { ListIssuersRequest } from "./ListIssuersRequest.js";

@@ -25,14 +25,14 @@ export class RecordsClient {
     }
 
     /**
-     * Reserved endpoint for fetching multiple records by ID in one call. When available, the response will contain only the records you can see; any IDs that do not exist or are outside your scope are silently omitted (there is no per-ID existence signal), matching the not-found behavior of the single-record GET. It currently returns 501 (not implemented). The documented 200 response schema is the stable shape this endpoint will use once available. Requires the `records:r` scope.
+     * Fetches multiple records by ID in one call (`ids`, maximum 100). The response contains only the records you can access — any id that does not exist, belongs to another account/AppContext, or is outside your token's scope is silently omitted, with no per-id existence signal, matching the not-found behavior of the single-record GET. Payloads are hydrated the same way a by-id GET hydrates them (payloads externalized to object storage are rehydrated for this response). Requires the `records:r` scope (and, for a scoped token, `records:r:<type>` per record type).
      *
      * @param {Vectros.BatchGetRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.TooManyRequestsError}
-     * @throws {@link Vectros.NotImplementedError}
      *
      * @example
      *     await client.records.batchGetRecords()
@@ -78,12 +78,12 @@ export class RecordsClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
-                case 501:
-                    throw new Vectros.NotImplementedError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,

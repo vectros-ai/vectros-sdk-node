@@ -10,4 +10,10 @@ export interface AppContextRequest {
     name: string;
     /** Optional free-text description of what this app context is for. */
     description?: string | undefined;
+    /** Declares the per-principal metering axis for this app context — enables visibility into and (with `principalUsageCap`) enforcement of per-principal usage within this context. Either `user` (per end-user) or `scope:<namespace>` (per declared namespace, e.g. `scope:org`). Omit to leave context-only accounting unchanged (the default). Only takes effect for a partner with the corresponding account-level feature enabled. */
+    meteringAxis?: string | undefined;
+    /** Per-principal, per-minute request cap, for the opt-in per-principal burst-protection feature. Only takes effect for a partner with that feature enabled on their account. Omit to leave unset. */
+    principalBurstLimit?: number | undefined;
+    /** Per-principal, per-billing-period operation cap, for the opt-in per-principal usage/quota feature. Omit to track per-principal usage without enforcing a cap. Only takes effect for a partner with that feature enabled on their account. */
+    principalUsageCap?: number | undefined;
 }

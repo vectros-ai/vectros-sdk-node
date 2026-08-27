@@ -119,6 +119,7 @@ export * from "./TenantCredits.js";
 export * from "./TenantDetail.js";
 export * from "./TenantInferenceSection.js";
 export * from "./Tenants.js";
+export * from "./TokenAssumeResponse.js";
 export * from "./TokenExchangeResponse.js";
 export * from "./TruncationWarningEvent.js";
 export * from "./UsageReportResponse.js";

@@ -10,6 +10,8 @@ export interface EntityResponse {
     id?: string | undefined;
     /** The namespace this entity belongs to. */
     namespace?: string | undefined;
+    /** The app context that owns this entity, or null for a TENANT-WIDE entity visible to every app context. Mirrors the owning namespace registration's `contextId` (see `GET /v1/namespaces`) — a context-owned namespace's entities all carry that same context. */
+    contextId?: string | undefined;
     /** Your own identifier for this entity, as supplied when it was created. */
     externalId?: string | undefined;
     /** Human-readable name of the entity. */

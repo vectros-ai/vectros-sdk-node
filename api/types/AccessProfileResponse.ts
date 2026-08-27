@@ -14,12 +14,16 @@ export interface AccessProfileResponse {
     contextId?: string | undefined;
     /** Principal this profile applies to — `usr_<userId>` for a user, or `key_<keyId>` for a scoped API key acting as its own principal. */
     principalId?: string | undefined;
-    /** Inline scope clauses granted to the principal. Mutually exclusive with `roleId` — exactly one of the two is present. */
+    /** Inline scope clauses granted to the principal. Mutually exclusive with `roleIds` — exactly one of the two is present. */
     scopes?: Vectros.ScopeClause[] | undefined;
-    /** Reference to a role that supplies this principal's scopes. Mutually exclusive with `scopes` — exactly one of the two is present. */
+    /** The roles that together supply this principal's scopes, in composition order — the effective grant is each role's own clauses concatenated. Mutually exclusive with `scopes`: exactly one of the two is present. */
+    roleIds?: string[] | undefined;
+    /** Deprecated single-role view of `roleIds`, present only when exactly one role composes. A profile composing two or more roles omits this field entirely — read `roleIds`, which is always present for a role-referencing profile. */
     roleId?: string | undefined;
     /** Per-context identity overrides, keyed by ownership namespace in `scope:<namespace>` form (for example `scope:org`, `scope:client`, `scope:group`). Read back exactly as authored. */
     identityOverrides?: Record<string, unknown> | undefined;
+    /** Which values, per `scope:<namespace>`, a holder of this profile may assume via `POST /v1/auth/token/assume`. Only meaningful when `scopes` (not `roleId`) is set — see `assumable`'s own request-field doc. Absent when the profile grants no assumption of anything (the common case, and always the case for a role-referencing profile — the grant lives on the Role instead). */
+    assumable?: Record<string, unknown> | undefined;
     /** Profile lifecycle status: `active` or `suspended`. */
     status?: string | undefined;
     /** When the profile was created (ISO-8601 UTC). */

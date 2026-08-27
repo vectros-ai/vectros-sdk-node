@@ -20,6 +20,12 @@ export interface AppContextResponse {
     lastModified?: string | undefined;
     /** Lifecycle status of the app context: `active` under normal operation; `purging` while an asynchronous delete is draining the context's data; `deleted` once that teardown completes. After you call DELETE on an app context (which returns 202 and drains asynchronously), poll this field to observe when the teardown has finished. */
     status?: AppContextResponse.Status | undefined;
+    /** The declared per-principal metering axis for this app context, or absent if unset (context-only accounting). */
+    meteringAxis?: string | undefined;
+    /** Per-principal, per-minute request cap for the opt-in per-principal burst-protection feature, or absent if unset. */
+    principalBurstLimit?: number | undefined;
+    /** Per-principal, per-billing-period operation cap for the opt-in per-principal usage/quota feature, or absent if unset (usage is still tracked for visibility/billing without a cap when `meteringAxis` is set but this is absent). */
+    principalUsageCap?: number | undefined;
 }
 
 export namespace AppContextResponse {

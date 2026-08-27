@@ -30,9 +30,9 @@ export class ComplianceClient {
      * @param {Vectros.ErasureRequest} request
      * @param {ComplianceClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.TooManyRequestsError}
-     * @throws {@link Vectros.NotImplementedError}
      *
      * @example
      *     await client.compliance.createErasureRequest({
@@ -80,12 +80,12 @@ export class ComplianceClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
-                case 501:
-                    throw new Vectros.NotImplementedError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -106,7 +106,6 @@ export class ComplianceClient {
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
-     * @throws {@link Vectros.NotImplementedError}
      *
      * @example
      *     await client.compliance.getErasureRequest({
@@ -156,8 +155,6 @@ export class ComplianceClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
-                case 501:
-                    throw new Vectros.NotImplementedError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,

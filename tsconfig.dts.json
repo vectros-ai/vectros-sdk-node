@@ -20,8 +20,6 @@
   // the source preserves the merger end-to-end — Fern's source-level barrels
   // (`export * from "./X.js"`) are the canonical shape, and the consumer
   // resolves through them naturally.
-  //
-  // Tracking: monorepo #104.
   // ===========================================================================
   "extends": "./tsconfig.json",
   "compilerOptions": {
@@ -30,10 +28,11 @@
     // gate: it FAILS the build on dangling/orphaned generated files (e.g. the
     // pre-rename AccessProfileTemplate* wrappers importing a type the barrel
     // no longer exports) that tsup's lenient `--dts` bundling silently shipped.
-    // #104 first used `noCheck:true` to match tsup's leniency, but that just
-    // perpetuated the blind spot. #105 makes the sibling-repo sync authoritative
-    // (deletes orphans before the cp), so the generated input is consistent and
-    // strict `tsc` passes — verified. Keeping strict means a future rename that
+    // An earlier version of this build first used `noCheck:true` to match tsup's
+    // leniency, but that just perpetuated the blind spot. The sibling-repo sync
+    // was then made authoritative (deletes orphans before the copy), so the
+    // generated input is consistent and strict `tsc` passes — verified. Keeping
+    // strict means a future rename that
     // re-introduces an orphan fails the build instead of shipping broken types.
     // Strip `.d.ts.map` emission — Fern's own tsconfig sets
     // `declarationMap: true`, but the maps reference source `.ts` paths

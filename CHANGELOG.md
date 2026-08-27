@@ -9,6 +9,267 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.41.0 — 2026-08-27
+
+### Added
+
+- **`PUT /v1/auth/issuers/{issuerId}` — update a registered trusted issuer's safe fields.**
+  Previously a registered issuer's `subClaim`/`emailClaim`/`status`/`selfSignupPolicies` could only
+  be set once, at registration — getting one wrong (or needing to change a self-signup policy after
+  initial setup) meant delete-and-re-register, which was itself refused once any real user had ever
+  bound through the issuer, leaving no recovery path at all. The new endpoint updates just that
+  "safe" field set (fields that only affect *future* first-logins, or whether the issuer's tokens
+  are currently honored). `issuer`/`jwksUri`/`audience` (the cryptographic trust anchor) and
+  `contextId` (the routing pin) stay immutable via this route — supplying a differing value is
+  rejected with `400`, naming the field; echoing the current value back is a no-op. As part of this,
+  `status: "suspended"` is now actually reachable: setting it rejects the issuer's tokens at
+  exchange time identically to an unregistered issuer (the enforcement already existed; nothing
+  could set the status before this).
+
+- **A registered issuer can now resolve an invitee's email via the IdP's OIDC userinfo endpoint,
+  when the presented token doesn't carry it directly.** `POST /v1/auth/token/exchange` presents your
+  IdP's access token, and access tokens generally don't carry an `email` claim under OIDC unless your
+  IdP was specifically configured to add one — previously, a first-login attempt against such a token
+  failed with no way to recover except that per-deployment IdP-side workaround. Set the new
+  `userinfoUri` field (`POST /v1/auth/issuers`, or `PUT /v1/auth/issuers/{issuerId}`) to your IdP's
+  userinfo endpoint to enable a fallback: when the configured `emailClaim` is absent from the
+  presented token, Vectros calls `userinfoUri` (with that same token as the bearer credential) and
+  reads `emailClaim` from its response instead. The fallback is tried only on a miss, never
+  unconditionally, and is entirely opt-in — omit `userinfoUri` to leave today's behavior unchanged.
+
+- **An access profile can now reference SEVERAL roles.** `POST`/`PUT /v1/app-contexts/{id}/profiles`
+  accepts `roleIds: ["case-handler", "hr-admin"]` in place of the single `roleId`. The effective grant
+  is each named role's own clauses concatenated in the order you list them — roles compose additively
+  and are never merged, so every clause keeps meaning exactly what its own author wrote. Every id must
+  name a role in the same app context, and no id may repeat. `roleId` still works and is now
+  deprecated: sending both is a `400`, and reads return `roleIds` always plus `roleId` only when
+  exactly one role composes.
+
+- **`POST /v1/auth/token/assume` accepts more than one namespace per call.** The body may now name
+  several `scope:<namespace>` keys at once — provided a SINGLE one of your roles grants all of them
+  together. The combination is never assembled across two roles, because no role author would have
+  vouched for it.
+
+### Changed
+
+- **`POST /v1/auth/token/assume` checks your entitlement LIVE, against your roles as they are right
+  now** — not against a copy captured when your token was minted. Three consequences worth planning
+  for:
+  - **A token produced by `/assume` can no longer assume again** (`403`). Every assume starts from the
+    token you exchanged for, so the identity you end up with is always one a single role explicitly
+    granted rather than a combination reached by chaining calls. Keep your original token if you need
+    to switch more than once, or exchange for a new one.
+  - **A new `409` response** means your credential's basis changed: the access profile or a role it
+    was minted from has since been edited, suspended or deleted. Re-authenticate to get a current
+    token, then retry the same request. Existing `400`/`401`/`403` cases are unchanged.
+  - **What survives the re-mint is now stated per clause.** `/assume` previously promised "every other
+    claim preserved verbatim". It now preserves every clause whose reach does not DEPEND on a namespace
+    you are changing; clauses that do are kept only if they come from a role that authorized the new
+    value. A clause depends on a namespace when it filters on it OR when one of its values resolves
+    against your own value for it (`${{ self.scope.<ns> }}`, `${{ under.self.scope.<ns> }}`) — the
+    latter can sit under a different key, so it is not always the key you would expect. A role that does not authorize it loses its clauses touching that namespace,
+    including any scoped to the value you already held. Assume into a value one role grants and you
+    keep that role's reach, not the reach of roles that never vouched for it.
+
+- **An `assumable` grant may no longer use `${{ under.self.scope.<namespace> }}`** (`400` at authoring
+  on `POST`/`PUT` of a role or profile). That form resolves against your own current value for a
+  namespace `/assume` can itself change, so what it admitted would depend on what was last assumed.
+  Use `${{ under.self.userId }}`, `${{ member.scope.<namespace>[:level] }}`, or a plain literal — all
+  of which mean the same thing before and after an assume. The same matcher remains valid in
+  `data_scope`, where it is re-derived per write.
+
+- **A role or access profile's `scopes` list is now size-limited.** Authoring a `Role` or
+  `AccessProfile` (`POST`/`PUT /v1/app-contexts/{id}/roles`, `.../profiles`) with more than 300
+  clauses, or whose `scopes` **and `assumable` combined** serialize to more than 5.5 KiB once
+  compressed, now returns a clear `400` at authoring time. Previously nothing bounded this, so an
+  oversized role could silently save and then fail unpredictably at request time once its holder's
+  token exceeded API Gateway's header budget. Existing scoped tokens (`st_*`) are unaffected in shape
+  — this only bounds new/updated authoring.
+
+### Fixed
+
+- **`POST /v1/users/invite` no longer rejects inviting an email that already has an identity in
+  your OTHER tenant (test vs. live).** Previously this returned `409` unconditionally — even for
+  the common case of inviting yourself, or a teammate who has already used your live tenant, into a
+  freshly-created test tenant. That email now gets a genuine second, independent membership in the
+  tenant you're inviting into, exactly like a brand-new email would.
+
+- **`POST /v1/users/invite` also grants access to an ADDITIONAL app context in the SAME tenant, for
+  an email that already resolves to an existing member there** — including the tenant owner's own
+  email, the account's founding identity every tenant has from creation. Previously this
+  unconditionally `409`'d, exactly like the cross-tenant case above, and for the owner's own email it
+  was unconditional and permanent: nothing about it could ever be worked around, since the owner's
+  identity exists from the moment the tenant does. If the email resolves to an ACTIVE member with no
+  existing access to the app context you're inviting into, that access is granted immediately (`201`,
+  no email is sent — there is nothing to accept, `emailSent` is `false` and the token/link fields are
+  absent) — this case additionally requires the `users:r` scope alongside `users:c`, since the
+  response names the existing member's `userId`. If it resolves to a member whose ORIGINAL invitation
+  is still pending, the new context's access is attached to that same outstanding invitation and its
+  token is rotated — requiring `users:r`+`users:u`, same as an ordinary same-context resend. A
+  collision within the SAME app context (an active/suspended member of that exact context, or another
+  outstanding invitation for that email under that exact context) still returns `409` as before, and a
+  SUSPENDED identity is never granted new-context access this way — reactivate it explicitly first.
+
+- **The immediate-grant case above now checks that the existing member can actually sign in to the
+  new context before granting it silently.** An active member's credential only works for the identity
+  provider it was originally created through — granting them a context that uses a DIFFERENT provider
+  (a different `POST /v1/auth/issuers` registration) left no way to ever authenticate into it, a silent
+  dead end previously reachable by, for example, a tenant owner (Cognito-only) being granted a context
+  federated through your own registered IdP. When the existing member's credential is compatible —
+  the new context has no registered issuer of its own AND the member isn't already proven bound
+  exclusively through a different, BYO IdP, or they're already bound through that exact issuer —
+  behavior is unchanged from above. When it isn't, a normal, independent invitation is created instead
+  — its own new `userId`, and a real token/accept link when `sendEmail` is `false` — exactly as if the
+  email had no existing identity in the tenant at all.
+
+- **`org` and `client` are no longer auto-provisioned at account creation.** Every namespace, `org`/
+  `client` included, now requires the same explicit `POST /v1/namespaces` registration before use —
+  matching what this reference doc already described (`docs/features/vectros/identity-access/
+  reference.md`, on `main` since before this release) but the platform didn't yet do. For a **new**
+  account: `GET /v1/namespaces` no longer lists `org`/`client` until you register them, and
+  `POST /v1/entities/org` (or `client`) 400s with "not entity-backed" until you do. Existing accounts'
+  already-provisioned `org`/`client` registrations are unaffected — this changes provisioning-time
+  behavior only, not existing rows. As a side effect, a `?scope=org:...`/`?scope=client:...` list
+  cursor issued before this release is invalidated on first use after deploy (`400`, fail-closed) —
+  the same precedent as the prior `scopes2`→`scopes3` cursor-format change.
+
+### Added
+
+- **Entity responses now carry `contextId`.** `GET`/`POST`/`PUT /v1/entities/{namespace}/...` never
+  surfaced which app context an entity belongs to — tenant-wide vs. a specific context — even though
+  0.40.0's split-registry work made a namespace registration's placement visible in its own response.
+  Every entity response now carries `contextId` (`null` for a tenant-wide entity), the same convention
+  `GET /v1/namespaces` already uses. Additive; no existing field changes.
+
+- **A blueprint's bootstrap credential can now register a tenant-wide namespace.** `POST
+  /v1/namespaces` previously 403'd unconditionally whenever a bootstrap credential omitted
+  `?contextId=` — a tenant-wide registration required a direct root API key. The bootstrap credential
+  now carries a second, independent, owner-only capability that permits exactly that one case (a
+  `null`-target registration visible to every app context); naming any other context still confines
+  the credential to its own, exactly as before. **This is live today for any account OWNER**, not
+  merely a platform-side capability awaiting a client: every bootstrap token minted via
+  `GET /developer/cli-bootstrap-token` carries the new capability unconditionally, the same way it has
+  always unconditionally carried the cross-context app-context-create capability — so a direct API
+  caller (no CLI required) can register a tenant-wide namespace as soon as this ships. The
+  CLI/blueprint-schema convenience surface — a `tenantWide` blueprint field
+  (`@vectros-ai/blueprints` 0.14.0) and an `--allow-tenant-wide-namespaces` flag (`@vectros-ai/cli`
+  0.17.0) that lets `vectros bootstrap` request this deliberately and refuse otherwise — is **already
+  shipped**, not pending; it's a **client-side courtesy**, not the authorization boundary, since the
+  OWNER check on the bootstrap mint is and remains the actual control.
+
+- **New endpoint: `POST /v1/auth/token/assume`** (supersedes the never-released `/switch` design
+  from this same still-open section — see below). Re-mints the presented `st_*` scoped token with
+  exactly one `identity.<namespace>` value changed — for a caller whose ROLE explicitly grants
+  assuming more than one value in that namespace (for example, an invited hr-admin or a multi-org
+  case-handler) and needs to change which one new writes are placed under. The request body names
+  exactly one namespace in canonical `scope:<namespace>` form, e.g. `{"scope:org": "orgB"}`, and the
+  value must be a plain literal — never a `${{ ... }}` placeholder. `st_*`-only — a root API key or
+  scoped API key gets `403`; neither needs this. The requested value must be explicitly granted by the
+  role's new `assumable` field (below) for that namespace — a POINT check against the one value
+  requested, deliberately separate from what the role's `data_scope` permits reading or writing:
+  holding broad `data_scope` reach in a namespace does NOT by itself grant assuming any value in it.
+  The re-minted token's `exp` is identical to the presented token's — this call can never extend a
+  session's life, only change which value is active within the window the original exchange already
+  established. Every other claim (including `data_scope` itself) is preserved verbatim. A fresh,
+  independently-revocable `jti` is stamped on every call, and the token also carries a `root_jti`
+  revocation-lineage claim so revoking the FIRST token in a chain closes every value ever assumed from
+  it at any depth. Uses the ordinary `{"message":...}` error shape, not the OAuth envelope
+  `POST /v1/auth/token/exchange` uses.
+
+  _(Design note, not part of the shipped surface: an earlier `/switch` draft of this endpoint computed
+  entitlement as a union across every clause's `data_scope` — a value legitimately present in an
+  unrelated, possibly read-only clause silently widened a different clause's write authority once
+  assumed, and re-assuming the same value could launder a revoked token. That design never shipped;
+  `/assume`'s point-checked `assumable` grant plus `root_jti` lineage close both holes from the start.)_
+
+- **`Role`'s `assumable` field — the entitlement grant `POST /v1/auth/token/assume` reads.** A new,
+  optional, role-level map (unlike `scopes`' per-clause `data_scope`) naming which values, per
+  `scope:<namespace>`, a holder of that role may assume: `{"scope:org": ["org_engineering",
+  "org_sales"]}`. The principal (`userId`) can never be named. Each value accepts a
+  plain literal, `${{ under.self.userId }}`, or `${{ member.scope.<namespace>[:level] }}` — never
+  `${{ under.self.scope.<namespace> }}` (see above), a bare `${{ self.<dim> }}`, or `${{ any }}}`, all
+  rejected at authoring time. Omitting the field grants no assumption of anything, the safe default.
+  Present on `Role` create/update/upsert, and directly authorable on an `AccessProfile` too — but only
+  alongside that profile's own inline `scopes`; setting it alongside `roleId`/`roleIds` is rejected
+  outright with `400` (it would never be read — a role-composed profile's `/assume` entitlement comes
+  from each referenced role's own `assumable`, checked live against the caller's current roles, never
+  from anything stored on the profile). A non-root credential authoring an `assumable` grant broader
+  than its own live composed reach gets `403`. Blueprint-loader and CLI schema support for authoring
+  this field are **already shipped** — a top-level `roleAssumable` map (`@vectros-ai/blueprints`
+  0.15.0), wired into role creation and `vectros role get`/`blueprint plan` (`@vectros-ai/cli` 0.18.0,
+  which requires this SDK build for `Role.assumable`) — in addition to the direct `PUT`/`POST
+  /v1/roles` call.
+
+### Fixed
+
+- **The last-OWNER delete refusal no longer names an endpoint the caller can't reach.** `DELETE
+  /v1/users/{id}`'s `409` when deleting the account's last OWNER pointed at `POST
+  /developer/account-owner` — a route gated on the developer-portal session surface, not reachable by
+  the partner-API root key that hits this endpoint (nor by a human without developer-portal access).
+  The message no longer names it; it directs you to contact support until a partner-API-reachable
+  transfer path exists. Message text only — the `409` status and refusal condition are unchanged.
+
+### Changed
+
+- **Clarified `externalSubject` on `PUT /v1/users/{id}`'s invitation-activation request.** No
+  behavior change — the description now states plainly that this field is stored exactly as sent,
+  with no normalization, and is informational record-keeping only — not an authentication binding
+  and not a correlation key (use `externalId` for your own correlation/bookkeeping needs). Setting
+  it never grants sign-in to the Vectros DevPortal, Admin App, or other Vectros-hosted web apps, and
+  it separately does not enable — or deduplicate against — a later sign-in via
+  `POST /v1/auth/token/exchange` either. If you want an invited person to be able to sign into any
+  Vectros-hosted surface, send them the invitation directly (the invite link for dev-portal/web-app
+  access, or the raw `inviteToken` for a party redeeming it themselves via token exchange) rather
+  than calling this endpoint on their behalf — it exists for a caller running their own backend who
+  wants Vectros to record which of their own users a given account corresponds to.
+
+- **`GET /v1/users/{id}/versions`'s `404` now documents both causes.** No behavior change: the `404`
+  fires both when the user doesn't exist and when a context-confined credential's own app context holds
+  no access profile for it, and the two are indistinguishable.
+
+- **`POST /v1/users`'s collision-echo and `?upsert=true` are now context-mediated.** A context-confined
+  credential colliding on `externalId` with a user outside its own app context receives the uniform
+  `400` ("already exists") instead of being shown that user's data (plain create) or allowed to
+  overwrite it (`?upsert=true`). This is in addition to the existing rule that a plain collision echo
+  also requires the `users:r` scope. A root API key, or a credential with cross-context reach, is
+  unaffected.
+
+- **The CLI bootstrap credential can be echoed a user across app contexts on a plain (non-upsert)
+  collision.** A narrow carve-out for the platform-minted `provisioning:c` capability — only
+  `vectros bootstrap` mints it, and no partner-authored role can acquire it — so a blueprint re-applying
+  against a service principal in a non-`default` app context isn't blocked by its own bootstrap
+  credential. Does not extend to `?upsert=true` or to `GET`/`PUT`/`DELETE`.
+
+### Added
+
+- **End-subject erasure requests are live.** `POST /v1/erasure-requests` + `GET /v1/erasure-requests/
+  {id}` — previously reserved as a `501` stub with the request/response shapes already frozen — now
+  perform a real, asynchronous right-to-erasure sweep for a single subject (`user`, or an ownership
+  namespace such as `org`/`client`/a custom namespace you've registered). `POST` returns `202` with a
+  `requestId`; poll `GET .../{id}` until `status` reaches `completed` for the verifiable completion
+  certificate (contexts swept, per-context deletion counts, dangling-reference and shared-row reports)
+  or `failed`. Requires the root API key, exactly as documented since the reservation — a scoped
+  credential still gets `403`. The request/response shapes themselves are unchanged from the reserved
+  contract; only the previously-`501` behavior is now real. See `POST /v1/erasure-requests`'s
+  description for the full semantics (what "solely owns" means for co-owned data, what's reported vs.
+  erased for shared/dangling references, and the `auditDisposition` options).
+
+- **App contexts can now declare a per-principal metering axis.** `PUT /v1/app-contexts/{id}` accepts
+  three new optional fields: `meteringAxis` (`user`, or `scope:<namespace>`) declares what "per-
+  principal" means for that context; `principalBurstLimit` sets a per-principal, per-minute request
+  cap; `principalUsageCap` sets a per-principal, per-billing-period operation cap. All three are
+  additive, `null`/omitted by default (no behavior change unless set), and only take effect for an
+  account with the corresponding feature enabled. `GET`/list app-context responses echo all three.
+
+- **Batch get-by-id is live.** `POST /v1/records/batch-get` — previously reserved as a `501` stub with
+  the request/response shapes already frozen — now fetches multiple records by id (`ids`,
+  maximum 100) in one call. Returns only the records you can access: any id that does not exist,
+  belongs to another account/AppContext, or is outside your token's scope is silently omitted, with no
+  per-id existence signal (matching the not-found behavior of the single-record GET, not a difference
+  worth documenting further — that indistinguishability is the point). Payloads are hydrated the same
+  way a by-id GET hydrates them. Requires the `records:r` scope, same as before. The request/response
+  shapes are unchanged from the reserved contract; only the previously-`501` behavior is now real.
+
 ## 0.40.0 — 2026-08-19
 
 ### Added

@@ -27,6 +27,8 @@ export interface IssuerRequest {
     subClaim?: string;
     /** The claim in the IdP's token that carries the subject's email, used for first-login invite matching. Defaults to `email` if omitted. */
     emailClaim?: string;
+    /** The IdP's OIDC userinfo endpoint. Optional. Presented tokens are access tokens, which under OIDC don't carry `email` unless the IdP was specifically configured to add it — if `emailClaim` misses on the presented token, and `userinfoUri` is configured, Vectros falls back to calling this endpoint (with the presented token as the bearer credential) and reads `emailClaim` from its JSON response instead. Omit to leave the fallback disabled — a token that doesn't carry the configured email claim then fails first-login exactly as it does today. */
+    userinfoUri?: string;
     /** Opt-in self-service signup: a list of {signup_type, role_id} pairs. When a first-time exchange caller presents no invite token but names a signup_type matching one of these (or omits signup_type and exactly one entry exists), a brand-new user is created and bound to that entry's role — no invite required. Every entry must, by construction, be something you're willing to grant to ANY caller who can present a token from this issuer: no entry may target a role carrying elevated (provisioning or wildcard) scope — rejected. Omit entirely to leave self-signup disabled (the default). */
     selfSignupPolicies?: Vectros.SelfSignupPolicy[];
 }

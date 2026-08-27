@@ -3,7 +3,7 @@
 import type * as Vectros from "../index.js";
 
 /**
- * The subset of requested records you can access. Ids you cannot access are silently omitted rather than reported as errors, so a missing id never reveals whether that record exists. Reserved for a future release: the endpoint currently returns HTTP 501 (Not Implemented).
+ * The subset of requested records you can access. Ids you cannot access are silently omitted rather than reported as errors, so a missing id never reveals whether that record exists.
  */
 export interface BatchGetResponse {
     /** The records you can access, in no guaranteed order. Any requested id not present here was not accessible to you. */

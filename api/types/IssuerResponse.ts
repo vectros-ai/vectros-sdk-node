@@ -20,6 +20,8 @@ export interface IssuerResponse {
     subClaim?: string | undefined;
     /** The subject-email claim. */
     emailClaim?: string | undefined;
+    /** The IdP's OIDC userinfo endpoint, used as a fallback email-resolution source. Absent when not configured. */
+    userinfoUri?: string | undefined;
     /** `active` or `suspended`. A suspended issuer is registered but its tokens are no longer accepted for exchange. */
     status?: string | undefined;
     /** Timestamp when the issuer was registered, as an ISO-8601 UTC timestamp. */

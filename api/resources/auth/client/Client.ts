@@ -2029,7 +2029,7 @@ export class AuthClient {
     }
 
     /**
-     * Retrieves a single registered issuer by issuerId. Requires a root API key or the bootstrap's provisioning capability. A credential confined to one app context sees only an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId. A root API key sees every context.
+     * Retrieves a single registered issuer by issuerId. Requires a root API key or the bootstrap's provisioning capability. A credential confined to one app context sees only an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId. A root API key sees every context. An ordinary bootstrap credential that didn't specify a context resolves to the `default` app context specifically, not every context — so this call returns 404 for an issuer registered under any other context unless you re-minted the bootstrap token pinned to that context.
      *
      * @param {Vectros.GetIssuerRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2095,6 +2095,84 @@ export class AuthClient {
         }
 
         return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/auth/issuers/{issuerId}");
+    }
+
+    /**
+     * Updates the mutable fields of a registered issuer: `subClaim`, `emailClaim`, `status` (`active`/`suspended` — a suspended issuer's tokens are rejected identically to an unregistered issuer at exchange time), and `selfSignupPolicies`. Fields omitted from the body are left unchanged (partial update). `issuer`, `jwksUri`, `audience`, and `contextId` are trust-anchor / routing-pin fields and are immutable via this route — supplying a value that differs from the current registration is rejected with 400; supplying the current value back is a no-op. Rotating a trust anchor requires deleting and re-registering the issuer, which is itself refused while any user is bound through it. Requires a root API key or the bootstrap's provisioning capability, gated identically to every other operation on this surface. A credential confined to one app context may only update an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId. A root API key may update any issuer.
+     *
+     * @param {Vectros.IssuerUpdateRequest} request
+     * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     *
+     * @example
+     *     await client.auth.updateIssuer({
+     *         issuerId: "auth0-prod"
+     *     })
+     */
+    public updateIssuer(
+        request: Vectros.IssuerUpdateRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.IssuerResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__updateIssuer(request, requestOptions));
+    }
+
+    private async __updateIssuer(
+        request: Vectros.IssuerUpdateRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.IssuerResponse>> {
+        const { issuerId, ..._body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/auth/issuers/${core.url.encodePathParam(issuerId)}`,
+            ),
+            method: "PUT",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: _body,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.IssuerResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "PUT", "/v1/auth/issuers/{issuerId}");
     }
 
     /**
@@ -2178,7 +2256,7 @@ export class AuthClient {
     }
 
     /**
-     * Returns the issuers registered in your tenant. Requires a root API key or the bootstrap's provisioning capability. A credential confined to one app context sees only the issuers registered in that context; a root API key sees every context. Returns a `{data, nextCursor}` envelope.
+     * Returns the issuers registered in your tenant. Requires a root API key or the bootstrap's provisioning capability. A credential confined to one app context sees only the issuers registered in that context; a root API key sees every context. An ordinary bootstrap credential that didn't specify a context resolves to the `default` app context specifically, not every context — so this call returns an empty page for a tenant whose issuers are all registered under a different context unless you re-minted the bootstrap token pinned to that context. Returns a `{data, nextCursor}` envelope.
      *
      * @param {Vectros.ListIssuersRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2548,7 +2626,7 @@ export class AuthClient {
     }
 
     /**
-     * Invite a new member to one of your app contexts by email. Creates a pending user with a pre-resolved access profile (their permissions on accept) and signs an invitation token. This call is idempotent on the combination of context and email: re-inviting the same email in the same context rotates the token and resends the invitation rather than creating a duplicate — this requires the `users:r` and `users:u` scopes in addition to `users:c`, because resending rotates a credential on an existing invitation and invalidates any link already sent. Without them the collision returns 409 instead, with no invitation details and no change to the outstanding invitation. Returns HTTP 201 on a new invite or a successful resend. Returns 409 if that email already belongs to an active or suspended member of the app context, or already has an identity elsewhere in your account (an email can currently belong to only one tenant per account, i.e. your test and live environments cannot share an email). When `sendEmail` is false, the response includes the raw token and a ready-to-use accept link so you can deliver the invitation through your own email provider. Requires the `users:c` scope.
+     * Invite a new member to one of your app contexts by email, OR grant an existing member access to an additional app context by inviting their same email again. Idempotent on the combination of context and email: re-inviting the same email into the SAME context rotates the token and resends the invitation rather than creating a duplicate — this requires the `users:r` and `users:u` scopes in addition to `users:c`, because resending rotates a credential on an existing invitation and invalidates any link already sent. Without them the collision returns 409 instead, with no invitation details and no change to the outstanding invitation. Inviting the SAME email into a DIFFERENT app context in this tenant, where that email already resolves to an existing member: if that member is active AND already has (or, once accepted, will have) a credential that works for the new context's own identity provider, this immediately grants them access to the new context (no email is sent — there is nothing to accept, `emailSent` is false) — this additionally requires the `users:r` scope (no `users:u`, since nothing is mutated), because the response names the existing member's userId, a fact about them your credential could not otherwise learn through this endpoint. If that active member's ONLY existing credential is for a DIFFERENT identity provider than the one the new context uses, a normal, independent invitation is created instead (its own new member id, a real token/accept link) — attaching them silently would leave no way for them to ever actually sign in to that context. If the existing member's original invitation is still pending, this attaches the new context's access to that same outstanding invitation and rotates its token (`users:r`+`users:u`, same as an ordinary resend — both the disclosure and the credential rotation apply here). A SUSPENDED member's email does not get new-context access this way — reactivate them explicitly first. Returns HTTP 201 in every one of those cases. Returns 409 if that email already belongs to an active or suspended member of THIS specific app context, already has a PENDING invitation for THIS specific app context, or resolves to an existing member elsewhere in the tenant and your token lacks the additional scope the grant/attach requires (`users:r`, or `users:r`+`users:u` for the still-pending case). An email that already has an identity in your OTHER tenant (test vs. live) is not a collision either — it creates an additional, independent membership in this tenant for that same identity. When `sendEmail` is false, the response includes the raw token and a ready-to-use accept link so you can deliver the invitation through your own email provider. Requires the `users:c` scope.
      *
      * @param {Vectros.CreateInviteRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2706,6 +2784,94 @@ export class AuthClient {
         }
 
         return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/users/invite/resend");
+    }
+
+    /**
+     * Re-mints the presented `st_*` scoped token with one or more `identity.<namespace>` values changed — for a caller whose ROLE explicitly grants assuming those values (an invited hr-admin, a multi-org case-handler) and needs to change which value new writes place records under. The request body names one or more namespaces in canonical `scope:<namespace>` form, e.g. `{"scope:org": "orgB"}` — each value must be a plain literal, never a `${{ ... }}` placeholder. When you name MORE THAN ONE namespace, a single one of your roles must grant all of them together: the combination is never assembled from two different roles, because no role author would have vouched for it. `st_*`-only — a root API key or `ssk_*` scoped API key gets 403; neither needs this (root already has full authority, and an `ssk_*`'s identity shape is not what this resolves against).
+     *
+     * **Only an original token may assume.** A token produced BY this endpoint cannot assume again (403) — every assume starts from the token you exchanged for, so the identity you end up with is always one a single role explicitly granted rather than a combination reached by chaining calls. Keep your original token if you need to switch more than once, or exchange for a new one.
+     *
+     * **Entitlement is checked LIVE, against your roles as they are right now** — not against a copy frozen into your token when it was minted. The requested value must be explicitly granted by a role's `assumable` field for that namespace: a POINT check against the one value requested, and a deliberately separate, explicitly-authored question from what the role's `data_scope` permits reading or writing. Holding broad `data_scope` reach in a namespace does NOT by itself grant assuming any value in it.
+     *
+     * **What is preserved, and what is not.** Every clause of your token that does not reference a requested namespace is preserved verbatim, as are all other claims (`partner_user_id`, `context_id`, mint attribution). Clauses that DO reference a requested namespace are kept only if they come from a role that authorized the new value. A role that does not authorize it loses all of its clauses touching that namespace — including any scoped to the value you already held. Assume into a value one role grants and you keep that role's reach, not the reach of roles that never vouched for it.
+     *
+     * The re-minted token's `exp` is IDENTICAL to the presented token's — this call can never extend a session's life. A fresh, independently-revocable `jti` is stamped on every call, and (except when the presented token predates jti support and has none to chain from) the token also carries a `root_jti` revocation-lineage claim so revoking the token you started from closes every value ever assumed from it. Uses the ordinary Vectros `{"message":...}` error shape, not the OAuth envelope `POST /v1/auth/token/exchange` uses — this endpoint's caller is always Vectros-SDK code already holding a bearer token, never generic OAuth tooling.
+     *
+     * @param {Record<string, unknown>} request
+     * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.UnauthorizedError}
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     *
+     * @example
+     *     await client.auth.assumeToken({
+     *         "scope:org": "orgB"
+     *     })
+     */
+    public assumeToken(
+        request: Record<string, unknown>,
+        requestOptions?: AuthClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.TokenAssumeResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__assumeToken(request, requestOptions));
+    }
+
+    private async __assumeToken(
+        request: Record<string, unknown>,
+        requestOptions?: AuthClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.TokenAssumeResponse>> {
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                "v1/auth/token/assume",
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: request,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.TokenAssumeResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 401:
+                    throw new Vectros.UnauthorizedError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/auth/token/assume");
     }
 
     /**
