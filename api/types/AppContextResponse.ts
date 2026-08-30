@@ -14,6 +14,8 @@ export interface AppContextResponse {
     name?: string | undefined;
     /** Free-text description of the app context. */
     description?: string | undefined;
+    /** Display name for the organization deploying this app context, or absent if unset. Distinct from `name` (the app's own identity) — used to personalize platform-sent correspondence (e.g. sub-user invitation emails) with your own branding. */
+    companyName?: string | undefined;
     /** When the app context was created, as an ISO-8601 UTC timestamp. */
     createdAt?: string | undefined;
     /** When the app context was last modified, as an ISO-8601 UTC timestamp. */

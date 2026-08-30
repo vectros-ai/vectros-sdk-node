@@ -9,6 +9,121 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.42.0 — 2026-08-30
+
+### Added
+
+- **`GET`/`POST /v1/documents/lookup` now accept `sortFrom`/`sortTo`**, narrowing an exact-value
+  document lookup by the lookup field's declared `sortBy`, on either index tier — the document
+  surface's equivalent of the existing `sortFrom`/`sortTo` on `/v1/records/lookup`. Purely
+  additive: both fields are optional and every existing request is unaffected. Composite
+  (multi-field) lookups remain records-only; documents keep single-field lookups.
+- **App contexts (`POST`/`PUT /v1/app-contexts`) accept a new optional `companyName` field**,
+  distinct from the existing `name` field. `name` is your app's own identity; `companyName` is
+  your own organization's display name, used to personalize platform-sent correspondence (e.g.
+  sub-user invitation emails) with your own branding instead of a generic app name. Purely
+  additive — optional on every request, absent on every context that predates this release.
+
+- **New `delegate-principal-stamp` capability**, grantable in `granted_capabilities`. Without it, a
+  record's `userId` on create must match the credential's own identity. With it, a `data_scope`
+  clause that already authorizes the write may also explicitly name a different `userId` in your
+  own tenant, so an admin role can create a membership-shaped record on behalf of a known user
+  instead of only itself. Grants nothing by itself — the clause authorizing the write must still name
+  `userId` (the capability itself may be granted on a different clause of the same role) — and does
+  not extend to updates, which continue to reject any principal reassignment regardless of this
+  capability.
+
+- **`POST /v1/rag`'s `truncation_warning` event now reports two independent drop reasons
+  separately.** It previously fired only when results were dropped for exceeding the model's
+  context window; it now also fires when a result had no groundable text to include at all,
+  regardless of budget. The event carries two new fields, `truncatedCount` and `noContentCount`,
+  so you can tell the two apart instead of inferring the cause from `resultsUsed` alone — the two
+  call for different responses (raise `maxTokens` / narrow your query vs. nothing actionable on
+  your end). `reason` gains two new values, `no_groundable_content` and
+  `context_window_budget_and_no_content`, alongside the existing `context_window_budget`. Purely
+  additive; the event's existing fields and firing name are unchanged.
+
+### Security
+
+- **Registering a trusted issuer (`POST /v1/auth/issuers`) now closes a race on the
+  `(issuer, audience)` uniqueness check.** Two concurrent registrations for the same pair under
+  different `issuerId`s could previously both succeed, which `POST /v1/auth/token/exchange` would
+  then need to arbitrate between arbitrarily. Registration now atomically claims the pair before
+  writing, and token exchange refuses (rather than picks) if it ever finds more than one active
+  registration sharing a pair.
+- **Token exchange no longer trusts an unverified external-identity binding.** `PUT /v1/users/{id}`
+  lets you record a user's `externalSubject` yourself, but — as its operation description has
+  always stated — that binding is informational only and was never meant to enable sign-in;
+  `POST /v1/auth/token/exchange` is supposed to compute and trust only the value it independently
+  verifies from a real credential. Previously the two kinds of binding weren't actually
+  distinguished internally, so a self-reported binding could, in practice, still be matched at
+  exchange time. Exchange now requires the stronger, independently-verified provenance before
+  honoring a match; a self-reported binding remains exactly as useful as documented — a record of
+  which of your own users an account corresponds to — and can never itself grant a session. No
+  action needed: every binding that predates this release already had the verified provenance.
+
+### Changed
+
+- **The `member-lifecycle` capability now also covers resending an invitation and attaching an
+  existing member to an additional app context**, matching its existing reach over creating and
+  removing one. A credential scoped to a single app context, holding `member-lifecycle` plus the
+  matching unqualified `profiles:*` grant(s), can now do everything a tenant-wide
+  `users:c`/`users:r`/`users:u` credential could already do on `POST /v1/users/invite` and
+  `POST /v1/users/invite/resend` — but the grant needed is not the same three letters in every
+  case, so grant only what the specific operation requires:
+  - `profiles:c` is the pre-existing baseline for both endpoints — unchanged by this release, but
+    still required: it's what gates entry to `POST /v1/users/invite` at all (including every case
+    below), and `POST /v1/users/invite/resend` requires it explicitly alongside `profiles:r`/
+    `profiles:u`. Omitting it is not an option for either endpoint.
+  - `POST /v1/users/invite/resend`, and `POST /v1/users/invite` when the invited email already
+    has a PENDING invitation (in the SAME context, or elsewhere in your tenant), all rotate a live
+    credential and therefore need `profiles:r` **and** `profiles:u` together (disclosure and
+    mutation, correlated) — on top of the `profiles:c` baseline above.
+  - `POST /v1/users/invite` attaching an **already-ACTIVE** member to a new context mints no
+    token — nothing is mutated — so it needs only `profiles:r` on top of the baseline; granting
+    `profiles:u` too is unnecessary for this case specifically.
+  See the operation descriptions on `POST /v1/users/invite` and `/invite/resend` for the exact
+  per-branch requirement.
+
+### Fixed
+
+- **Listing records/documents/folders/entities by `scope`/`userId` filters no longer requires
+  restating every ownership dimension your role holds.** A role authorized over more than one
+  ownership dimension at once (e.g. both `scope:org` and `scope:client`) previously couldn't
+  successfully list anything: the list endpoints rejected any `?scope=`/`?userId=` combination
+  that didn't name every dimension a clause carried, but a single call only accepts one
+  `namespace:value` pair. Listing now succeeds once your filter is backed by at least one clause
+  dimension; every returned row is still filtered against your full data scope exactly as before,
+  so nothing you couldn't already read is now visible.
+- **Sub-user invitation emails now carry the app context's own branding, not your account's
+  internal name.** The email previously named your own vendor/account organization name and
+  unconditionally signed off "on Vectros," regardless of whether the app context inviting the
+  recipient is white-labeled. It now uses the app context's `name` (and `companyName`, when set)
+  and drops the hardcoded Vectros branding, so an invitee sees the product they're actually
+  joining rather than your platform vendor relationship.
+- **A duplicate `externalId` on `POST /v1/users` under concurrent requests now returns the
+  documented `400 already exists` instead of an unhandled `500`.** Two near-simultaneous creates
+  for the same `externalId` could previously race past the initial duplicate check and have the
+  loser fail with a generic server error; it now resolves to the same clean "already exists"
+  response a non-racing duplicate request already got.
+- **`POST /v1/erasure-requests` now validates `contextScope` up front.** Each entry must name an
+  app context that actually exists for the caller's tenant; an unknown or mistyped context id now
+  returns `400` immediately instead of being silently accepted. Previously such a request was
+  accepted and, due to a separate erasure-engine bug now also fixed, still erased the subject's
+  data in every *real* context named alongside the bad one — masking the typo. With that bug fixed,
+  an unvalidated bad context would instead have let the request report `completed` having erased
+  nothing at all for that context. If you scope erasure requests to specific contexts, double-check
+  the context id spelling against `GET /v1/app-contexts`.
+- **`score` on a search/RAG result is now documented accurately — no wire-shape change.**
+  The field's description previously implied a single, roughly 0–1 "relevance confidence"
+  in every mode; in `HYBRID` mode it is actually a Reciprocal Rank Fusion value — small and
+  tightly clustered (a top single-leg hit scores ~0.016, a top dual-leg hit ~0.033) — on a
+  genuinely different scale from `TEXT`- or `SEMANTIC`-only mode's own native score. The
+  description and example on `GET /v1/search`'s `SearchResult.score` and `POST /v1/rag`'s
+  `RagSearchResult.score` now explain the per-mode scale so a `HYBRID` score of `0.02`
+  isn't mistaken for "2% relevant," and a similarity-style threshold isn't set against it
+  expecting it to behave like a 0–1 confidence.
+
 ## 0.41.0 — 2026-08-27
 
 ### Added

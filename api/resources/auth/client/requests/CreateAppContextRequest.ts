@@ -12,7 +12,7 @@ import type * as Vectros from "../../../../index.js";
  *     }
  */
 export interface CreateAppContextRequest {
-    /** When `true`, if an app context with the same `contextId` already exists its `name` and `description` are updated to the submitted values instead of being returned unchanged. Defaults to `false`. Requires the `app-contexts:u` scope in addition to `app-contexts:c`. */
+    /** When `true`, if an app context with the same `contextId` already exists its `name`, `description`, and `companyName` are updated to the submitted values instead of being returned unchanged. Defaults to `false`. Requires the `app-contexts:u` scope in addition to `app-contexts:c`. */
     upsert?: boolean;
     body: Vectros.AppContextRequest;
 }

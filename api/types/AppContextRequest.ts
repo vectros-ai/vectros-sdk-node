@@ -10,6 +10,8 @@ export interface AppContextRequest {
     name: string;
     /** Optional free-text description of what this app context is for. */
     description?: string | undefined;
+    /** Optional display name for the organization deploying this app context — distinct from `name`, which is the app's own identity. Used to personalize platform-sent correspondence (e.g. sub-user invitation emails) with your own branding instead of a generic app name. */
+    companyName?: string | undefined;
     /** Declares the per-principal metering axis for this app context — enables visibility into and (with `principalUsageCap`) enforcement of per-principal usage within this context. Either `user` (per end-user) or `scope:<namespace>` (per declared namespace, e.g. `scope:org`). Omit to leave context-only accounting unchanged (the default). Only takes effect for a partner with the corresponding account-level feature enabled. */
     meteringAxis?: string | undefined;
     /** Per-principal, per-minute request cap, for the opt-in per-principal burst-protection feature. Only takes effect for a partner with that feature enabled on their account. Omit to leave unset. */

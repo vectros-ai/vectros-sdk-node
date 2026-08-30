@@ -519,7 +519,21 @@ export class DocumentsClient {
         request: Vectros.LookupDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.DocumentLookupPage>> {
-        const { type: type_, field, value, from: from_, to, prefix, startFrom, limit, order, userId, scope } = request;
+        const {
+            type: type_,
+            field,
+            value,
+            from: from_,
+            to,
+            prefix,
+            sortFrom,
+            sortTo,
+            startFrom,
+            limit,
+            order,
+            userId,
+            scope,
+        } = request;
         const _queryParams: Record<string, unknown> = {
             type: type_,
             field,
@@ -527,6 +541,8 @@ export class DocumentsClient {
             from: from_,
             to,
             prefix,
+            sortFrom,
+            sortTo,
             startFrom,
             limit,
             order: order != null ? order : undefined,
