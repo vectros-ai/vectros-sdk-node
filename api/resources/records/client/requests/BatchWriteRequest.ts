@@ -7,14 +7,18 @@ import type * as Vectros from "../../../../index.js";
  *     {}
  */
 export interface BatchWriteRequest {
-    /** Controls how the batch commits. `all_or_nothing` commits every item or none (transactional, but allows a smaller maximum batch size); `best_effort` commits each item independently and reports a per-item outcome. Defaults to `best_effort`. */
+    /** Applies to every item, exactly as it does on a single `POST /v1/records`: when `true`, an item whose `externalId` already exists overwrites that record instead of returning it unchanged. Requires the `records:u:<type>` scope in addition to `records:c:<type>`, checked per item. Defaults to `false`. */
+    upsert?: boolean;
+    /** Only relevant with `?upsert=true`; same meaning as on a single `POST /v1/records`. Defaults to `false`. */
+    allowClear?: boolean;
+    /** Controls how the batch commits. `best_effort` (the default, maximum 50 items) commits each item independently and reports a per-item outcome, so some items can succeed while others fail. `all_or_nothing` (maximum 50 items) commits every item in one transaction: if any item fails, no record is created or updated at all and the items that were themselves fine come back with status `not_committed`. Because that transaction is bounded by the number of underlying storage rows rather than by the number of records, a large `all_or_nothing` batch can still be refused as too big to commit atomically even when it is within the item limit — nothing is written when that happens. Any value other than these two is rejected rather than treated as the default, so a typo can never silently downgrade a transactional batch. */
     atomicity?: BatchWriteRequest.Atomicity;
-    /** The records to write. Each item has the same shape as the body of a single create-record request (`POST /v1/records`). */
+    /** The records to write. Each item has the same shape as the body of a single create-record request (`POST /v1/records`), and goes through the same schema validation, `externalId` idempotency, unique-field enforcement and scope check — the `records:c:<type>` check being applied per item, against that item's own record type. */
     items?: Vectros.RecordRequest[];
 }
 
 export namespace BatchWriteRequest {
-    /** Controls how the batch commits. `all_or_nothing` commits every item or none (transactional, but allows a smaller maximum batch size); `best_effort` commits each item independently and reports a per-item outcome. Defaults to `best_effort`. */
+    /** Controls how the batch commits. `best_effort` (the default, maximum 50 items) commits each item independently and reports a per-item outcome, so some items can succeed while others fail. `all_or_nothing` (maximum 50 items) commits every item in one transaction: if any item fails, no record is created or updated at all and the items that were themselves fine come back with status `not_committed`. Because that transaction is bounded by the number of underlying storage rows rather than by the number of records, a large `all_or_nothing` batch can still be refused as too big to commit atomically even when it is within the item limit — nothing is written when that happens. Any value other than these two is rejected rather than treated as the default, so a typo can never silently downgrade a transactional batch. */
     export const Atomicity = {
         AllOrNothing: "all_or_nothing",
         BestEffort: "best_effort",

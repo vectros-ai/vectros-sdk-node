@@ -9,6 +9,680 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.43.0 — 2026-09-07
+
+### Added
+
+- **New `POST /v1/scripts/execute` — run a stored script synchronously, as one atomic transaction.**
+  Send `{ scriptRef: { name, version | "latest" }, input: { ... } }` and the script you pushed to
+  `POST /v1/scripts` runs under your own credential, in the same sandbox and with the same
+  `vectros.records` / `vectros.documents` / `vectros.folders` host functions a trigger rule uses. Every
+  write it makes is committed as **one transaction after the script finishes** — all or nothing — and
+  the response `{ result, execution: { id, durationMs } }` is sent only after the commit, so everything
+  in `result` is committed state. The motivating case: create a folder and file documents into it in
+  one call instead of several independently-failing round trips. `result` is whatever the script
+  returned, opaque to the platform, capped at 256 KB serialised.
+
+  Requires the new **`scripts:x`** scope — the permission to *execute*, separate from `scripts:c` —
+  either bare (every script) or qualified as `scripts:x:<name>` (that script, every version). Inside
+  the script every read and write is enforced by your data scopes exactly as the equivalent REST call
+  would be.
+
+  Your script sees `input.event` (`"execute"`), `input.userId`, and `input.params` (your `input`
+  object) — the same grammar a trigger firing uses, so one script can serve both. Budget: 15 s of wall
+  clock, a bounded number of statements and host calls, and 100 storage rows per transaction (a folder
+  is 3 rows; a plain text document or record 1 row plus one per range-indexed lookup field and one per
+  reference) — the error names `total` and `limit`, and nothing is committed. Failures map the trigger
+  taxonomy onto HTTP: the script's own thrown message is a `400 SCRIPT_ERROR`, a concurrent
+  modification a `409` naming the ids to re-read, a timeout a `504`. The request takes the write-path
+  limits once, before the script runs; reads and writes inside it are metered as such, and execution
+  time beyond what they include is charged as script execution time (see `GET /v1/usage` below).
+
+- **Optional `Idempotency-Key` header on `POST /v1/scripts/execute`.** A request repeated under the
+  same key within 24 hours receives the first attempt's response without executing again; a duplicate
+  still in flight is `409 IDEMPOTENCY_IN_PROGRESS`, the same key on a different request
+  `422 IDEMPOTENCY_KEY_REUSED`.
+
+  **Exactly two outcomes are replayable**, and this is the part to write your retry loop around: a
+  success, and the undetermined outcome below. Every other response — a `400`, a `403`, a `504`
+  timeout, a refusal at the concurrency ceiling — records nothing, so the key stays spendable and a
+  retry under it **runs the script again**. That is deliberate: those are the outcomes where retrying
+  is what you want. If you need a failed attempt to stay failed, use a new key rather than the same
+  one. When an execution's outcome cannot be determined (the script did not
+  finish inside the budget while its writes may have committed) the response is
+  `500 EXECUTION_OUTCOME_UNKNOWN` carrying `execution.id`, and a keyed retry receives that same answer
+  — inspect what the script would have written, then use a new key for a new attempt. **With a key
+  present the serialised `result` is capped at 16 KB** rather than 256 KB. This is a platform header, available on this
+  endpoint only.
+
+- **`GET /v1/usage` now reports script execution time and its charge.** A new `execution` section
+  carries `executions`, `totalMillis`, `includedMillis`, `billableMillis`, `credits` and
+  `creditsMilli`; `credits.breakdown` gains `scriptExecution` / `scriptExecutionMilli` so the
+  per-category breakdown continues to sum to `credits.used`. Script execution bills at **1 credit per
+  100 seconds**, and each billable operation your script performs includes execution time at no charge
+  — 350 ms for a simple record write, 1000 ms for a document ingest, and 150 ms for a read charged
+  as overage (a read inside your plan's allowance earns nothing) — with a 200 ms per-execution
+  platform baseline. You are charged only for time beyond what your operations
+  included, so a script that does real work and returns promptly pays nothing. An indexed, foldered or
+  oversized write earns a different amount because it is priced differently;
+  `execution.includedMillis` reports the exact total actually applied against your execution time —
+  including the full duration of any execution we do not charge for at all — so the arithmetic stays
+  checkable without reconstructing it. Firings refused before your script runs — rate limits, credit
+  ceiling, concurrency limits, a missing script — are never charged and never metered. The section
+  covers both trigger firings and synchronous `POST /v1/scripts/execute` calls.
+
+- **New `/v1/scripts` endpoints** for storing versioned script source. `POST /v1/scripts` pushes a
+  new, immutable version of a named script (`scriptVersion` auto-increments per `name`, starting at
+  1); `GET /v1/scripts/{id}` retrieves one version by its id; `GET /v1/scripts` lists your scripts,
+  optionally filtered by `?name=` to list every version of one script; `DELETE /v1/scripts/{id}`
+  removes one version. Requires the new `scripts:c`/`scripts:r`/`scripts:d` scopes — there is no `u`
+  scope, because a script version is immutable once pushed. Your SDK will still show an
+  `updateScript` method for `PUT /v1/scripts/{id}`: that route exists only to refuse, and returns
+  `400` for every caller regardless of scope. Push a new version instead.
+
+  `source` is capped at 300,000 UTF-8 bytes and `declaredInputContract` at 50,000. One caveat worth
+  stating rather than discovering: the request-size limit is applied to the encoded request body,
+  while `source`'s cap counts UTF-8 bytes — so a script that is mostly non-ASCII, sent by a client
+  that escapes non-ASCII characters, can be refused below its own documented byte cap. Ordinary ASCII
+  source has ample headroom.
+
+  **Deliberately narrow access:** scripts carry no ownership dimension, so an ordinary role grant with
+  a bare, non-empty `data_scope` clause (the routine shape of a blueprint-issued role) does not reach
+  scripts at all — reaching them requires a clause with no `data_scope`, the explicit null-sentinel
+  opt-in in the clause's value list, or a root credential. This is intentional: script authoring is a
+  design-time, admin-shaped surface, not one meant for ordinary confined partner roles.
+
+- **New `/v1/triggers` endpoints** for declaring async trigger rules, **and trigger rules now fire.**
+  `POST /v1/triggers` declares a new rule ("when a schema record fires this event, invoke this script
+  version under this grant"), or with `?upsert=true` reconciles an existing one of the same name to
+  the submitted shape; `GET /v1/triggers/{id}` retrieves one by id; `GET /v1/triggers` lists your
+  rules; `PUT /v1/triggers/{id}` reconciles an existing rule (unlike scripts, a trigger rule is
+  upsert-based, not immutable-per-version — a blueprint re-apply updates it in place);
+  `DELETE /v1/triggers/{id}` removes one. Requires the new `triggers:c`/`r`/`u`/`d` scopes.
+
+  A record write on a triggers-enabled schema dispatches the rule's script, which runs asynchronously
+  in a sandbox under the rule's own grant — so a rule's `scopes`/`roleIds` are live authority, not a
+  declaration awaiting a future release.
+
+  A rule's `scriptRef.version` is a pinned decimal version or the literal `"latest"` (resolved at fire
+  time); its grant is XOR — either `roleIds` (role composition) or an inline
+  `scopes`/`dataScope`/`capabilities` clause — mirroring the shape an access profile already uses. An
+  optional `manifest` narrows which host-object verbs (e.g. `records.update`) the triggered script may
+  call, and **is enforced at execution**: a verb outside it is refused even where the grant would
+  permit it. A trigger's optional `principalId` (the identity the script executes under) must resolve
+  to an existing user of `type: "SERVICE"` with an AccessProfile already provisioned in the same
+  tenant and context — rejected with a `400` otherwise. `principalId` is immutable once set (`400` on an attempt
+  to change it), alongside `name` and `provisionedBy`; to run a trigger as a different service
+  principal, delete it and re-create it.
+
+  A trigger also carries an optional `provisionedBy`: the name of the blueprint that manages it.
+  `vectros bootstrap --blueprint <file>` sets this, and deletes only the triggers carrying its own blueprint's name when you
+  remove one from that blueprint — so a trigger belonging to another blueprint, or created directly
+  through this API, is never removed by someone else's apply. Leave it unset for a trigger you manage
+  yourself.
+
+  Because a rule's grant is executed, declaring or reconciling one is subject to the same
+  scope-monotonicity rule every other authority-granting surface applies: a scoped credential cannot
+  declare a trigger whose grant exceeds its own, on `POST` or on `PUT`, and an unresolvable `roleIds`
+  entry is rejected with a `400` rather than stored. A root API key is unaffected. Same deliberately
+  narrow, ownerless-resource access posture as `/v1/scripts` above.
+
+  Three further consequences to plan for:
+
+  - **`${{ self.* }}`, `${{ under.self.* }}` and `${{ member.* }}` are rejected (`400`) in a trigger's
+    grant** — inline or via a composed role. They resolve against the trigger principal's identity,
+    not the author's, so the reach they describe is not bounded by the author's own and the platform
+    cannot admit them here. They remain valid everywhere else they were before (roles, access
+    profiles, blueprint fragments). Use `${{ input.* }}` to confine a trigger's grant to the record
+    that fired it, or name literal values.
+  - **A trigger firing that fails for a retryable reason is redelivered** rather than dropped. A
+    transient condition — a platform write freeze, a rate limit, a concurrency limit — no longer loses
+    the firing permanently. Deterministic failures (an unresolvable script, a manifest violation, an
+    authorization denial) are still consumed, since redelivering them cannot change the answer.
+  - **`vectros bootstrap --blueprint` can now fail where it previously succeeded**: if two blueprints declare a
+    trigger of the same name in one app context, the second apply is rejected with a `400` instead of
+    silently taking the row over. Rename one of them, or move it to its own context.
+
+- **A trigger script receives the record that fired it — and a rule declares which fields, in a new
+  required `fields` list.** What a trigger script sees as `input`: `event` (`CREATE`, `UPDATE` or
+  `DELETE`), `schemaId`, `recordId` (the id `vectros.records.get` accepts), `userId` and
+  `scope.<namespace>` (the record's stamped ownership — the values the rule's own `${{ input.* }}`
+  grant resolved against), **`record`** (the rule's declared `fields` from the row as written — or,
+  on `DELETE`, from the deleted row, which is the only way a script can see anything of it) and, on
+  `UPDATE` only, **`previous`** (the same fields from the row before the write, so a script can act on
+  what actually changed). A field the record does not carry is absent (`undefined`), never null.
+
+  `fields` is **required** on `POST /v1/triggers`: a rule states what it needs, and `[]` projects
+  nothing beyond the record's identity. The generated SDKs type it as optional, because the same body
+  serves `PUT /v1/triggers/{id}` where omitting it means "unchanged" — so omitting it on a create is a
+  runtime `400 "fields is required"`, not a compile error. Every entry must name a field the schema keeps **inline** —
+  declared `inline: true` (new, below), `filterable`, or as a lookup field — and not `sensitive`;
+  anything else is a `400` listing the projectable fields. This is a bound by construction rather than
+  a runtime surprise: a record's payload moves out of the row above 4 KB (or always, on a
+  `LARGE_PAYLOAD` schema), and only the schema's inline fields ride the change event a trigger fires
+  from — so a field that is not inline could reach a script for small records and silently vanish for
+  large ones. Restricting `fields` to the inline set makes the projection identical whatever the row's
+  size. **A rule that declares `fields` must be able to read every record it fires on**: its grant
+  must hold a `records:r` clause covering the schema's type — a grant with no read at all is rejected
+  with a `400` — and that clause may not carry a literal `data_scope` constraint (a
+  `${{ input.userId }}` / `${{ input.scope.<namespace> }}` placeholder is fine — it is the firing
+  record's own value) or the rule is rejected with a `400`; and if at execution the rule's grant cannot
+  read the firing record (a composed role narrowed after declaration, say), `record` and `previous`
+  are delivered as empty objects — the image never discloses what the script's own read would be
+  refused. On `PUT /v1/triggers/{id}`, omitting `fields` leaves the stored declaration unchanged, like
+  `manifest`. Together, `record` and `previous` are limited to **224 KB serialised**; a firing whose
+  projected input exceeds that is not run and is recorded as a new **`INPUT_TOO_LARGE`** failure
+  category naming the size and the limit — narrow the rule's `fields` to what the script reads.
+
+  One thing to plan for: a record last written before its schema inlined a field, or before the rule
+  was declared, may not yet carry that field on its row, so `previous` on its first `UPDATE` (or
+  `record` on its `DELETE`) can lack it until the record is written again; `record` on `CREATE`/`UPDATE`
+  is always complete.
+
+- **Schema fields accept a new `inline` flag.** `inline: true` keeps the field on the record row when
+  the payload is stored out of line: it then appears in list and lookup projections without
+  `includePayload`, and is projectable into a trigger's `input.record`. It cannot be combined with
+  `sensitive`, and `PUT /v1/schemas/{id}` is rejected with a `409` if it would stop keeping a field
+  inline (by dropping `inline`, `filterable` or the lookup that carried it) while a trigger rule still
+  projects that field — narrow the rule's `fields` first, matching the endpoint's existing refusal to
+  turn `triggersEnabled` off under live rules.
+
+- **Schemas opt in to firing triggers, via `capabilities.triggersEnabled`.** Set it to `true` on the
+  schema named by a rule's `firingSource.schemaId` before declaring the rule, or the create is
+  rejected with a `400`; records of a schema fire triggers only when that schema opts in. It defaults
+  to `false` and is independent of `capabilities.auditHistory` — turning audit history off does not
+  turn triggers off.
+
+  Symmetrically, `PUT /v1/schemas/{id}` is rejected with a `409` if it would turn `triggersEnabled`
+  off while trigger rules still fire off that schema, and `DELETE /v1/schemas/{id}` is refused with a
+  `409` while any rule fires off it — delete those rules first, matching the endpoint's existing
+  refusals for records of the type and for lineage variants. The `PUT` case matters because a schema
+  update replaces `capabilities` **in full when you supply it**: omitting the block preserves it, but
+  supplying a partial map (to change `auditHistory`, say) drops `triggersEnabled` along with it and
+  would otherwise disable every trigger on the schema with no error.
+
+- **Trigger scripts can now reach documents and folders, not just records.** The `vectros` host object
+  gains two namespaces alongside `vectros.records.*`:
+  `vectros.documents.create/get/update/delete/query/lookup` and
+  `vectros.folders.create/get/update/delete/query` (folders have no `lookup` — there is no
+  `/v1/folders/lookup` endpoint to mirror). Each verb is the in-process equivalent of the same
+  `/v1/documents` or `/v1/folders` call, running through the identical scope, placement and validation
+  path, so a script can do exactly what a scoped credential holding the same grant could do over HTTP
+  — and nothing more. `update` is a partial (JSON Merge Patch) update on both, matching
+  `records.update`. A trigger's `manifest` can now name these verbs (`documents.get`,
+  `folders.create`, …); an entry naming a verb that does not exist — including `folders.lookup` — is
+  rejected with a `400` listing the recognized set. Presigned-URL routes
+  (`POST /v1/documents/upload`, `GET /v1/documents/{id}/download`) are deliberately **not** exposed to
+  scripts: they hand back a credential that outlives the execution, which is a different capability
+  from calling the API in-process. Purely additive — an existing trigger, script and manifest behave
+  exactly as before.
+
+- **A per-tenant ceiling on concurrent script executions.** At most **10** run concurrently per
+  tenant — and trigger firings and `POST /v1/scripts/execute` draw from **separate pools of 10**, so
+  a burst of synchronous calls cannot starve your triggers, or the other way round. A firing refused
+  at the ceiling is recorded as the retryable category `TENANT_CONCURRENCY_LIMIT` and redelivered
+  rather than dropped, and is neither charged nor metered; a synchronous call refused there fails the
+  request. This is a fixed platform limit in this release, not a per-plan or per-request setting.
+
+- **New `GET /v1/trigger-failures` endpoint** — find automation that has stopped running. Returns a
+  page of trigger executions that failed: what went wrong (`category`, a closed set server-side but
+  typed as a plain string in the SDKs, so match on the value and treat an unrecognised one as
+  unknown rather than assuming your enum is exhaustive — among them `SCRIPT_ERROR`, `TIMEOUT`,
+  `AUTHORIZATION_DENIED`, `MANIFEST_VIOLATION`, `CONCURRENT_MODIFICATION`, `RESOURCE_LIMIT_EXCEEDED`,
+  `WRITE_BUFFER_CAP_EXCEEDED`, `RATE_LIMITED`, `CREDIT_LIMIT_EXCEEDED`, `TENANT_CONCURRENCY_LIMIT`
+  and `INTERNAL_ERROR`), whether the platform will
+  retry it, how many attempts it has made, and which of your rules, schemas and records were involved.
+  Filter by `ruleId`, `category`, `retryable`, and a `from`/`to` time window; paginates like every
+  other list endpoint. Requires the existing `triggers:r` scope — no new scope to grant. Until now a
+  failing trigger left no partner-visible trace at all.
+
+  **A record appears once per firing, not once per attempt.** If the platform retries a retryable
+  failure, the same record's `attempts` count rises rather than a second record appearing — and **if a
+  retry later succeeds, the record is removed**. So this endpoint tells you what is broken *now*; it
+  is not an append-only history, and you should not build a permanent audit on it. Records also expire
+  30 days after the firing first failed.
+
+  **A refusal your script does not `catch` is categorised as that refusal**, not as an internal
+  error: a `vectros.*` call your credential or manifest does not allow is recorded as
+  `AUTHORIZATION_DENIED` or `MANIFEST_VIOLATION` naming the refused operation, and any other `4xx` a
+  `vectros.*` call returns (a not-found, a validation failure, a version conflict) as `SCRIPT_ERROR`
+  carrying that message — the same categories you get if the script catches the error and throws its
+  own, and all of them bill execution time like any other script failure. `INTERNAL_ERROR` is reserved
+  for a genuine platform fault: unbilled, and not retried as a script error.
+
+  `detail` is safe to surface to your own users: it carries only your own content (a script's own
+  thrown message) or public API vocabulary (verb names, scope dimensions, record ids), never platform
+  internals. For `INTERNAL_ERROR` it is absent and a `correlationId` is returned instead — quote that
+  to support. A `CONCURRENT_MODIFICATION` **names the specific records, documents and folders**
+  another writer changed (by id, with no type word — an id is globally unique), so you know which rows
+  to re-read; it deliberately does not return their current version numbers, because re-applying your
+  change on top of a returned version overwrites the concurrent writer instead of reconciling with
+  them. Re-read, re-apply, retry.
+
+- **New `trigger.failed` webhook event** — subscribe a webhook to it to be told when a trigger
+  execution fails, instead of polling the endpoint above. `data` carries the failure's own fields —
+  the same ones a `GET /v1/trigger-failures` record carries, except its `createdAt`/`updatedAt`
+  timestamps; the envelope's own `created` is the delivery's.
+
+  **It fires once per problem, when the platform gives up** — immediately for a failure that cannot be
+  retried, and only on the final attempt for one that can. A transient failure that succeeds on retry
+  sends no webhook at all.
+
+  **If you alert on this event, deduplicate on `data.id`**, which is stable for a given firing. Do
+  **not** deduplicate on the envelope's own `id`: that is the delivery's id, minted fresh per
+  delivery, so one firing fanning out to two subscribed webhooks produces two of them. In rare recovery cases we may re-send an event for a firing you were already told about, or
+  recover a firing after telling you it failed — in which case the matching `GET /v1/trigger-failures`
+  record is removed and that id will no longer resolve. Treat the event as "this failed" rather than
+  as a durable handle. (The `GET` endpoint still shows the in-progress failure meanwhile, so you can
+  see a retry in flight if you look; the webhook deliberately stays quiet until the outcome is
+  settled.)
+
+- **`POST /v1/records/batch` is now implemented** (closing a contract previously reserved as an HTTP
+  501) — writes multiple records in one call. Each item in `items` has the same shape as a single
+  `POST /v1/records` body and goes through the same schema validation, `externalId` idempotency,
+  unique-field enforcement, and `records:c:<type>` scope check, applied **per item** against that
+  item's own record type. `atomicity` selects how the batch commits: `best_effort` (the default, up to
+  50 items) writes each item independently, so some can succeed while others fail; `all_or_nothing`
+  (up to 50 items) commits every item in one transaction, and if any item fails nothing is written at
+  all — reported with an `error.code` of `batch_not_committed` (a different item failed),
+  `batch_refused` (the batch is too large to commit atomically; the practical maximum is below the
+  item limit) or `batch_conflict` (a concurrent writer). The response is HTTP 200 whenever the batch
+  was processed — including when every item failed —
+  so always inspect the per-item `results` rather than the status code, matching each result to the
+  item you sent via its `index`. `?upsert=true` and `?allowClear=true` are honored per item, exactly
+  as on a single create.
+
+  **In an `all_or_nothing` batch, an item may depend on a row written earlier in the same batch** — a
+  child record can carry a `reference` to a parent created by an earlier item, and the batch commits.
+  See the read-your-own-writes entry under *Changed* for the full rule, which applies identically to a
+  script execution.
+
+- **`BatchWriteResult.status` carries six values** — `created`, `updated`, `conflict`, `invalid`,
+  `forbidden` and `not_committed` — and `succeeded` + `failed` account for every item you submitted.
+  `forbidden` means your credential lacks the scope or ownership that item required, so the fix is to
+  your credential rather than to the item; `not_committed` means the item itself was fine but an
+  `all_or_nothing` batch was aborted by a different item, so nothing was written and resubmitting with
+  that item fixed will write this one unchanged.
+
+- **Issuer registrations (`POST /v1/auth/issuers`, `PUT /v1/auth/issuers/{issuerId}`) accept a new optional `capturedClaims`
+  field** — a list of additional OIDC claim names (beyond `emailClaim`, which keeps its own dedicated
+  field) to capture from that issuer's tokens on every successful token exchange, stored as your
+  tenant's golden identity-provider-asserted copy for the signed-in user. Not a fixed set: name
+  whatever claims your identity provider actually asserts (standard claims like `name` or
+  `phone_number`, or your provider's own custom claims). Each claim is read from the verified token
+  first, falling back to the registration's `userinfoUri` (if configured) only for names still missing
+  after that. Purely additive — omit entirely to capture nothing beyond email (unchanged default
+  behavior for every existing registration).
+
+- **App contexts (`POST`/`PUT /v1/app-contexts`) accept a new optional `identityProjectionClaims`
+  field** — declares which of your tenant's captured identity-provider claim names (see
+  `capturedClaims` above) get projected, read-only, onto access profiles in this context. Filled in
+  once per profile, the first time a sign-in for that principal can supply a value — usually at
+  profile-creation, but for an invited member not until they actually accept and sign in for the first
+  time. Once filled, a profile's projection does not update again even if this declaration or the
+  underlying identity data changes later. Requires a root API key or your platform provisioning
+  credential; an ordinary `app-contexts:u`-scoped token cannot set it. Projected values surface as a
+  new read-only `identityProjection` object on `AccessProfileResponse`
+  (`GET`/`POST`/`PUT` on `/v1/app-contexts/{contextId}/profiles/*`) — absent when your context
+  declares no projection, when none of the declared names have a captured value for that principal
+  yet, or before that principal's first successful sign-in. Platform-write-only: it cannot be set or
+  changed via the profile's own `POST`/`PUT` body.
+
+- **Role/AccessProfile scope clauses accept a new optional `assignable_roles` field** — a
+  designated-roleId allow-list restricting WHICH named roles a clause may compose into a delegated
+  AccessProfile (`roleIds` composition), independent of how much data the clause's own `data_scope`
+  reaches. Absent/null means no roleId restriction (default-open), matching `data_scope`'s existing
+  default-open-for-reads posture — every existing clause keeps behaving exactly as it does today; a
+  tenant opts into the restriction by adding this field to a clause that grants `profiles:c`-shaped
+  authority. Capped at 20 entries; purely additive — omit entirely for unchanged
+  behavior. **Adoption note:** "unchanged behavior" holds only for non-adopters — once you add
+  `assignable_roles` to a clause, that clause can only compose the roles the list NAMES — so plan a
+  rollout that names every roleId the restricted clause still needs BEFORE adding the field, not
+  after.
+
+  One further condition, and it is the one that catches a common shape: a composed role that itself
+  grants role-composing authority (`profiles`, `users`, `keys` or `triggers` with `c`, `u` or `d`, or a
+  wildcard `*` — `users:c` is "can invite team members", so this is not an exotic case) must ALSO carry an
+  `assignable_roles` no broader than yours. Without that, composing such a role would hand the
+  delegate unrestricted composing power one hop later, which is the escalation the field exists to
+  close. So those roles need updating before you adopt; an ordinary role that grants no composing
+  authority of its own does not, and composing one keeps working exactly as it does today.
+
+- **`POST /v1/auth/token`, `POST /v1/auth/token/exchange`, and `POST /v1/auth/token/assume` now return
+  a new `resolvedScope` object** alongside the minted/exchanged/re-minted token —
+  `{allowedActions: string[], identity: Record<string, string>}`, the same plaintext data baked into
+  the token's own (compressed) `scope` claim, resolved server-side so you no longer need to decode the
+  token to read it. `allowedActions` is the union of `allowed_actions` across every clause the token
+  carries (`["*"]` for a wildcard-scoped credential); `identity` is the token's own `identity` claim,
+  keyed by the same public dimension names (`userId`, `scope:<namespace>`) you send on mint. Purely
+  additive — every existing response field is unchanged.
+
+- **`POST /v1/search` and `POST /v1/rag` accept a new optional `scopeFilters` array** (on `/v1/rag`
+  it sits inside `search`) — narrow a search or RAG retrieval by more than one ownership dimension in
+  a single request, for example
+  `["org:<id>", "client:<id>"]` to narrow to one specific client within one specific org. Mutually
+  exclusive with the existing `scope` field: use `scope` for a single dimension, `scopeFilters` when
+  you need more than one. Purely additive — omit entirely for unchanged behavior.
+
+### Security
+
+- **`POST /v1/admin/keys/scoped` no longer mints a key against a `suspended` access profile.** It
+  returned `201` and handed back a working `ssk_*` bound to a profile that had already been suspended,
+  so suspending a profile did not stop new credentials being issued against it. It now returns `409`
+  naming the profile, before anything is written. **This changes an outcome you may be relying on:** a
+  mint that previously succeeded against a suspended profile now fails, for every credential including
+  a root `sk_*`, and a repeat `POST` of a tuple whose key already exists is refused too rather than
+  returning its metadata with `200`. Reactivate the profile
+  (`PUT /v1/app-contexts/{contextId}/profiles/{principalId}` with `status: active`) and retry.
+
+  The status is `409`, not `403`, on purpose: every `403` this endpoint returns is about your
+  credential being insufficient, while this one is about the referenced profile's state — if you
+  handle `403` by re-issuing a broader credential, that is the wrong remedy here.
+
+  **The token exchange is fixed in the same release, so issuance is now immediate on both paths.**
+  `POST /v1/auth/token/exchange` could also mint a brand-new `st_*` against a suspended profile for up
+  to five minutes, because the resolved-scope cache served a memoized scope without re-reading the
+  profile's status — and since an `st_*` carries its own one-hour lifetime, that produced credentials
+  valid roughly 65 minutes past the suspension. The exchange now reads the profile's status on every
+  request and returns its usual uniform `403 invalid_grant`. `AccessProfileRequest`'s `status`
+  description previously described both paths as returning "a uniform 403"; they are now described
+  separately, because they answer differently.
+
+  **What is NOT changed: credentials already issued.** An `ssk_*` or `st_*` handed out before you
+  suspended may keep working for up to five minutes while the access-profile cache expires, and an
+  `st_*` keeps its own one-hour lifetime regardless. Suspension is immediate containment against new
+  credentials and eventually-consistent against existing ones; to stop a specific credential now,
+  revoke that credential.
+
+- **`POST /v1/admin/keys/scoped` no longer mints a key for a `SUSPENDED` user.** Suspending a user via
+  `PUT /v1/users/{id}` does not suspend their access profiles, and the mint did not check the user's
+  own status — so a suspended user could still have new keys minted for them, though `status`'s own
+  documentation says `SUSPENDED` users are blocked from new operations. It now returns `409` naming
+  the user. `PENDING` users are deliberately unaffected: a pending user is an outstanding invitation,
+  and minting against one is a supported bootstrap step. Note this prevents ISSUANCE only — a key
+  minted before the user was suspended is unaffected, since user status is not consulted when a
+  credential authenticates.
+
+  Two details worth knowing if you automate around this. The check is **case-insensitive and
+  allow-listed**: `status` on a user is `ACTIVE`/`SUSPENDED`/`PENDING` in upper case, while `status`
+  on an access profile is `active`/`suspended` in lower case, and any value that is not recognisably
+  `ACTIVE` or `PENDING` is treated as not mintable. And the developer-portal token route
+  (`GET /developer/scoped-token`) got the same rule in this release — a suspended member is refused
+  there too, with that route's usual uniform `404`, since it does not distinguish refusal causes.
+
+### Changed
+
+- **A record or document write is refused (`400`) when the fields its schema keeps `inline` total more
+  than 224 KB on that item** — the same limit as a trigger's projected input, which is what `inline`
+  exists to feed. Without it the identical write reached the storage row's 400 KB ceiling as a `500`. Only
+  `inline: true` fields can reach this; `filterable` fields and lookup fields keep their existing,
+  smaller budgets.
+
+- **A root API key can no longer file a document, record or folder into an AppContext other than
+  `default`.** `POST`/`PUT /v1/documents`, `POST /v1/documents/upload`, `POST`/`PUT
+  /v1/records` and `POST /v1/folders` previously accepted a `folderId`/`parentFolderId` naming a
+  folder in any of the tenant's contexts when called with an unscoped root key; they now return the
+  same uniform `400 "Folder not found"` that every other credential already received.
+
+  **This never did what it appeared to do.** A root key's writes are always stamped with the
+  `default` context, so the child landed in `default` while its folder lived elsewhere — the row's
+  containment and its context partition disagreed permanently. Such a row is listed by
+  `GET /v1/documents?folderId=` only for callers in `default`, and is invisible to the context that
+  owns the folder. No coherent placement is lost: the accepted shape was the incoherent one.
+
+  **The same rule now applies to the SCHEMA a row is bound to**, for the same reason and on the same
+  credential. `POST`/`PUT`/`PATCH /v1/documents`, `POST /v1/documents/upload`, and the `schemaId` of a
+  trigger rule's `firingSource` previously accepted a schema belonging to another AppContext when
+  called with an unscoped root key; they now return `400 "Schema not found"`. A root-written row is
+  stamped `default`, so binding it to another context's schema left the row pointing at a definition
+  no caller confined to the row's own context could resolve. Records are unaffected on update — a
+  record's `schemaId` is immutable once created — and unchanged for every scoped credential, which
+  could always bind only its own context's schemas.
+
+  **If you were relying on either**, the supported route is a scoped key or token bound to the target
+  context (`POST /v1/admin/keys/scoped` with that `contextId`), which could always file into and bind
+  within its own context and still can. Rows written in the old shape are unchanged by this release
+  and are still readable, updatable and deletable: an update that omits `folderId` preserves the
+  existing placement, one that carries the existing `schemaId` forward keeps working, and supplying a
+  `default`-context folder or schema re-files the row into a coherent shape.
+
+- **Inside one script execution or one `all_or_nothing` batch, reads and guards see that operation's
+  own uncommitted writes.** Each read and each guard was previously answered from the state that
+  existed before the operation started, so a script or a batch could contradict itself. Now:
+
+  - `vectros.records.query(...)`/`lookup(...)`, `vectros.documents.query(...)`/`lookup(...)` and
+    `vectros.folders.query(...)` subtract what the same execution has deleted, and show a row the same
+    execution re-saved with its updated content — so a script that removes rows and then returns "what
+    remains" hands back a list consistent with the commit it reports. Previously `get(id)` on such a
+    row already returned 404 while a list still returned it. This is a property of every paginated
+    read the execution makes, not of the three `query` functions by name.
+  - Uniqueness and existence guards see rows staged earlier in the same operation. A second write of
+    the same unique field value in one operation is refused rather than both writes being admitted to
+    collide at commit; and a row that references or requires another row staged earlier in the same
+    operation resolves against it instead of failing as missing. This is what lets an
+    `all_or_nothing` batch file a child under a parent it creates in the same call.
+  - A second write to the *same* row within one operation builds on the first, not on the state before
+    the operation began. Two partial updates of one record in one execution previously each merged
+    onto the pre-operation baseline, so the second silently discarded the first's fields.
+  - An idempotent create still finds a row this operation has written to. Re-sending a create for an
+    `externalId` a row already held — or a folder slug — returns that row, carrying this operation's
+    own updated content, rather than colliding with the operation's own staged write. Claiming an
+    identifier that only a SIBLING of this operation staged stays refused, on records, documents and
+    folders alike: creating one identifier twice in a single operation is a mistake, not an
+    idempotent repeat, and the two cases are deliberately answered differently.
+
+  Two limits are deliberate and unchanged. A list does not show a row the same operation *created* —
+  you hold its id from `create()`. And what your credential is *permitted* to do is always decided
+  from committed state, so a script cannot widen (or narrow) its own permissions mid-execution by
+  editing the records that grant them. Nothing changes for reads made outside an execution or batch.
+
+- **A `filterable: true` field may no longer be declared with a field id the platform owns in the
+  search index.** `POST`/`PUT /v1/schemas` now rejects, with a `400`, a filterable field whose
+  `fieldId` collides with a platform-written search-index metadata key for a surface the schema binds
+  to: `tenantId`, `owner_id`, `folderId`, `rootFolderId` and `recordType` for a schema allowing the
+  `record` surface, and those plus `model_type` and `title` for one allowing `document`. Such a field
+  shadowed the platform's own value in the index, silently costing recall and precision on
+  type-scoped searches. **This changes an outcome you may be relying on:** an existing schema
+  declaring such a field is rejected the next time you `PUT` it, and a blueprint that declares one
+  fails to apply. Rename the field, or leave it non-filterable — a non-filterable field of any name is
+  unaffected, as is a schema that binds only to `user`/`entity` surfaces.
+
+- **Records no longer publish their lifecycle `status` into search-index metadata.** The key was
+  information-free — an archived record is removed from the index entirely — and nothing read it, but
+  it meant a record schema could not safely use `status` as a filterable field of its own. It now can:
+  `status` is reserved on neither surface. **This changes an outcome you may be relying on:** a
+  `POST /v1/search` `filters` clause on `status` no longer matches the platform's lifecycle value —
+  for a schema that declares its own filterable `status` field it now matches that field, and for one
+  that does not it matches nothing. **`POST /v1/search`'s own published `filters` example used to be
+  `status`, and is now the neutral, non-colliding `category`** — if you started from that example,
+  yours is the clause this changes. Documents are unaffected: they
+  have always kept lifecycle off the index, on the dedicated `lifecycleStatus` field.
+
+- **Webhook delivery history is now retained for 30 days.** A successfully delivered webhook left a
+  permanent record carrying the full event payload, with nothing to reclaim it. A delivered record
+  now expires **30 days after the delivery record was created** (not 30 days after it succeeded) —
+  long enough to review recent deliveries in the developer portal, and a bound on how long the
+  platform retains your event payloads. Undelivered and failed records keep their existing 7-day
+  window, measured the same way.
+
+- **`status` descriptions on `UserRequest` and `EntityRequest` corrected.** Both said `SUSPENDED`
+  records "are retained but blocked from new operations", which promised enforcement the platform does
+  not perform. Suspending a **user** stops new credentials being issued for them and does **not**
+  revoke credentials they already hold — those keep working until they expire or are revoked.
+  Suspending an **entity** does nothing at
+  all: the field is a label you set and read back, and a suspended entity is still readable, updatable
+  and referenceable. Enforce entity status in your own application if you need it to have an effect.
+  No behaviour changed here — the documentation did.
+
+### Removed
+
+- **`PENDING` is no longer an accepted value of the `status` request field on `POST`/`PUT /v1/users`.**
+  It is a server-managed state and the field's own description already said you could not set it
+  directly, but it was listed among the accepted values, so the OpenAPI spec and all three SDKs
+  published it as settable. Sending it now returns `400` (see *Fixed* below). **Nothing about reading
+  changes:** a user is still returned with `status: "PENDING"` while an invitation is outstanding, and
+  the response field still carries all three values. An invited user is still activated exactly as
+  before — `status: "ACTIVE"` together with `inviteToken`, `externalSubject` and
+  `emailVerifiedAttestation: true`.
+
+  In a typed SDK this narrows a generated enum, so code that names the `PENDING` member of the
+  *request* type will no longer compile; switch to the response type's enum, or to the string literal.
+
+### Fixed
+
+- **`status: "ARCHIVED"` now reliably keeps a DOCUMENT out of search.** Archiving is documented to
+  retract an item from search and recall while keeping it stored, and it did — but a later write to a
+  document could silently put it back. Writing new content to an already-archived document re-created
+  its search-index entry, leaving the document reporting `ARCHIVED` while still being returned by
+  `POST /v1/search` and RAG, with no error on either side. Creating a document directly with
+  `status: "ARCHIVED"` indexed it for the same reason. **Records were not affected by either of
+  those** — they have refused to index an archived record since 0.35. Both document paths are now
+  fixed, and writing to an archived document no longer moves its `indexStatus` to `PENDING_INDEX`:
+  nothing is queued for an archived document, so the field keeps the value it already had rather than
+  reporting work that will never happen.
+
+  **For documents and records alike:** re-sending the archive now re-asserts the retraction instead of
+  doing nothing, so an item found archived-but-still-searchable can be repaired without a hard delete;
+  and background re-index passes drop an archived item's index entry rather than refreshing it.
+
+  **If you have an item that is already archived-but-still-searchable, it stays that way until it is
+  written to.** Nothing sweeps for the existing ones — the periodic reconcile pass only revisits items
+  whose indexing did not complete, and a stranded item's index entry looks perfectly healthy to it.
+  Re-sending `status: "ARCHIVED"` on the item is the fix, and now works.
+
+- **`createdAt` on a search hit is documented accurately.** The field was described as when the source
+  item was created. It is when the item was added to the *search index*, which is the same moment in
+  the common case but is later for anything that was re-indexed onto a new entry. The description now
+  says so and points at `documents.get` / `records.get` for the source creation time. No behaviour
+  changed — the value was always the index time.
+
+- **The update paths now validate `status` the way the create paths always did.** Three endpoints
+  stored whatever `status` string you sent:
+
+  - `PUT /v1/users/{id}`
+  - `PUT /v1/entities/{namespace}/{id}`
+  - `POST /v1/entities/{namespace}?upsert=true`, when it matches an existing entity
+
+  On users, `POST /v1/users` and `POST /v1/users?upsert=true` both already normalised and rejected, so
+  the same request was accepted or refused depending only on which verb you used. On entities, only
+  the create branch did.
+
+  **This changes an outcome you may be relying on.** On all three endpoints:
+
+  - a lowercase or mixed-case `status` is now normalised — send `"suspended"`, read back `"SUSPENDED"`
+    (previously it was stored verbatim);
+  - a value outside `ACTIVE`/`SUSPENDED` — including the empty string — now returns `400` instead of
+    being stored;
+  - `status: "PENDING"` on `PUT /v1/users/{id}` now returns `400`. This includes echoing a pending
+    user's own status back in a read-modify-write, which is the one case where a request that used to
+    succeed now fails. Omit `status` from the body to update a pending user's other fields.
+    `POST /v1/users?upsert=true` already refused `PENDING`, so the two write paths now agree.
+
+  An explicit `"status": null` still means "leave it unchanged", exactly as omitting the field does.
+
+  **One consequence specific to entity upsert.** A re-applied upsert whose content matches the stored
+  entity is a documented no-op — no version bump, no audit row, no write fee. Because the incoming
+  `status` is now normalised before that comparison, an upsert that re-sends `"suspended"` against an
+  entity stored as `"suspended"` no longer matches and is written once, canonicalising the row. From
+  then on it matches and is a no-op again. Only entities holding a non-canonical status are affected,
+  and each is affected once.
+
+  **Activating a pending user now requires the invite token however their status is spelled.** A user
+  whose stored status was a non-canonical spelling of `pending` was not recognised as pending, so
+  sending `status: "ACTIVE"` for them set them active **without an invite token**, on
+  `PUT /v1/users/{id}` and on `POST /v1/users?upsert=true` alike. Both now compare the stored value
+  case-insensitively. If you have such a user and no longer hold their invitation, re-invite them.
+
+  Sending a non-canonical `status` to `PUT /v1/users/{id}` had real consequences. A user stored as
+  `"active"` rather than `"ACTIVE"` was refused at `POST /v1/auth/token/exchange` with a uniform `403`
+  — the sign-in path compares the value exactly. Repair such a row by sending `status: "ACTIVE"`; the
+  update now rewrites it to the canonical value. Sending `status: "PENDING"` was worse: it demoted a
+  live user into the invitation state, with no way back through the API, because the pending-to-active
+  transition requires the `inviteToken` from an invitation that a demoted user never had. That door is
+  now closed at the entrance.
+
+- **A browser SDK caller now sees the API's shaped error instead of a CORS failure.** Preflight for a
+  request that never reaches the API's own handlers — an unmatched route, an expired or rejected
+  token, a throttled or firewall-blocked request — was answered with an allow-list that omitted
+  headers every generated SDK sends on every request, so the browser refused to send the real request
+  and the developer saw a bare CORS error with no status. All three allow-lists now carry the same
+  full set, so those responses arrive as the `404`, `401` or `403` they were shaped to be. Affects
+  browser-hosted integrations only; server-side callers were never subject to preflight.
+
+- **Webhook deliveries are no longer silently stranded or dropped.** Two paths lost a delivery with no
+  retry, no failure record, and nothing to see: an attempt killed part-way through never incremented
+  its attempt count or scheduled a retry, and a failure to enqueue the attempt at all left the
+  delivery permanently pending. Both now record the failure and schedule the retry the delivery policy
+  calls for. No partner-visible field or payload changed — deliveries that would previously have
+  vanished now arrive, or surface as failures.
+
+- **A refused document update no longer leaves the new text already written over the old.**
+  `PUT /v1/documents/{id}` wrote the supplied `text` to storage before the checks that can reject the
+  request, and reused the document's own object key, so a rejected update replaced the live body and
+  then returned `400` — while the document's metadata and search index still described the previous
+  text. The write now happens after every such check. A valid update behaves exactly as before.
+
+- **Moving an `externalId` onto one another resource already holds is now rejected** — on documents
+  via a re-type, and on identity entities directly. An `externalId` is unique per type for a document
+  (`(tenant, context, type)`) and, for an entity, per namespace **within its placement** — a namespace
+  registered to one app context is a separate space from a tenant-wide one of the same name, so the
+  same `externalId` may legitimately exist in both. Nothing on either update path re-checked that
+  uniqueness, so the identifier could be moved onto an occupied slot and two resources would end up
+  sharing one. After that, every lookup keyed on that `externalId` resolved to an arbitrary one of the
+  two: the idempotent-create echo, `GET /v1/entities/{namespace}?externalId=`, and — the sharp end —
+  `POST /v1/documents?upsert=true`, which could overwrite the wrong document with no error anywhere.
+
+  **What this is, precisely:** a check performed against the current state when your request is
+  processed — not a reservation. Two requests moving onto the *same free* identifier at the same
+  instant can still both succeed, exactly as two simultaneous creates of the same `externalId` always
+  could. If you rely on an `externalId` being held by exactly one resource, treat this as the safety
+  net it is and keep your own writes serialised.
+
+  Two ways to reach it, both now refused with `400`:
+
+  - **Documents.** `PATCH`/`PUT /v1/documents/{id}` changing `schemaId` to a type on which the
+    document's `externalId` is already taken. (The `externalId` *value* was already immutable on
+    update; its uniqueness *scope* was not, because the scope is the bound schema's type.)
+  - **Identity entities.** `PUT /v1/entities/{namespace}/{id}` changing `externalId` to one another
+    entity in that namespace already holds.
+
+  **This changes an outcome you may be relying on**, but only in the colliding case. Re-typing a
+  document onto a type where its `externalId` is free still works, as does binding a schema to a
+  previously untyped document, re-typing a document that has no `externalId` at all, and moving an
+  entity onto an unused `externalId`. Re-sending a resource's current `schemaId` or `externalId` is
+  unaffected. If you hit the refusal, the identifier is genuinely in use — pick a different one, or
+  delete the resource holding it first. The error names the conflict but never identifies the other
+  resource.
+
+- **`DELETE /v1/folders/{id}` no longer deletes a folder that still holds documents or records.** The
+  emptiness guard saw sub-folders and file-backed documents but was blind to text-ingested documents
+  and to records, so deleting such a folder returned `204` and left its documents and records readable
+  and listable behind a `folderId` that no longer resolves. The endpoint now rejects with `400` unless
+  the folder is empty across all three populations. **This changes an outcome you may be relying on:**
+  a `DELETE` that previously succeeded on a folder holding text documents or records now fails. Empty
+  the folder first — `GET /v1/documents?folderId=`, `GET /v1/records?folderId=` and
+  `GET /v1/folders?parentFolderId=` enumerate what is in it.
+
+  Two consequences worth knowing before you hit them:
+
+  - **The guard counts everything in the folder, including items your credential cannot read.** If
+    your credential is scoped to a subset of a shared tenant and someone else files a document or
+    record into a folder you own, that folder now refuses to delete for you, and your own
+    `GET /v1/documents?folderId=` will not show you why. This is deliberate — the alternative is
+    deleting the container out from under data you were not allowed to see — but it means such a
+    folder needs a credential that can reach the whole folder to empty it. The refusal discloses only
+    that *something* is filed there: never what, whose, or how many.
+  - **Folders already orphaned by the old behaviour are not repaired by this change**, and there is no
+    endpoint that enumerates them: `GET /v1/documents?folderId=` needs the folder id, which is exactly
+    what is gone. To clean them up, page `GET /v1/documents` and `GET /v1/records` and re-file
+    (`PATCH` the `folderId`) any row whose `folderId` no longer resolves via `GET /v1/folders/{id}`.
+
+- **Two schemas can no longer be created with the same `recordType`.** Two concurrent
+  `POST /v1/schemas` calls naming one `recordType` could both succeed, and the duplicate then broke
+  subsequent record writes against that type — for every caller, not just the two racing creates. The
+  type name is now claimed atomically, so one of the two creates wins and the other is refused. A
+  sequential create of a duplicate `recordType` was, and remains, refused.
+
 ## 0.42.0 — 2026-08-30
 
 ### Added
@@ -982,7 +1656,7 @@ This project adheres to [Semantic Versioning](https://semver.org).
 ### Security
 
 - **A user's `email` can no longer be changed while an invitation to them is outstanding.**
-  `PUT /v1/users/{userId}` and `POST /v1/users?upsert=true` now return `400` for that one
+  `PUT /v1/users/{id}` and `POST /v1/users?upsert=true` now return `400` for that one
   case; every other mutable field is unaffected, and the address is editable again once the
   invitation is accepted or the user is removed. Revoke and re-invite to change where an outstanding
   invitation goes. Previously the change was accepted, leaving the invitation addressed to one

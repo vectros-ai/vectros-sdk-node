@@ -31,4 +31,6 @@ export interface IssuerRequest {
     userinfoUri?: string;
     /** Opt-in self-service signup: a list of {signup_type, role_id} pairs. When a first-time exchange caller presents no invite token but names a signup_type matching one of these (or omits signup_type and exactly one entry exists), a brand-new user is created and bound to that entry's role — no invite required. Every entry must, by construction, be something you're willing to grant to ANY caller who can present a token from this issuer: no entry may target a role carrying elevated (provisioning or wildcard) scope — rejected. Omit entirely to leave self-signup disabled (the default). */
     selfSignupPolicies?: Vectros.SelfSignupPolicy[];
+    /** Opt-in additional identity-claim capture. A list of OIDC claim names — beyond `emailClaim`, which keeps its own dedicated field — to capture from this issuer's tokens on every successful token exchange and store as your tenant's golden IdP-asserted identity copy. Not a fixed set: name whatever claims this IdP actually asserts (standard, e.g. `name`/`phone_number`/`address`, or your IdP's own custom claims). Each claim is read from the verified token first, falling back to `userinfoUri` (if configured) only for names still missing after that. Omit entirely to capture nothing beyond email (the default). */
+    capturedClaims?: string[];
 }

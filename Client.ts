@@ -8,7 +8,9 @@ import { IdentityClient } from "./api/resources/identity/client/Client.js";
 import { InferenceClient } from "./api/resources/inference/client/Client.js";
 import { RecordsClient } from "./api/resources/records/client/Client.js";
 import { SchemasClient } from "./api/resources/schemas/client/Client.js";
+import { ScriptsClient } from "./api/resources/scripts/client/Client.js";
 import { SearchClient } from "./api/resources/search/client/Client.js";
+import { TriggersClient } from "./api/resources/triggers/client/Client.js";
 import type { BaseClientOptions, BaseRequestOptions } from "./BaseClient.js";
 import { type NormalizedClientOptionsWithAuth, normalizeClientOptionsWithAuth } from "./BaseClient.js";
 import * as core from "./core/index.js";
@@ -29,7 +31,9 @@ export class VectrosClient {
     protected _inference: InferenceClient | undefined;
     protected _records: RecordsClient | undefined;
     protected _schemas: SchemasClient | undefined;
+    protected _scripts: ScriptsClient | undefined;
     protected _search: SearchClient | undefined;
+    protected _triggers: TriggersClient | undefined;
 
     constructor(options: VectrosClient.Options) {
         this._options = normalizeClientOptionsWithAuth(options);
@@ -67,8 +71,16 @@ export class VectrosClient {
         return (this._schemas ??= new SchemasClient(this._options));
     }
 
+    public get scripts(): ScriptsClient {
+        return (this._scripts ??= new ScriptsClient(this._options));
+    }
+
     public get search(): SearchClient {
         return (this._search ??= new SearchClient(this._options));
+    }
+
+    public get triggers(): TriggersClient {
+        return (this._triggers ??= new TriggersClient(this._options));
     }
 
     /**

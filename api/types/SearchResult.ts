@@ -24,7 +24,7 @@ export interface SearchResult {
     sourceType?: SearchResult.SourceType | undefined;
     /** The metadata you supplied for this item when you ingested it, such as its title, folder ID, and any custom fields you included. */
     metadata?: Record<string, unknown> | undefined;
-    /** When the source item was created, as an ISO-8601 UTC timestamp. */
+    /** When this item was added to the search index, as an ISO-8601 UTC timestamp. Usually the same moment the source item was created, but not always: if the item was re-indexed onto a new index entry at some later point, this reports that later time. Use the item's own `createdAt` from documents.get / records.get when you need the source creation time. */
     createdAt?: string | undefined;
 }
 

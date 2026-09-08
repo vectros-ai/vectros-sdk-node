@@ -277,7 +277,7 @@ export class SchemasClient {
     }
 
     /**
-     * Updates a record schema. Fields you omit are preserved; `typeName` is immutable and cannot be changed. Collection fields (`fields`, `lookupFields`, `renderHints`, `capabilities`) are replaced in full when supplied. Requires the `schemas:u` scope.
+     * Updates a record schema. Fields you omit are preserved; `typeName` is immutable and cannot be changed. Collection fields (`fields`, `lookupFields`, `renderHints`, `capabilities`) are replaced in full when supplied. Because `capabilities` is replaced in full, omitting `triggersEnabled` clears it — the request is refused with 409 if that would disable triggers while trigger rules still fire off this schema, so delete those rules first. Requires the `schemas:u` scope.
      *
      * @param {Vectros.UpdateSchemaRequest} request
      * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -285,6 +285,7 @@ export class SchemasClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -345,6 +346,8 @@ export class SchemasClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -360,7 +363,7 @@ export class SchemasClient {
     }
 
     /**
-     * Permanently deletes a record schema. The request is refused with 409 if records of this type still exist — delete those records first, since every record must reference a live schema. A lineage base (a schema other schemas declare `basedOn`) also cannot be deleted while any such variant still exists — delete the variant schema(s) first. Requires the `schemas:d` scope.
+     * Permanently deletes a record schema. The request is refused with 409 if records of this type still exist — delete those records first, since every record must reference a live schema. A lineage base (a schema other schemas declare `basedOn`) also cannot be deleted while any such variant still exists — delete the variant schema(s) first. It is likewise refused while any trigger rule fires off this schema — delete those trigger rules first. Requires the `schemas:d` scope.
      *
      * @param {Vectros.DeleteSchemaRequest} request
      * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.

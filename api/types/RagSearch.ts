@@ -14,8 +14,10 @@ export interface RagSearch {
     filters?: Record<string, Vectros.FilterValue> | undefined;
     /** Restrict retrieval to content owned by this user id. */
     userId?: string | undefined;
-    /** Restrict retrieval to content carrying this scope value, in `namespace:value` form — for example `group:eng-team`, `org:<id>`, or `client:<id>`. Resolve an entity's UUID from your own identifier via `GET /v1/entities/{namespace}?externalId=`. */
+    /** Restrict retrieval to content carrying this scope value, in `namespace:value` form — for example `group:eng-team`, `org:<id>`, or `client:<id>`. Resolve an entity's UUID from your own identifier via `GET /v1/entities/{namespace}?externalId=`. Mutually exclusive with `scopeFilters` — use this for a single dimension, `scopeFilters` when you need to narrow by more than one. */
     scope?: string | undefined;
+    /** Restrict retrieval to content matching ALL of these scope values (one per namespace), for a credential whose access spans more than one ownership dimension — for example `["org:<id>", "client:<id>"]` to narrow to one specific client within one specific org. Each entry uses the same `namespace:value` form as `scope`. Naming the same namespace twice is rejected. Mutually exclusive with `scope`. */
+    scopeFilters?: string[] | undefined;
     /** Narrow retrieval to specific content types. When omitted, both documents and records are searched — records are valid grounding content too (for example, structured patient data or intake forms). Pass ["documents"] for documents only or ["records"] for records only. Each retrieved result carries a `sourceType` field indicating which type it is. */
     contentTypes?: RagSearch.ContentTypes.Item[] | undefined;
     /** Restrict retrieval to content (documents or records) in this exact folder. Folders are a unified organizational primitive and may hold mixed content. Provide the UUID of a folder. To include a folder and all of its descendants instead, use `rootFolderId`. */

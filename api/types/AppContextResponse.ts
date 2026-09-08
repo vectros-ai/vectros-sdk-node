@@ -28,6 +28,8 @@ export interface AppContextResponse {
     principalBurstLimit?: number | undefined;
     /** Per-principal, per-billing-period operation cap for the opt-in per-principal usage/quota feature, or absent if unset (usage is still tracked for visibility/billing without a cap when `meteringAxis` is set but this is absent). */
     principalUsageCap?: number | undefined;
+    /** The golden IdP-asserted identity claim names projected, read-only, onto access profiles in this context. Filled in once per profile, the first time a sign-in for that principal can supply a value — usually at profile-creation, but for an invited member not until they actually accept and sign in, since there is nothing to project before that. Once filled, a profile's projection does not update again even if this declaration or the underlying identity data changes later. Absent when no projection is declared. */
+    identityProjectionClaims?: string[] | undefined;
 }
 
 export namespace AppContextResponse {

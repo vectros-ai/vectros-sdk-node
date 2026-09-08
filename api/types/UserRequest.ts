@@ -8,7 +8,7 @@ export interface UserRequest {
     externalId: string;
     /** The user's email address. Used for display and notifications only; it is not used for authentication to the Vectros API. */
     email?: string | undefined;
-    /** The user's lifecycle status. `ACTIVE` users can be used normally; `SUSPENDED` users are retained but blocked from new operations. `PENDING` is a server-managed state for invitations awaiting acceptance — you cannot set it directly. (A pending user becomes `ACTIVE` by sending status=ACTIVE together with `inviteToken`, `externalSubject`, and `emailVerifiedAttestation=true`.) You may set only `ACTIVE` or `SUSPENDED` directly. */
+    /** The user's lifecycle status. `ACTIVE` users can be used normally; `SUSPENDED` users are retained, and no new credentials can be issued for them — credentials they already hold keep working until they expire or are revoked. `PENDING` is a server-managed state for invitations awaiting acceptance and cannot be set on this endpoint: send only `ACTIVE` or `SUSPENDED`. (A pending user becomes `ACTIVE` by sending status=ACTIVE together with `inviteToken`, `externalSubject`, and `emailVerifiedAttestation=true`.) */
     status?: UserRequest.Status | undefined;
     /** The kind of user. `HUMAN` (the default) is a real person; `SERVICE` is a bot, agent, scheduled job, or other named integration with no specific person behind it. Service users may omit `email`. The type is immutable after creation — to change it, create a new user. */
     type?: UserRequest.Type | undefined;
@@ -25,11 +25,10 @@ export interface UserRequest {
 }
 
 export namespace UserRequest {
-    /** The user's lifecycle status. `ACTIVE` users can be used normally; `SUSPENDED` users are retained but blocked from new operations. `PENDING` is a server-managed state for invitations awaiting acceptance — you cannot set it directly. (A pending user becomes `ACTIVE` by sending status=ACTIVE together with `inviteToken`, `externalSubject`, and `emailVerifiedAttestation=true`.) You may set only `ACTIVE` or `SUSPENDED` directly. */
+    /** The user's lifecycle status. `ACTIVE` users can be used normally; `SUSPENDED` users are retained, and no new credentials can be issued for them — credentials they already hold keep working until they expire or are revoked. `PENDING` is a server-managed state for invitations awaiting acceptance and cannot be set on this endpoint: send only `ACTIVE` or `SUSPENDED`. (A pending user becomes `ACTIVE` by sending status=ACTIVE together with `inviteToken`, `externalSubject`, and `emailVerifiedAttestation=true`.) */
     export const Status = {
         Active: "ACTIVE",
         Suspended: "SUSPENDED",
-        Pending: "PENDING",
     } as const;
     export type Status = (typeof Status)[keyof typeof Status];
     /** The kind of user. `HUMAN` (the default) is a real person; `SERVICE` is a bot, agent, scheduled job, or other named integration with no specific person behind it. Service users may omit `email`. The type is immutable after creation — to change it, create a new user. */

@@ -247,7 +247,7 @@ export class AuthClient {
     }
 
     /**
-     * Creates a scoped API key (an `ssk_*` secret) that inherits its permissions from an existing access profile in your account. The call is idempotent on the combination of tenant, context, user, and key name: re-issuing the same request returns the existing key WITHOUT re-disclosing its raw secret. The raw key is returned ONLY in this response — store it securely, as it cannot be retrieved again. Requires the `keys:c` scope. If you use a scoped credential, `keys:c` alone is not sufficient: because the minted key is durably bound to the profile you name, the profile's effective scopes may not exceed your own, and you may only mint against a profile whose `identityOverrides` values your own identity holds. Minting a key bound to your OWN principal needs nothing further; minting one bound to a DIFFERENT principal additionally requires the `delegate-mint` capability (`granted_capabilities`) on your credential — without it the request is refused. A root API key (`sk_`) is exempt from all three bounds.
+     * Creates a scoped API key (an `ssk_*` secret) that inherits its permissions from an existing access profile in your account. The call is idempotent on the combination of tenant, context, user, and key name: re-issuing the same request returns the existing key WITHOUT re-disclosing its raw secret. The raw key is returned ONLY in this response — store it securely, as it cannot be retrieved again. Requires the `keys:c` scope. If you use a scoped credential, `keys:c` alone is not sufficient: because the minted key is durably bound to the profile you name, the profile's effective scopes may not exceed your own, and you may only mint against a profile whose `identityOverrides` values your own identity holds. Minting a key bound to your OWN principal needs nothing further; minting one bound to a DIFFERENT principal additionally requires the `delegate-mint` capability (`granted_capabilities`) on your credential — without it the request is refused. A root API key (`sk_`) is exempt from all three bounds. The profile you name must be `active` AND the user you name must not be `SUSPENDED`: either is refused with `409`, and no root exemption applies to that. Both refusals stop ISSUANCE only. Suspending the profile additionally stops credentials already bound to it, within about five minutes; suspending the user does not stop their existing keys at all. A `PENDING` user is fine.
      *
      * @param {Vectros.CreateScopedKeyRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -255,6 +255,7 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -312,6 +313,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -1951,7 +1954,7 @@ export class AuthClient {
     }
 
     /**
-     * Returns full usage detail for the requested calendar month, broken down by category (search, documents, and records) with per-category credit estimates and a split between your live and test environments. Defaults to the current month when `year` and `month` are omitted. Requires the `billing:r` scope on scoped tokens; API keys always have access. **A token confined to a single app context sees only that context's usage**: totals, the environment split, and the `contexts` breakdown narrow to it, and the environment your context is not bound to is omitted (`null`), not zeroed. Only a token with cross-context reach sees your full account-wide totals. Two exceptions to the narrowing, since they have no per-context breakdown to narrow to: `reads.calls.used`/`reads.dataOut.bytes` (metered per account, not per context) read as `0` for a confined token rather than a narrowed figure — the corresponding overage-credit charge fields narrow correctly; and `credits.limit` stays your whole plan's ceiling, so `credits.remaining` may overstate the account's true remaining room.
+     * Returns full usage detail for the requested calendar month, broken down by category (search, documents, records, and trigger-script execution time) with per-category credit estimates and a split between your live and test environments. Defaults to the current month when `year` and `month` are omitted. Requires the `billing:r` scope on scoped tokens; API keys always have access. **A token confined to a single app context sees only that context's usage**: totals, the environment split, and the `contexts` breakdown narrow to it, and the environment your context is not bound to is omitted (`null`), not zeroed. Only a token with cross-context reach sees your full account-wide totals. Two exceptions to the narrowing, since they have no per-context breakdown to narrow to: `reads.calls.used`/`reads.dataOut.bytes` (metered per account, not per context) read as `0` for a confined token rather than a narrowed figure — the corresponding overage-credit charge fields narrow correctly; and `credits.limit` stays your whole plan's ceiling, so `credits.remaining` may overstate the account's true remaining room. The `execution` section narrows correctly for a confined token, like the other per-context charge fields — but note its credits carry sub-credit remainders forward across your whole account for the period, so compare `execution.creditsMilli` against your account-wide figure rather than recomputing it from one context's `billableMillis`.
      *
      * @param {Vectros.GetUsageRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.

@@ -326,7 +326,7 @@ export class FoldersClient {
     }
 
     /**
-     * Permanently deletes a folder. The folder must be empty (contain no documents or sub-folders) and must not be protected. Your context's root folder is protected and cannot be deleted. Requires the `folders:d` scope.
+     * Permanently deletes a folder. The folder must be empty — it must contain no documents, no records, and no sub-folders — and must not be protected. Your context's root folder is protected and cannot be deleted. Requires the `folders:d` scope.
      *
      * @param {Vectros.DeleteFolderRequest} request
      * @param {FoldersClient.RequestOptions} requestOptions - Request-specific configuration.

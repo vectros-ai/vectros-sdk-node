@@ -29,4 +29,6 @@ export interface IssuerUpdateRequest {
     status?: string;
     /** Safe field — updatable. Omit to leave unchanged; pass an empty list to disable self-signup entirely. See `IssuerRequest.selfSignupPolicies` for the full semantics — the same elevated-role restriction applies here. */
     selfSignupPolicies?: Vectros.SelfSignupPolicy[];
+    /** Safe field — updatable. Omit to leave unchanged; pass an empty list to stop capturing any claim beyond email. See `IssuerRequest.capturedClaims` for the full semantics. */
+    capturedClaims?: string[];
 }

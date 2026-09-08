@@ -4,11 +4,11 @@
  * Request body for creating or updating an identity entity. The namespace comes from the URL path. On update (PUT), omitted fields are preserved — a null value does not clear a field — and the `payload` object is replaced in full when supplied, rather than deep-merged.
  */
 export interface EntityRequest {
-    /** Your own unique identifier for this entity, unique within its namespace. Used for idempotent create: if an entity with this `externalId` already exists in the namespace, it is returned instead of creating a duplicate. */
+    /** Your own unique identifier for this entity, unique within its namespace and app context. Used for idempotent create: if an entity with this `externalId` already exists there, it is returned instead of creating a duplicate. A namespace registered to one app context is a separate space from a tenant-wide namespace of the same name, so the same `externalId` may legitimately exist in both. On update you may supply a different value to re-point the entity, but it must still be unused in that space — moving onto an `externalId` another entity holds is rejected with `400`. Two entities therefore cannot swap identifiers directly; move one to a temporary value first. */
     externalId: string;
     /** Human-readable name for the entity. */
     name?: string | undefined;
-    /** Lifecycle status of the entity. `ACTIVE` entities can be used normally; `SUSPENDED` entities are retained but blocked from new operations. */
+    /** Lifecycle status of the entity, which you set and read back. `SUSPENDED` records your own intent to retire the entity; the platform does not enforce it — a suspended entity can still be read, updated, and referenced by other records. Enforce it in your own application if you need it to have an effect. */
     status?: EntityRequest.Status | undefined;
     /** Free-form key-value attributes to store with the entity. On update, the supplied object replaces the stored payload in full (it is not key-merged); omit it to leave the stored payload unchanged. */
     payload?: Record<string, unknown> | undefined;
@@ -19,7 +19,7 @@ export interface EntityRequest {
 }
 
 export namespace EntityRequest {
-    /** Lifecycle status of the entity. `ACTIVE` entities can be used normally; `SUSPENDED` entities are retained but blocked from new operations. */
+    /** Lifecycle status of the entity, which you set and read back. `SUSPENDED` records your own intent to retire the entity; the platform does not enforce it — a suspended entity can still be read, updated, and referenced by other records. Enforce it in your own application if you need it to have an effect. */
     export const Status = {
         Active: "ACTIVE",
         Suspended: "SUSPENDED",

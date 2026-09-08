@@ -30,6 +30,8 @@ export interface FieldDef {
     targetSurface?: string | undefined;
     /** Marks the field as sensitive (PHI/PII). Sensitive fields are redacted in logs, audit trails, and errors; blind-indexed for lookups; excluded from search; and masked in responses unless the token carries the `s` reveal scope for this record type. */
     sensitive?: boolean | undefined;
+    /** Keep this field on the record row when the record's payload is stored out of line (large records, or a `LARGE_PAYLOAD` storage profile). An inline field appears in list and lookup projections without `includePayload`, and is the ONLY kind of field a trigger rule may project into its script's `input.record` — a rule's `fields` may name a field only if it is `inline`, `filterable`, or a lookup field, and not `sensitive`. Cannot be combined with `sensitive`. Removing it from a field a trigger rule still projects is refused. */
+    inline?: boolean | undefined;
 }
 
 export namespace FieldDef {

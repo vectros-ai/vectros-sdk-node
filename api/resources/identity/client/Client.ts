@@ -282,11 +282,12 @@ export class IdentityClient {
     }
 
     /**
-     * Updates the mutable fields of an entity. Omitted fields are preserved (a null value does not clear a field), and the `payload` object is replaced in full when supplied. Providing `scopes` replaces the entity's parent edges. Requires the `entities:u:<namespace>` scope.
+     * Updates the mutable fields of an entity. Omitted fields are preserved (a null value does not clear a field), and the `payload` object is replaced in full when supplied. Providing `scopes` replaces the entity's parent edges. Supplying a different `externalId` re-points the entity's identifier; it must still be unused in this namespace and app context. Requires the `entities:u:<namespace>` scope.
      *
      * @param {Vectros.UpdateEntityRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
@@ -349,6 +350,8 @@ export class IdentityClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 429:

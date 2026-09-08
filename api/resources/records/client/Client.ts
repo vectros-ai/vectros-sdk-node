@@ -169,14 +169,18 @@ export class RecordsClient {
     }
 
     /**
-     * Reserved endpoint for bulk record writes. The published response shape includes a per-item partial-failure envelope and an atomicity flag. It currently returns 501 (not implemented). The documented 200 response schema is the stable shape this endpoint will use once available, published now so SDK integrations against it will not break when it ships. Requires the `records:c` scope.
+     * Writes up to 50 records (or 50 with `atomicity: all_or_nothing`) in a single request. Each item in `items` has exactly the same shape, and goes through exactly the same validation, authorization and idempotency rules, as the body of a single `POST /v1/records` — including schema validation, `externalId` idempotency, unique-field enforcement, and the `records:c:<type>` scope check, which is applied per item against that item's own record type. A batch is not a way to write a type your credential could not write one at a time.
+     *
+     * `atomicity` selects how the batch commits. `best_effort` (the default) writes each item independently: some can succeed while others fail, and each item's own outcome is reported. `all_or_nothing` commits every item in one transaction — if any item fails, no record is created or updated at all, and every item that was itself fine reports `not_committed` while the ones that failed report why. Because the transaction is bounded by the number of underlying storage rows rather than by the number of records, a large `all_or_nothing` batch can be refused as too large to commit atomically even when it is within the item limit; the error says so, and nothing is written when it happens.
+     *
+     * The response is HTTP 200 whenever the batch was processed at all — including when every item failed — so always inspect `results` rather than relying on the status code. Match each result to the item you sent using its `index`. Requires the `records:c` scope.
      *
      * @param {Vectros.BatchWriteRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.TooManyRequestsError}
-     * @throws {@link Vectros.NotImplementedError}
      *
      * @example
      *     await client.records.batchWriteRecords()
@@ -192,6 +196,11 @@ export class RecordsClient {
         request: Vectros.BatchWriteRequest = {},
         requestOptions?: RecordsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.BatchWriteResponse>> {
+        const { upsert, allowClear, ..._body } = request;
+        const _queryParams: Record<string, unknown> = {
+            upsert,
+            allowClear,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -207,9 +216,13 @@ export class RecordsClient {
             method: "POST",
             headers: _headers,
             contentType: "application/json",
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             requestType: "json",
-            body: request,
+            body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -222,12 +235,12 @@ export class RecordsClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
-                case 501:
-                    throw new Vectros.NotImplementedError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,

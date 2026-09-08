@@ -10,6 +10,6 @@ export interface BatchWriteResponse {
     results?: Vectros.BatchWriteResult[] | undefined;
     /** The number of items that were created or updated. */
     succeeded?: number | undefined;
-    /** The number of items that failed (status `conflict` or `invalid`). */
+    /** The number of items that failed (status `conflict`, `invalid`, `forbidden`, or `not_committed`). Together with `succeeded` this always accounts for every item you submitted. */
     failed?: number | undefined;
 }
