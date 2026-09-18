@@ -8,10 +8,14 @@
  *     }
  */
 export interface ListScriptsRequest {
-    /** List every version of this script name (oldest first), instead of a flat cross-name list. */
+    /** List every version of this script name (oldest first), instead of a flat cross-name list. Required when `latest=true`. */
     name?: string;
-    /** Pagination cursor. Pass the `nextCursor` returned by the previous page to fetch the next page; omit it for the first page. The cursor is **opaque** — echo it back unchanged. */
+    /** Pagination cursor. Pass the `nextCursor` returned by the previous page to fetch the next page; omit it for the first page. The cursor is **opaque** — echo it back unchanged. Ignored when `latest=true`. */
     startFrom?: string;
-    /** Maximum number of scripts to return per page. Must be between 1 and 100; defaults to 20. */
+    /** Maximum number of scripts to return per page. Must be between 1 and 100; defaults to 20. Ignored when `latest=true`. */
     limit?: number;
+    /** Include each row's full `source` inline instead of the default omitted projection. Costs the same per-row weight a by-id GET pays; at `limit=100` on large scripts this can approach the response-payload ceiling (the reason the default changed). Defaults to false. */
+    includeSource?: boolean;
+    /** Instead of a page, return a single `ScriptResponse`: the current newest version of `name` (required alongside this). One bounded read (`GET`-by-id-equivalent cost) instead of draining every page of the name's version history to compute the max version yourself. Defaults to false. */
+    latest?: boolean;
 }

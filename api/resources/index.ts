@@ -19,6 +19,7 @@ export * from "./schemas/client/requests/index.js";
 export * as schemas from "./schemas/index.js";
 export * from "./scripts/client/requests/index.js";
 export * as scripts from "./scripts/index.js";
+export * from "./scripts/types/index.js";
 export * from "./search/client/requests/index.js";
 export * as search from "./search/index.js";
 export * from "./triggers/client/requests/index.js";

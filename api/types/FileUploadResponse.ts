@@ -4,14 +4,18 @@
  * Response containing the presigned upload URL and the assigned document ID.
  */
 export interface FileUploadResponse {
-    /** Whether this call created a new document. True when a new document was created; false when a document with the same `externalId` already existed and a fresh upload URL to its existing object was re-issued (idempotent upload). Present only on the upload response (POST /v1/documents/upload). The HTTP status mirrors it — 201 when created, 200 when an existing document was returned. */
+    /** Whether this call created a new document. True when a new document was created; false when a document with the same `externalId` already existed and a fresh upload URL was issued for it (idempotent upload); the upload targets a new object, and the document adopts it once the upload is validated. Present only on the upload response (POST /v1/documents/upload). The HTTP status mirrors it — 201 when created, 200 when an existing document was returned. */
     created?: boolean | undefined;
     /** Document ID assigned to this upload. Poll `GET /v1/documents/{id}` to track indexing status after the upload completes. */
     id?: string | undefined;
-    /** Presigned upload URL. Upload the raw file bytes directly to this URL with an HTTP PUT request, setting the Content-Type header to the `fileType` you provided. No Authorization header is needed — the URL is self-authenticating. */
+    /** Presigned upload URL. Upload the raw file bytes directly to this URL with an HTTP PUT request, setting the Content-Type header to the `fileType` you provided. No Authorization header is needed — the URL is self-authenticating. Your PUT MUST also include the header named in `requiredHeaderName`, set to `requiredHeaderValue` exactly — the URL is single-use and this header is part of what makes it so; omitting it fails the request. */
     uploadUrl?: string | undefined;
-    /** ISO-8601 UTC timestamp at which the presigned URL expires. The upload must complete before this time. Default expiry is 60 minutes. */
+    /** ISO-8601 UTC timestamp at which the presigned URL expires. The upload must complete before this time. Default expiry is 15 minutes. */
     expiresAt?: string | undefined;
     /** The stable identifier you supplied on the request, echoed back. Immutable, and unique within your account and context. Null when you did not supply one. */
     externalId?: string | undefined;
+    /** HTTP header your PUT to `uploadUrl` MUST send. The presigned URL is single-use (S3 conditional writes) and this header is part of what makes its signature valid — omit it, or change its value, and the PUT is rejected. */
+    requiredHeaderName?: string | undefined;
+    /** The exact value to send for `requiredHeaderName`, verbatim. */
+    requiredHeaderValue?: string | undefined;
 }

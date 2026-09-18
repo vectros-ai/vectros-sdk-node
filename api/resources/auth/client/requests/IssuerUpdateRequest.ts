@@ -19,7 +19,7 @@ export interface IssuerUpdateRequest {
     audience?: string;
     /** Routing-pin field — immutable. Present only so the current value may be echoed back without error; a differing value is rejected. */
     contextId?: string;
-    /** Safe field — updatable. Omit to leave unchanged. */
+    /** Updatable, but NOT a "safe" field in the sense the others on this object are: it names which verified JWT claim becomes a federated user's internal identity key, so changing it re-identifies (or, under self-signup, orphans) every user already bound through this issuer. Refused with 400 once the issuer has ever bound a user; freely updatable before that, and supplying the current value back is always a no-op. Omit to leave unchanged. */
     subClaim?: string;
     /** Safe field — updatable. Omit to leave unchanged. */
     emailClaim?: string;
@@ -31,4 +31,6 @@ export interface IssuerUpdateRequest {
     selfSignupPolicies?: Vectros.SelfSignupPolicy[];
     /** Safe field — updatable. Omit to leave unchanged; pass an empty list to stop capturing any claim beyond email. See `IssuerRequest.capturedClaims` for the full semantics. */
     capturedClaims?: string[];
+    /** Safe field — updatable. A NEW non-blank value must already be a VERIFIED domain for your account (same requirement as at registration); an empty string clears this issuer to domain-less (unrestricted). Omit to leave unchanged. See `IssuerRequest.restrictedToDomain` for the full semantics, including why this field is updatable while issuer/jwksUri/audience/contextId are not. */
+    restrictedToDomain?: string;
 }

@@ -15,7 +15,7 @@ export interface GetAdminLogsRequest {
     startTime: string;
     /** End of the time window (ISO-8601 UTC; defaults to now). */
     endTime?: string;
-    /** Filter by resource type. One of `documents`, `records`, `search`, `schemas`, `folders`, `entities`, `namespaces`, `users`, `usage`, `auth`, `models`, `ping`, `issuers`, `rag`, `chat`, `ask`, `erasure-requests`, or `export`. `clients` and `orgs` are not accepted — `/v1/orgs` and `/v1/clients` were retired onto `/v1/entities/{namespace}` and no log row was ever written under those resource names. */
+    /** Filter by resource type. One of `documents`, `records`, `search`, `schemas`, `folders`, `entities`, `namespaces`, `users`, `usage`, `auth`, `models`, `ping`, `issuers`, `rag`, `chat`, `ask`, `erasure-requests`, `export`, `scripts`, or `triggers`. `clients` and `orgs` are not accepted — `/v1/orgs` and `/v1/clients` were retired onto `/v1/entities/{namespace}` and no log row was ever written under those resource names. `trigger-failures` is also not accepted: `GET /v1/trigger-failures` rows are logged under `triggers`, not a separate resource name. */
     resource?: string;
     /** Filter by HTTP method (`GET`, `POST`, `PUT`, or `DELETE`). */
     method?: string;

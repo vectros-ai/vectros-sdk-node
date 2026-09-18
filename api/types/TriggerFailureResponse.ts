@@ -10,7 +10,7 @@ export interface TriggerFailureResponse {
     ruleId?: string | undefined;
     /** The rule's name at the time it failed. */
     ruleName?: string | undefined;
-    /** Why the execution failed, from a fixed set of categories. `RULE_DELETED`, `RULE_RETARGETED` and `TRIGGERS_DISABLED` never appear here — those are the correct outcome of your own edit, not a failure. The categories you can see are: `CASCADE_DEPTH_EXCEEDED`, `INPUT_TOO_LARGE` (the rule's projected `fields` exceeded the 224 KB input limit — narrow the declaration), `PRINCIPAL_UNRESOLVED`, `GRANT_UNRESOLVED`, `SCRIPT_NOT_FOUND`, `WRITE_FROZEN`, `RATE_LIMITED`, `CREDIT_LIMIT_EXCEEDED`, `PRINCIPAL_QUOTA_EXCEEDED`, `TENANT_CONCURRENCY_LIMIT`, `TIMEOUT`, `RESOURCE_LIMIT_EXCEEDED`, `WRITE_BUFFER_CAP_EXCEEDED`, `MANIFEST_VIOLATION`, `AUTHORIZATION_DENIED`, `CONCURRENT_MODIFICATION`, `SCRIPT_ERROR` and `INTERNAL_ERROR`. */
+    /** Why the execution failed, from a fixed set of categories. `RULE_DELETED`, `RULE_RETARGETED` and `TRIGGERS_DISABLED` never appear here — those are the correct outcome of your own edit, not a failure. The categories you can see are: `INPUT_TOO_LARGE` (the rule's projected `fields` exceeded the 224 KB input limit — narrow the declaration), `PRINCIPAL_UNRESOLVED`, `GRANT_UNRESOLVED`, `SCRIPT_NOT_FOUND`, `WRITE_FROZEN`, `RATE_LIMITED`, `CREDIT_LIMIT_EXCEEDED`, `PRINCIPAL_QUOTA_EXCEEDED`, `TENANT_CONCURRENCY_LIMIT`, `TIMEOUT`, `RESOURCE_LIMIT_EXCEEDED`, `WRITE_BUFFER_CAP_EXCEEDED`, `MANIFEST_VIOLATION`, `AUTHORIZATION_DENIED`, `CONCURRENT_MODIFICATION`, `SCRIPT_ERROR` and `INTERNAL_ERROR`. `CASCADE_DEPTH_EXCEEDED` is a fixed-set member you will NOT normally see: the platform now suppresses dispatch for a write past the cascade cap at its source, before any failure record is created, rather than dispatching it for you to refuse. The category is retained only as a defense-in-depth path and should be treated as effectively retired. */
     category?: string | undefined;
     /** Whether redelivering this firing could plausibly produce a different answer. When true, the platform retries automatically before giving up; when false, nothing changes until your script, your grant or your trigger topology does. */
     retryable?: boolean | undefined;
@@ -28,7 +28,7 @@ export interface TriggerFailureResponse {
     recordId?: string | undefined;
     /** How deep in a chain of triggers this execution would have run. 1 means the firing record was written directly rather than by another trigger. */
     executionDepth?: number | undefined;
-    /** How long this attempt ran, in milliseconds, before it failed. Absent when nothing ran (for example `CASCADE_DEPTH_EXCEEDED`, which is refused before the script starts). Covers only the most recent attempt — see `attempts` for how many there were. */
+    /** How long this attempt ran, in milliseconds, before it failed. Absent when nothing ran (for example `SCRIPT_NOT_FOUND`, which is refused before the script starts). Despite sounding pre-flight, `MANIFEST_VIOLATION` and `AUTHORIZATION_DENIED` are NOT in this absent-duration set — both are chargeable execution outcomes, so durationMs is PRESENT for them, not absent. Covers only the most recent attempt — see `attempts` for how many there were. */
     durationMs?: number | undefined;
     /** When this firing first failed, as an ISO-8601 UTC timestamp. */
     createdAt?: string | undefined;

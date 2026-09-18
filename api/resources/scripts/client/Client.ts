@@ -139,10 +139,13 @@ export class ScriptsClient {
     }
 
     /**
-     * Returns a paginated list of your scripts. Pass `name` to list every version of one script name (oldest first); omit it for a flat list across every name in your account (newest first). Results are returned as a `{data, nextCursor}` envelope — pass `nextCursor` as `startFrom` to fetch the next page. Requires the `scripts:r` scope.
+     * Returns a paginated list of your scripts. Pass `name` to list every version of one script name (oldest first); omit it for a flat list across every name in your account (newest first). Results are returned as a `{data, nextCursor}` envelope — pass `nextCursor` as `startFrom` to fetch the next page. Requires the `scripts:r` scope. **Each row's `source` is omitted by default** (`sourceOmitted: true`) — scripts are immutable per version, so a name's version history can otherwise carry every version's complete source in one response. Pass `?includeSource=true` to get it back inline, or fetch one version's full source with a by-id GET. **`?name=<n>&latest=true`** answers "what is the current version of this name" in one bounded call — a single `ScriptResponse` object (not a page), instead of draining every page of the name's version history to find the newest yourself.
      *
      * @param {Vectros.ListScriptsRequest} request
      * @param {ScriptsClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.NotFoundError}
      *
      * @example
      *     await client.scripts.listScripts({
@@ -153,19 +156,21 @@ export class ScriptsClient {
     public listScripts(
         request: Vectros.ListScriptsRequest = {},
         requestOptions?: ScriptsClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.ScriptPage> {
+    ): core.HttpResponsePromise<Vectros.ListScriptsResponse> {
         return core.HttpResponsePromise.fromPromise(this.__listScripts(request, requestOptions));
     }
 
     private async __listScripts(
         request: Vectros.ListScriptsRequest = {},
         requestOptions?: ScriptsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.ScriptPage>> {
-        const { name, startFrom, limit } = request;
+    ): Promise<core.WithRawResponse<Vectros.ListScriptsResponse>> {
+        const { name, startFrom, limit, includeSource, latest } = request;
         const _queryParams: Record<string, unknown> = {
             name,
             startFrom,
             limit,
+            includeSource,
+            latest,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -193,22 +198,29 @@ export class ScriptsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as Vectros.ScriptPage, rawResponse: _response.rawResponse };
+            return { data: _response.body as Vectros.ListScriptsResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
-            throw new errors.VectrosError({
-                statusCode: _response.error.statusCode,
-                body: _response.error.body,
-                rawResponse: _response.rawResponse,
-            });
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
         }
 
         return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/scripts");
     }
 
     /**
-     * Stores a new version of a script object. Every POST creates a genuinely new version — this is NOT idempotent-by-name: pushing `name` again always creates a new row with `scriptVersion` auto-incremented (the first version pushed for a name is 1). `source` is stored as-is: nothing parses or validates it at push time. A version runs when a trigger rule references it (`POST /v1/triggers`) or when `POST /v1/scripts/execute` names it. Requires the `scripts:c` scope.
+     * Stores a new version of a script object. Every POST creates a genuinely new version — this is NOT idempotent-by-name: pushing `name` again always creates a new row with `scriptVersion` auto-incremented (the first version pushed for a name is 1). `source` is stored as-is: nothing parses or validates it at push time. A version runs when a trigger rule references it (`POST /v1/triggers`) or when `POST /v1/scripts/execute` names it. `provisionedBy` MAY BE SET ON ABSENT, NEVER CHANGED, evaluated against the CURRENT LATEST version of this `name` at push time: if the latest version has no marker recorded, this push may set any value; if the latest version already has one, an omitted value inherits it forward and a DIFFERENT value is refused — a live comparison against whichever version is newest at push time, not a value fixed for the name's whole history. Pushing onto an EXISTING name with no `provisionedBy` recorded on its current latest version additionally requires that you were the caller who pushed that latest version — a name carrying a `provisionedBy` marker is exempt from this check (proving you can supply or inherit the matching marker is itself the ownership proof there). Requires the `scripts:c` scope.
      *
      * @param {Vectros.ScriptRequest} request
      * @param {ScriptsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -428,12 +440,13 @@ export class ScriptsClient {
     }
 
     /**
-     * Permanently deletes one script version by ID. Deleting one version does not affect any other version of the same name. Requires the `scripts:d` scope.
+     * Permanently deletes one script version by ID. Deleting one version does not affect any other version of the same name. Requires the `scripts:d` scope. Refused with 409 if a live trigger rule still references this version — either directly (a pinned `scriptRef`), or via `"latest"` when this IS the newest version of its name. Delete or re-point those rules first.
      *
      * @param {Vectros.DeleteScriptRequest} request
      * @param {ScriptsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -482,6 +495,8 @@ export class ScriptsClient {
             switch (_response.error.statusCode) {
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:

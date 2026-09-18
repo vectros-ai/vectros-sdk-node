@@ -10,4 +10,6 @@ export interface ScriptRequest {
     source: string;
     /** Optional free-text description of the input shape this script expects. Not validated or enforced in this release. Capped at 50,000 UTF-8 bytes (~50 KB) — an oversized value is rejected with a 400. */
     declaredInputContract?: string | undefined;
+    /** An optional provenance marker naming the blueprint that provisions this script, so a convergent caller can tell a script it manages from one hand-authored or owned by a different blueprint. Not currently sent by `vectros bootstrap --blueprint`, which does not yet set this field for scripts. Leave it unset for a script you manage yourself. MAY BE SET ON ABSENT, NEVER CHANGED, evaluated against the CURRENT LATEST version of this `name` at push time: if the latest version has no marker recorded, this push may set any value (including onto a previously-unmarked, hand-authored name); if the latest version already has one recorded, an omitted value inherits it forward, and supplying a DIFFERENT value is refused. This compares against whichever version is newest right now, not a value fixed for the name's whole history — deleting the version(s) carrying a given marker and pushing again is unconstrained by it. */
+    provisionedBy?: string | undefined;
 }

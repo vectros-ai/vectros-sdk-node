@@ -917,7 +917,7 @@ export class RecordsClient {
     }
 
     /**
-     * Returns the tombstone left behind when a record was hard-deleted, confirming the deletion and recording when it happened. Look it up using the deleted record's original ID. Requires the `records:r:<type>` scope.
+     * Returns the tombstone left behind when a record was hard-deleted, confirming the deletion and recording when it happened. Look it up using the deleted record's original ID. Requires the `records:r:<type>` scope, granted without a `data_scope` restriction: the owner of a deleted record cannot be checked, so a credential confined to an ownership compartment (e.g. `data_scope: {scope:org: [org_A]}`) cannot read tombstones, including for records it owned.
      *
      * @param {Vectros.GetRecordTombstoneRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -932,14 +932,14 @@ export class RecordsClient {
     public getRecordTombstone(
         request: Vectros.GetRecordTombstoneRequest,
         requestOptions?: RecordsClient.RequestOptions,
-    ): core.HttpResponsePromise<Vectros.RecordResponse> {
+    ): core.HttpResponsePromise<Vectros.TombstoneResponse> {
         return core.HttpResponsePromise.fromPromise(this.__getRecordTombstone(request, requestOptions));
     }
 
     private async __getRecordTombstone(
         request: Vectros.GetRecordTombstoneRequest,
         requestOptions?: RecordsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<Vectros.RecordResponse>> {
+    ): Promise<core.WithRawResponse<Vectros.TombstoneResponse>> {
         const { id } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -963,7 +963,7 @@ export class RecordsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as Vectros.RecordResponse, rawResponse: _response.rawResponse };
+            return { data: _response.body as Vectros.TombstoneResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {

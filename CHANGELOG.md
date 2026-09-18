@@ -9,6 +9,481 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.44.0 — 2026-09-17
+
+This release includes **four breaking changes to existing response shapes** and several further
+endpoints that now refuse requests they previously accepted. Read every entry below marked
+**BREAKING**, or carrying a "this changes an outcome you may be relying on" note, if any of the
+affected surfaces are part of your integration.
+
+The four response-shape changes:
+1. `GET /v1/admin/access-log` rows now carry a `subjects[]` array in place of the single
+   `subjectType`/`subjectId` pair (query parameters are unchanged).
+2. `GET /v1/scripts` no longer returns each row's full `source` by default.
+3. `GET /v1/scripts`'s response schema is separately now a `oneOf` union — this changes the
+   generated SDK return type for every caller of this endpoint, not only those passing
+   `?latest=true`.
+4. `GET /v1/records/{id}/tombstone`'s response now carries a strict subset of its previous fields.
+
+Several further changes are new refusal conditions rather than shape changes — a previously-succeeding
+request can now fail where it did not before, with no change to any response's shape: `POST`/`PUT
+/v1/triggers` refusing a control-plane grant without a new capability; self-signup refusing a role
+that authors, updates, or deletes scripts; a credential bound to a deleted user, or minted into an
+app context that is being deleted; an invited user moved to `ACTIVE` without accepting the
+invitation; the tombstone endpoint's own new AppContext/record-type/`data_scope` checks (alongside
+its shape change above); and a bare `PUT` to a presigned upload URL with no extra header. Each is
+called out individually below with its own migration guidance.
+
+### Security
+
+- **A scoped API key (`ssk_*`) bound to a DELETED user is now refused immediately, rather than
+  remaining valid until an asynchronous cleanup step completes — and no new credential or access
+  grant can be created in an app context that is being deleted.** **This changes an outcome you may
+  be relying on:** `POST /v1/admin/keys/scoped`,
+  `POST /v1/app-contexts/{contextId}/profiles` (including `?upsert=true`),
+  `POST /v1/users/invite` and
+  its resend, `POST /v1/auth/token` with a `contextId`, and `POST /v1/auth/token/exchange` now return the
+  same not-found (or, for the exchange, the uniform `403 invalid_grant`) response for a context that is
+  being deleted as for one that does not exist; `POST /v1/auth/token/assume` returns `403`. The same
+  `404` now also answers `POST /v1/app-contexts/{contextId}/roles`, `PUT` and `DELETE` on
+  `/v1/app-contexts/{contextId}/roles/{roleId}`, and `DELETE` on
+  `/v1/app-contexts/{contextId}/profiles/{principalId}` for a context that is being deleted. `PUT` on a
+  profile stays available there, so a profile can still be suspended while its context is torn down. A request with a key whose
+  bound user no longer exists is refused — `403` on the Vectros API, `401` on inference routes — within about five minutes of the deletion, the same bound
+  as suspending an access profile, because resolved key scopes are cached for that long. No response
+  shape changes.
+
+- **Activating an invited user now always requires the invitation to have been accepted, regardless of
+  what status transitions preceded it.** **This changes an outcome you may be relying on:** moving a
+  user who still has an unaccepted invitation to `ACTIVE` by either `PUT /v1/users/{id}` or
+  `POST /v1/users?upsert=true` now fails with `400`.
+  Accepting the invitation is unaffected. Setting such a user to `SUSPENDED` still succeeds, but the
+  invitation can then no longer be accepted at all — to recover, delete the user and invite them again.
+  A user who has already accepted an invitation is unaffected, including being suspended and
+  reactivated. No response shape changes.
+
+- **`POST`/`PUT /v1/triggers` refuses a grant carrying a control-plane verb** (`keys`, `profiles`,
+  `users`, `app-contexts`, `access-log`, or `scripts` — any op) or the bare wildcard `*`, which grants
+  every resource, **unless your credential holds the new `trigger-control-plane-grant` capability.** A
+  trigger's grant executes unattended, on every matching record write, for as long as the rule exists,
+  which now requires this explicit, separately-granted capability beyond the scope itself. Not a known
+  exploit: no shipped blueprint declares a trigger with a control-plane scope, and this ships closed by
+  default (no credential is granted the new capability). **This changes an outcome you may be relying
+  on**: if you had been declaring one of the six resources (or `*`) on a trigger's own `scopes`/composed role, that declaration now fails with
+  `403` naming the capability, whether or not you already held the underlying scope yourself.
+
+- **A self-signup role that authors, updates, or deletes scripts (`scripts:c`/`u`/`d`) is refused —
+  self-signup roles that only READ or EXECUTE scripts are unaffected.** Script creation lets the
+  holder push code that then runs under whatever grant a `version:"latest"` trigger rule stores —
+  potentially a DIFFERENT principal's authority — which is not something an anonymous, self-vetted
+  external-IdP signup should be able to hand itself. **`scripts:x` (execution) and `scripts:r`
+  (listing/reading) are deliberately NOT refused**: script execution is a normal, expected part of a
+  self-signup role's product surface, and — unlike creation — it can already be narrowed to specific
+  scripts by name (`scripts:x:<name>`), so a blueprint author who wants a self-signup role to run only
+  its own approved scripts already has the tool to say so.
+
+- **A write past a trigger chain's cascade-depth cap no longer dispatches at all — it is suppressed
+  before any trigger, failure record, or webhook is produced**, rather than dispatched to every
+  matching rule for it to individually refuse. **This changes an outcome you may
+  be relying on:** `GET /v1/trigger-failures` will no longer show a `CASCADE_DEPTH_EXCEEDED` entry
+  for an automation that silently stopped running because its chain got too deep — that category is
+  now a defense-in-depth path only, not one you should expect to observe. If your monitoring alerts
+  on that specific category, it will go quiet; the underlying condition (a chain that's grown too
+  deep) still exists and is still worth knowing about, but this release removes the per-hop signal
+  for it. Shortening the trigger chain remains the only remedy, as before.
+
+- **`POST /v1/auth/issuers` now requires an `https://` `jwksUri`, and `POST /v1/auth/token/exchange`
+  only ever fetches a signing-key set over `https://`, including for an existing registration.**
+  `jwksUri` is otherwise immutable, so both the registration write and every subsequent exchange
+  fetch needed to move together.
+  **This changes an outcome you may be relying on:** a registration attempt with an `http://` `jwksUri`
+  now fails with `400`, and — if you registered one before this change — every exchange through that
+  issuer now fails uniformly (`401`) as of this release, since the fetch itself is refused. There is no
+  in-place fix: `jwksUri` cannot be edited (it is a trust-anchor field) and deleting a registration with
+  bound users is refused regardless of their `status`. **There is also no same-context self-service
+  replacement**: the app context's one-active-issuer claim is released only when this registration is
+  deleted, so a new registration targeting the same context is refused for the identical reason.
+  Suspend this issuer and register a replacement under a **different** app context with a new
+  `(issuer, audience)` pair and an `https://` endpoint. A Vectros operator can force-release a bound
+  registration instead, but that **permanently retires its `issuerId` and leaves its bound users
+  unable to ever exchange through it again** — their existing accounts are lost either way, so this
+  buys nothing over the different-context option above beyond staying in the same app context.
+
+- **`PUT /v1/auth/issuers/{issuerId}` refuses a `subClaim` change once the issuer has a bound user.**
+  `subClaim` names which verified JWT claim becomes a federated user's internal identity key. It is
+  now refused with `400` once any user has ever bound through the issuer — the same "has anyone bound" condition
+  `DELETE` already enforces — and remains freely updatable before an issuer's first real login.
+  Supplying the current value back is still a no-op, even on a bound issuer.
+
+- **`POST /v1/auth/issuers` caps a tenant at 50 registered issuers.** Bounds how many
+  platform-global `(issuer, audience)` pairs a single tenant account can hold at once. Registering
+  past the cap returns `400`; deregister an unused issuer to free a slot. This does not, by itself,
+  verify that a registrant controls the issuer it names — that remains a known, tracked gap.
+
+- **`POST /v1/auth/issuers` now requires an `https://` `userinfoUri`, and the userinfo fallback
+  only ever calls one over `https://`, including for an existing registration.** `userinfoUri` sends
+  your presented token as an `Authorization: Bearer` header and supplies the email used for
+  first-login matching and every `capturedClaims` value, so it gets the same treatment as `jwksUri`
+  above. **This changes an outcome you may be relying on:** a registration
+  or update attempt with an `http://` `userinfoUri` now fails with `400`, and — if you registered one
+  before this change — the userinfo fallback now fails closed (the exchange proceeds without it,
+  identically to `userinfoUri` never having been configured) rather than fetching over plaintext.
+  **Unlike `jwksUri`, `userinfoUri` is a plain safe field, not a trust anchor — fix it in place with
+  one call**, `PUT /v1/auth/issuers/{issuerId}` `{"userinfoUri": "https://…"}`, which works even on a
+  registration with bound users; no context migration and no operator involvement needed.
+
+- **New optional `restrictedToDomain` on `POST /v1/auth/issuers` — prove control of your users'
+  company domain before your issuer registration binds.** `restrictedToDomain` scopes an
+  `(issuer, audience)` pair's uniqueness to a specific, domain-verified population: registrants whose
+  users authenticate under a company domain (captive enterprise SSO). Name a domain you've already
+  verified for your account (`POST
+  /developer/domains`, add the DNS TXT record, then `POST /developer/domains/{id}/verify`), and this
+  registration's uniqueness is scoped to that specific domain rather than the bare pair — so it is
+  **never blocked by an unrelated tenant's existing, unverified registration on the same
+  `(issuer, audience)` pair**, and at exchange time this registration is matched only when the
+  presented token carries an `hd` claim (the OIDC hosted-domain convention) equal to your verified
+  domain. Google Workspace emits `hd` natively; other IdPs need a claims-mapping rule configured to
+  emit a claim literally named `hd`. Updatable via `PUT` (an empty string clears it back to
+  domain-less) — a new value must also already be verified. **What this does NOT close:** a
+  domain-less registration (the only option for an issuer with no company-domain population, e.g. a
+  shared consumer IdP) is completely unaffected — same first-come claim as before, no proof required.
+  A token carrying no `hd` claim at all can only ever match a domain-less registration, even when a
+  domain-bound one exists for the same pair.
+
+- **A trigger rule's input no longer discloses `userId`/`scope.<namespace>` for a row the rule's grant
+  cannot read.** A rule declaring no `fields` now receives the same ownership-projection treatment as
+  one that does: only rows within the rule's own grant reach have their ownership axis included.
+  `event` and `recordId` are unaffected: they are dispatch facts, not row content.
+
+- **A trigger rule's `principalId` can no longer be set to a principal other than the caller without
+  the `delegate-principal-stamp` capability.** Every write a script makes is attributed to its rule's
+  `principalId` in the audit trail. This is the same capability `POST /v1/records` (and every other CREATE-path ownership stamp) already
+  requires to stamp a `userId` other than your own — declaring a trigger whose `principalId` is your
+  own identity needs no new grant.
+
+### Added
+
+- **`readAccessLogDefault` on app contexts, now settable as well as readable** — whether PHI
+  read-access logging (the HIPAA §164.528 accounting of disclosures) is on by default for an app
+  context. Previously only the per-schema `capabilities.readAccessLog` flag was visible, which left
+  an empty `GET /v1/admin/access-log` result ambiguous: "no one accessed this subject" and "nothing
+  was being recorded" looked identical. `AppContextResponse.readAccessLogDefault` shipped earlier in
+  this same version as a read-only projection; `PUT /v1/app-contexts/{contextId}` now also accepts
+  `readAccessLogDefault` to set it (omit to leave unchanged — same PATCH-if-non-null shape as
+  `meteringAxis`/`principalUsageCap`). A schema that sets the capability still overrides this; a
+  schema that does not inherits it. Null means no context default is set, so logging is off.
+- **The accounting-of-disclosures query answers on every ownership dimension of a disclosure.** A
+  read of a record owned by a user *and* an organisation *and* a team is now retrievable by
+  `subjectType=user`, `org` **and** `team` — one disclosure with three subjects. Most consequentially
+  the patient-centric query works: `subjectType=client` returns the disclosures of a record held
+  about that client, which previously returned nothing and was answerable only by a caller who
+  already knew the custodian organisation. No request or response shape changes.
+- **`POST /v1/documents/{id}/ask` is now recorded in the read-access log.** Interrogating a
+  document reads its full text into the model's context, and that disclosure previously left no row,
+  so it could not appear in a §164.528 accounting. It is recorded like the equivalent `/v1/rag`
+  retrieval, subject to the same opt-in gating.
+- **`provisionedBy` on script objects** (`ScriptRequest`/`ScriptResponse`) — an optional provenance
+  marker naming the blueprint that provisions a script's name, the same convergence idea
+  `TriggerRuleRequest`/`TriggerRuleResponse` already carry (not currently set by `vectros bootstrap
+  --blueprint`, which does not yet send this field for scripts). Optional on `POST /v1/scripts`: leave
+  it unset for a script you manage yourself. MAY BE SET ON ABSENT, NEVER CHANGED, evaluated against
+  the CURRENT LATEST version of the name at push time: if that version has no marker recorded, the
+  push may set any value; if it already has one, an omitted value inherits it forward and a
+  DIFFERENT value is refused with `400`. This is a live comparison against whichever
+  version is newest at push time, not a value fixed for the name's whole history — deleting the
+  version(s) carrying a given marker and pushing again is unconstrained by it.
+- **`GET /v1/users/{id}/versions` is now readable after the user has been deleted, for an
+  account-level (root) API key.** The delete-audit trail was always written and retained; the route
+  simply refused to serve it once the parent row was gone. A context-confined credential (a scoped API
+  key or scoped token) still gets `404` after the delete — serving one would require relaxing what that
+  credential could read while the user was live, a separate, larger decision this change does not make.
+- **`GET /v1/admin/logs`'s `resource` filter now accepts `scripts` and `triggers`.** Both surfaces'
+  rows were already being logged — this only widens the filter's own allow-list to admit values every
+  row could already carry, so log traffic from script pushes/executes and trigger rule CRUD is now
+  reachable by filter, not just visible unfiltered. `trigger-failures` is deliberately not a separate
+  value: `GET /v1/trigger-failures` rows are logged under `triggers`.
+
+### Changed
+
+- **BREAKING — `GET /v1/admin/access-log` rows now carry `subjects[]` instead of
+  `subjectType`/`subjectId`.** A disclosure has as many subjects as the accessed row had ownership
+  dimensions, so the response reports all of them:
+  `"subjects": [{"type": "user", "id": "usr_1"}, {"type": "org", "id": "org_1"}]`.
+  The singular pair could name only one, which meant silently picking a winner among a record's
+  owners — in the store whose whole purpose is to answer *whose data was seen*. `subjects` is empty
+  only when the accessed row carried no ownership at all (the read is then accounted at tenant level).
+  **The `subjectType` and `subjectId` QUERY PARAMETERS are unchanged** — you still ask about one
+  subject at a time.
+  - Migrating: replace `row.subjectType`/`row.subjectId` with a scan of `row.subjects`. If you were
+    displaying the single subject, note that you were displaying an arbitrary one of several.
+- **`AdminLogsResponse.errorCode` no longer claims a closed set of eight codes.** The description
+  named eight, and the field has never been limited to them: it carries the name of whichever typed
+  failure occurred, from several producers, so no fixed list can track it. Code that branches on
+  the published eight silently drops the rest — `SCRIPT_ERROR`, `RESULT_TOO_LARGE` and
+  `AUTHORIZATION_DENIED` among them. The field's shape and behaviour are unchanged; what changed is
+  that the documentation now says the set is open, gives examples rather than an enumeration, and
+  points at the per-endpoint error responses that document each call's own codes. **If you match
+  `errorCode` against a hard-coded list, add a fallback branch for unrecognised values.**
+
+- **BREAKING — `GET /v1/scripts` no longer returns each row's full `source` by default.** Scripts are immutable
+  per version, so a name's version history accumulates one full copy of `source` per push — an
+  ordinary, actively-developed script pushed a hundred times over a few months could make a plain
+  version-history listing exceed the response-payload ceiling and fail as an unhandled `502` with no
+  error contract. Each list row now carries `sourceOmitted: true` in place of `source`; pass
+  `?includeSource=true` to get the full text back inline (at the same per-row weight a by-id `GET`
+  pays), or fetch one version's full source with `GET /v1/scripts/{id}`, which is unaffected — a by-id
+  read and a create response both still return the complete `source` unconditionally, with no
+  `sourceOmitted` field at all. **This changes an outcome you may be relying on:** code reading
+  `.source` directly off a list response now gets `undefined`/absent unless you add
+  `?includeSource=true`.
+
+- **BREAKING — `GET /v1/scripts`'s response schema is now `oneOf` a `{data, nextCursor}` page or a
+  single script version object.** New: `?name=<n>&latest=true` returns the single newest version of
+  `name` directly — one bounded call to answer "what is the current version of this name," instead of
+  draining every page of its version history to compute the max version yourself; respects
+  `?includeSource=true` exactly like the paginated list, `400` if `name` is omitted, `404` if no
+  version of `name` exists. **This changes an outcome you may be relying on, for every caller of this
+  endpoint, not only ones passing `?latest=true`:** a statically-typed SDK client's generated return
+  type for `GET /v1/scripts` is now a union instead of a single page type. Regenerate/update your SDK
+  and handle both shapes (distinguish by the presence of a top-level `data` array) before adopting this
+  release, even if you never intend to pass `?latest=true` yourself.
+
+- **Presigned document upload URLs (`POST /v1/documents/upload`) are now single-use, enforced by an S3
+  conditional-write precondition baked into the URL's own signature.** `FileUploadResponse` carries two
+  new fields, `requiredHeaderName` and `requiredHeaderValue` — **your PUT to `uploadUrl` MUST include
+  that exact header, set to that exact value, or the request fails.** This is not optional: the header
+  is part of the SigV4 signature, so omitting it (or changing its value) fails with a `403
+  SignatureDoesNotMatch` — the PUT never reaches this API, so this is not this API's usual JSON error
+  shape. Every upload URL — a first upload, a damaged-document heal, and a re-upload replacing an
+  existing document's body alike — now uses the same precondition, `If-None-Match: *` against a fresh,
+  never-before-used object key: a replay of a URL that already succeeded once, while the object it named
+  still exists, is rejected by S3 with a `412`; a genuine concurrent-delete race can surface as a `409`.
+  Whichever you receive, the remedy is the same: re-initiate the upload for a fresh URL rather than
+  retrying the same PUT. (The guarantee is "single-use while the object exists", not "exactly once,
+  ever" — an object that is subsequently deleted re-arms a still-valid, unexpired URL of any of the
+  three kinds; narrowing this further needs a different mechanism and is not attempted here. This
+  applies uniformly now — earlier drafts of this release described the re-upload case differently; the
+  shipped mechanism is identical across all three.)
+
+  **This changes an outcome you may be relying on:** a bare `PUT` to `uploadUrl` with no extra header —
+  which is what every SDK/example predating this release does — now fails outright. **Deploy-sequencing
+  requirement for anyone consuming this API from a long-lived client (our own included):** update the
+  client to read `requiredHeaderName`/`requiredHeaderValue` from the upload-init response and set that
+  header on the PUT *before* this API version is in front of it. A client written defensively — set the
+  header only when the response actually carries `requiredHeaderName`, do nothing otherwise — is safe to
+  deploy in either order: against an older API (no such fields yet) it sends no extra header and behaves
+  exactly as it does today; against this version it becomes correct. A client that assumes the fields
+  are always present, or that hardcodes today's unconditioned PUT, is not.
+
+  The presign window is also shortened, 60 minutes → 15, reducing how long a captured or leaked URL
+  stays usable independent of whether it has been consumed.
+
+- **An uploaded file now downloads instead of rendering in-browser.** `GET /v1/documents/{id}/download`'s
+  signed URL now always carries a `response-content-disposition: attachment; filename=<your fileName>`
+  override, regardless of the file's content type.
+  **This changes an outcome you may be relying on:** if you (or a UI you built against this API) opened
+  `downloadUrl` expecting inline rendering of a safe type (PDF, image) rather than a save-file prompt,
+  that behavior is gone for every file type — the fix does not content-type-sniff.
+
+- **BREAKING — `GET /v1/records/{id}/tombstone` now returns a smaller, purpose-built response
+  (`id`, `recordType`, `deletedBy`, `deleteVersionId`, `deletionReason`, `deletedAt`) and enforces the
+  same AppContext + record-type scope every other record route already enforces.** A scoped credential
+  now also needs `records:r:<type>` for the deleted record's own type, in its own AppContext — a
+  caller lacking either now gets the same `404` a nonexistent id gets, not the tombstone.
+  - **A credential whose grant carries a `data_scope` restriction can no longer read tombstones.** The
+    owner of a deleted record cannot be checked on this route, so a scoped credential confined to an
+    ownership compartment (e.g. `data_scope: {scope:org: [org_A]}`) now gets the same `404` for every
+    tombstone of that type — including one for a record its own compartment owned. A grant of
+    `records:r:<type>` (or `records:r`) with no `data_scope`, a grant whose `data_scope` is exactly the
+    all-rows wildcard `{"*": ["${{ any }}", null]}` (as Dev Admin tokens and an account owner's initial
+    access profile carry), and root API keys are unaffected.
+  - Migrating: if you were reading `ownerKey`/`eraseOwnerKey`/`eraseClientKey`/`eraseContextId` off
+    this response, that data is no longer served here (it was never intended to be exposed on this endpoint).
+    If a scoped credential you use for this call is confined to one AppContext or one record type, it
+    now needs to match the deleted record's own context and type or the call will 404 where it
+    previously returned 200. If it is confined by `data_scope`, read tombstones with a credential whose
+    `records:r` grant has no `data_scope` instead.
+
+- **Documentation: `POST /v1/documents/upload` and `FileUploadResponse.created` no longer describe a
+  re-issued upload URL as pointing at the document's existing object.** Every upload — a create, a
+  re-upload, and a recovery upload for a document whose earlier file is missing — targets a new object,
+  which the document adopts once the upload is validated. The descriptions now say so. No behaviour changed.
+
+- **Documentation: internal references removed from published descriptions.**
+  - **Issue numbers:** removed from `POST /v1/documents/upload`, issuer registration and update
+    (`restrictedToDomain`), the scripts list's `includeSource` and `latest` parameters, and
+    `TriggerFailureResponse.category`.
+  - **Internal design-document name:** removed from the token exchange request's `invite_token`.
+
+  Otherwise the wording is unchanged, and a build check now keeps both kinds out. No behaviour changed.
+
+- **Packaging metadata in the published Java (`pom.xml`) and Python (`pyproject.toml`) SDK artifacts
+  no longer references internal documentation.** Build-config comments only; the packages themselves
+  are unchanged. No behaviour changed.
+
+### Fixed
+
+- **A retried `record.indexed`, `record.failed`, `document.indexed` or `document.failed` webhook
+  notification no longer duplicates.** These fire when a record or document reaches a terminal
+  indexing outcome. An at-least-once retry of that notification on our side — after a timeout or an
+  error, before we could confirm it was queued — previously minted a fresh envelope `id` per attempt,
+  so a retried notification for the SAME outcome could reach you twice, with no shared field to
+  recognize the two as one event. The envelope `id` is now deterministic per (record or document,
+  webhook, event type, and the specific indexing outcome that produced it), so a genuine retry of the
+  same outcome reuses the SAME `id` — deduplicate on it directly. A GENUINELY LATER outcome for the
+  same record/document (a real re-index after a content update, or an admin re-drive) still produces
+  its own new `id`, exactly as before; only a true retry of an already-processed outcome is now
+  deduplicated. **One gap this does not close:** a message already in flight at the moment this change
+  deployed could still mint a random (non-deterministic) `id` and duplicate once, since the
+  deterministic derivation needs a field that only a message produced after the deploy carries — a
+  one-time, self-resolving exposure, not a standing gap.
+
+- **A replayed `trigger.failed` webhook notification no longer duplicates.** A redelivery of the
+  terminal notification for a firing a notification was already queued for — a timeout or crash
+  before we could confirm the notification was queued, or a failed firing being retried again later
+  on our side — previously minted a fresh envelope `id` per attempt, so you could receive
+  two `trigger.failed` events for the one firing with no field in common to recognize them by. The
+  envelope `id` is now deterministic per firing + webhook, so a replayed notification reuses the
+  SAME `id` instead: deduplicating on the envelope's own `id` now works for this case too, in
+  addition to the `data.id` guidance already given when this event shipped (0.43.0, below). **One
+  `trigger.failed` per firing per subscribed webhook, while the original notification's delivery
+  record is retained (7 days if it never delivered):** if a failed firing is retried later on our
+  side and fails again, you will generally **not** receive a second `trigger.failed` event for it — a
+  notification was already queued for this firing, and the platform does not distinguish "retried
+  and failed again" from "the original notification, replayed." Two cases still produce a genuinely
+  new event, neither a bug: a webhook you subscribed to `trigger.failed` AFTER the original failure
+  gets its own first delivery on that retry; and a retry more than 7 days after the original
+  failure — past the delivery record's own retention window — is indistinguishable from a fresh
+  firing. A firing that instead SUCCEEDS after a retry still behaves as documented when this event
+  shipped (its `GET /v1/trigger-failures` record is removed).
+
+- **Deleting a role, access profile, user, token issuer or identity namespace no longer records duplicate
+  or stale delete history.** Two deletes of the same row arriving close together (a retried or
+  double-submitted `DELETE`) each wrote a delete entry to that row's version history, and a delete that
+  followed an update closely could record the row as it was before the update. A delete now records exactly
+  one entry, of the row as it was when it was removed; a second delete of a row that is already gone records
+  nothing. **This changes an outcome you may be relying on:** a `DELETE /v1/users/{id}` or
+  `DELETE /v1/app-contexts/{contextId}/profiles/{principalId}` whose target keeps changing throughout the
+  request now answers `409` (`errorCode` `VERSION_CONFLICT`) instead of deleting whichever version happened to
+  be current. The target was not deleted — retry the request. One exception: when a context-confined
+  credential deletes a user, the user's access profile in that credential's own app context is removed
+  first, and stays removed if the user delete is then refused this way; retry with a credential that can
+  still reach the user.
+
+- **A duplicate `DELETE /v1/users/{id}` is no longer billed twice.** Storage and the delete's write charge
+  were recorded before the user row was removed, so each of two near-simultaneous deletes of the same user
+  was billed, and a delete refused after that point was billed too. They are now recorded only once the
+  user is actually deleted, from the row that was deleted.
+
+- **Deleting an app context now also removes its trusted-issuer registrations.** A registration
+  (`POST /v1/auth/issuers`) is bound to one app context; its cleanup is now included as part of the
+  context's teardown, before it finishes deleting. `POST /v1/auth/issuers` also
+  now refuses a new registration into a context that is being deleted, the same way it already refuses
+  one naming a context that does not exist. **One outcome to be aware of:** if any user had ever
+  authenticated through the registration before its context was deleted, its `issuerId` is
+  permanently retired at that point — the same "cannot be reused" `400` `POST /v1/auth/issuers`
+  already documents for an operator-released bound registration now also names this trigger — so that
+  exact `issuerId` can never be registered again for the tenant, under any identity provider. Choose a
+  new `issuerId` when re-registering after a context that had real sign-ins is torn down.
+
+- **A read-access row is no longer discarded when the operation that produced it fails.** Rows
+  written during a script execution rode that execution's transaction, so any non-success outcome
+  rolled them back along with the data writes — losing the record of disclosures precisely on the
+  failure paths an investigation cares about most. The read had already happened; the accounting now
+  says so regardless of how the surrounding operation ended.
+
+- **`DELETE /v1/scripts/{id}` now refuses (`409`) when a live trigger rule still references the version
+  being deleted** — directly, by a pinned `scriptRef`, or via `"latest"` when the version being deleted
+  is the current newest of its name. The declare-time half of this symmetry (a rule cannot be created
+  against a script with no versions, or a version that does not exist) has existed since trigger rules
+  shipped; the delete-time half was never built, so a version could be deleted out from under a live
+  rule with no refusal and no warning. The `"latest"` case was the more serious of the two: deleting
+  the newest version of a name silently re-resolves every `"latest"` rule to the next-newest version —
+  no error, no failure record, no signal of any kind, so rolling back a bad push by deleting
+  its newest version would unknowingly revert every `"latest"` rule to older behaviour. A version
+  pinned by name+number was already loud (`SCRIPT_NOT_FOUND` on every subsequent firing); it is now
+  refused up front instead. The `409` names the offending rule — delete or re-point it first.
+
+- **Retrying an interrupted "replace file" now consistently requires update authority (`documents:u`).**
+  A repeat call against a file left in the re-upload-pending state now correctly requires the same
+  authority the initial replace attempt required, in every case.
+
+- **An oversize file upload is no longer silently indexed with `"File too large…"` as its
+  extracted text, on any upload shape.** The 100 MB cap is now checked at byte-arrival for a
+  first-time upload, a damaged-document heal, and a re-upload alike; the object is deleted and the
+  prior body — for a re-upload — is left untouched and live.
+
+- **Document upload, heal, and re-upload now share one "stage, then promote" mechanism instead of three
+  different ones — and re-upload no longer writes directly to a live document's object.** Every
+  upload — first, heal, or re-upload — now targets a fresh, throwaway key and only repoints the
+  document once the new bytes have durably landed; an interrupted or rejected replacement leaves the
+  document's current body untouched throughout.
+
+  **This changes an outcome you may be relying on:** re-initiating an upload against a document that
+  already exists at the target `externalId` now uniformly requires update authority (`documents:u`),
+  regardless of whether any bytes were ever previously uploaded for it. A token holding only
+  `documents:c` can no longer retry its own abandoned first upload; re-authorize it with `documents:u`
+  or complete the original upload attempt's URL before it expires.
+
+- **`GET /v1/documents/{id}/download` on a document with an interrupted upload/heal now returns a clean
+  404** instead of a `200` naming a signed URL to an object that was never written. Affects any document
+  recovered via the documented damaged-document heal path (re-initiating an upload on a damaged document)
+  whose subsequent PUT does not complete, and — traced wider while fixing the heal case — any brand-new
+  document whose first PUT has not yet landed either. A document with an *armed re-upload* in progress
+  (`REUPLOAD_PENDING`) is unaffected: its prior body remains live and downloadable, as before.
+- **Deleting a file upload that was never completed no longer drifts a folder's displayed item count
+  negative.** The count is a display/accounting value only; no data was lost.
+
+- **`DELETE /v1/schemas/{id}` now refuses (`409`) while a document is still bound to the schema**
+  (`schemaId`), not just while records of its type still exist. A schema declaring the `document`
+  surface could previously be deleted out from under any document bound to it, silently orphaning
+  the document's `schemaId` — its lookup-by-`externalId` stopped resolving it and its schema-declared
+  searchable fields silently dropped out of the search index, both without error. Delete the bound
+  document(s) first, the same requirement records already had.
+
+### Pricing
+
+- **Read-access-log storage is now billed at 5 credits per 100 MB per month**, the DynamoDB-resident
+  rate every other structured surface uses. The usage report previously forecast this line at a rate
+  the platform did not charge; the forecast and the charge now derive from one table. Read-access
+  logging remains opt-in and off by default, so this affects only accounts that turned it on. The
+  per-read write count (`readAccessRows`) is still reported and still unpriced.
+
+- **`POST /v1/records/lookup`, `POST /v1/documents/lookup`, `POST /v1/users/lookup`,
+  `POST /v1/entities/{namespace}/lookup`, `POST /v1/records/batch-get`, and `POST /v1/search` now meter
+  identically to their GET equivalents** — the same per-call and data-out allowances, the same overage
+  rate. Previously these accrued nothing: the meter keyed on HTTP verb (`GET`/`HEAD`), and every one of
+  these reads happens to arrive as `POST`. `/v1/search` has no `GET` form at all, so it was entirely
+  unmetered. **If you were routing a sensitive-field lookup through the documented `POST` spelling to
+  keep the value out of the URL** (still the correct, required choice — that guidance is unchanged), that
+  traffic now counts toward your read allowance the same as any other lookup; most accounts stay within
+  their existing free allowance and see no change on their invoice. `vectros.records.lookup()` from a
+  trigger script is metered the same way.
+
+- **The same six metered routes now take the free-allowance read ENFORCEMENT path too, not just the
+  metering above — plus a SEVENTH, `POST /v1/records/lookup/batch`, which is not part of the metering
+  fix above (it is a reserved `501` stub — nothing to meter yet) but takes the same enforcement
+  classification since enforcement runs before any response is produced.** An account over its
+  monthly credit ceiling but still within the free per-call/data-out read allowance was, until now,
+  blocked (`402`) calling `POST /v1/records/lookup` (and its six siblings, `/lookup/batch` included)
+  where the identical `GET /v1/records/lookup` would be served for free — the metering fix above made
+  six of the seven routes bill as reads, but the pre-request enforcement check still gated purely on
+  HTTP verb, so the two halves of one classification disagreed. **This is a strict loosening**: a
+  request that was previously blocked may now succeed if you are within your free read allowance,
+  whichever `POST`/`GET` spelling you use — for `/lookup/batch` specifically, it now reaches its `501`
+  response instead of being `402`-blocked before ever getting there. Nothing that was previously served
+  is now blocked. **Burst-rate-limit and per-principal-quota enforcement (where you've opted into the
+  latter) are UNCHANGED on all seven routes** — they took the write-path branch before this fix and
+  still get both checks; only the
+  monthly-credit-ceiling treatment moved to the free-allowance form described above.
+
+- **Manual inference-balance top-ups paid by bank transfer now credit only once the transfer actually
+  settles, not at checkout.** Card payments are unaffected — they still confirm and credit synchronously.
+  A bank-transfer top-up can take several business days to settle; the balance updates when it does, and
+  a transfer that ultimately fails credits nothing. (Auto-recharge already worked this way for a
+  bank-transfer default payment method and is unchanged by this entry — this closes the same gap on the
+  manual top-up flow specifically.)
+
 ## 0.43.0 — 2026-09-07
 
 ### Added

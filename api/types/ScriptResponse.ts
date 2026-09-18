@@ -10,10 +10,14 @@ export interface ScriptResponse {
     name?: string | undefined;
     /** The auto-incrementing version number for this name, server-computed at push time. The first version pushed for a name is 1. */
     scriptVersion?: number | undefined;
-    /** The script's source text. */
+    /** The script's source text. On a by-id GET this is always the full text. On a list response (GET /v1/scripts) it is omitted by default — see `sourceOmitted` — because scripts are immutable per version and a version-history listing can otherwise carry every version's complete source at once. Pass `?includeSource=true` to a list call to get it back inline (at the cost of the same per-row weight a by-id GET pays). */
     source?: string | undefined;
+    /** True when THIS response omitted `source` because it came from a list call (GET /v1/scripts) without `?includeSource=true` — fetch the full source with a by-id GET or `?includeSource=true`. Null (omitted from the response) on a by-id GET or a create response, which return the full source unconditionally — same convention as a document's `payloadPartial`. Unlike that field, this is never a PARTIAL value: `source` is either the complete text or entirely absent, never truncated. */
+    sourceOmitted?: boolean | undefined;
     /** Free-text description of the input shape this script expects, or null if not supplied. */
     declaredInputContract?: string | undefined;
+    /** The name of the blueprint that provisions this script, or null if it is unmanaged (hand-authored, or pushed before this field existed and never re-pushed). A later push of this name inherits it forward automatically when the push omits the field — see `ScriptRequest.provisionedBy` for the full mechanism, including why this is a live comparison against the current latest version rather than a value fixed for the name's whole history. */
+    provisionedBy?: string | undefined;
     /** When this script version was created, as an ISO-8601 UTC timestamp. */
     createdAt?: string | undefined;
     /** When this script version was last modified, as an ISO-8601 UTC timestamp. Scripts are immutable per version, so this is always equal to createdAt. */

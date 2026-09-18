@@ -18,6 +18,8 @@ export interface AppContextRequest {
     principalBurstLimit?: number | undefined;
     /** Per-principal, per-billing-period operation cap, for the opt-in per-principal usage/quota feature. Omit to track per-principal usage without enforcing a cap. Only takes effect for a partner with that feature enabled on their account. */
     principalUsageCap?: number | undefined;
+    /** Whether PHI read-access logging (the HIPAA §164.528 accounting of disclosures) is on by default for this context. A schema that sets `capabilities.readAccessLog` overrides it; a schema that does not inherits it. Omit to leave unchanged. */
+    readAccessLogDefault?: boolean | undefined;
     /** Declares which golden IdP-asserted identity claim names (from your issuer's `capturedClaims`) get projected, read-only, onto access profiles in this context. Filled in once per profile, the first time a sign-in for that principal can supply a value — usually at profile-creation, but for an invited member not until they actually accept and sign in, since there is nothing to project before that. Once filled, a profile's projection does not update again even if this declaration or the underlying identity data changes later — changing this declaration affects only profiles that haven't been filled yet. Omit to leave unchanged; send an empty list to disable future projection. **Requires the platform provisioning capability** (the same authority your bootstrap credential already uses to declare namespaces and register trusted issuers) — an ordinary `app-contexts:u` credential may rename its own context but may not opt it into projecting IdP-golden identity data. */
     identityProjectionClaims?: string[] | undefined;
 }
