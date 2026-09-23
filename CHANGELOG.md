@@ -9,6 +9,66 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.45.0 — 2026-09-22
+
+**One breaking change to an existing flow.** A trusted-issuer registration created **without**
+`restrictedToDomain` now starts as `pending_verification` and accepts no token exchange until you prove
+you control the issuer (see **Changed**, below). A script that registers an issuer and immediately
+exchanges a token against it must add the verification step.
+
+### Added
+
+- **`POST /v1/auth/issuers/{issuerId}/verify` (`verifyIssuer`) — prove you control a registered issuer.**
+  Send `{ "token": "<jwt>" }`: a JWT your identity provider issued for a real login, carrying the
+  `verificationClaim` claim set to the registration's `verificationNonce`. On success the registration
+  becomes `active`. The token is checked and discarded — never stored, logged, or used to sign anyone in.
+  It must verify against the key set your issuer publishes in its own OpenID Connect discovery document
+  (`<issuer>/.well-known/openid-configuration`), and the `jwksUri` you registered must be **exactly** that
+  document's `jwks_uri`: a registration pointing at a key set the issuer does not publish cannot be
+  verified. An issuer that publishes no discovery document, or an identity provider with no way to add a
+  claim to its tokens (for example raw "Sign in with Google" for personal accounts), cannot be verified
+  this way. A failure leaves the registration `pending_verification` and returns `400`; an unknown or
+  another tenant's `issuerId` returns `404`; a registration changed or removed while it was being verified
+  returns `409` and this request activates nothing (read the registration back: another verification
+  may already have). Same gate as `registerIssuer`. The request body is limited to 8 KB, like every other
+  request on this surface.
+- **`IssuerResponse` gains `verificationClaim`, `verificationNonce` and `verificationExpiresAt`,
+  present only while `status` is `pending_verification`.** `verificationClaim` is always
+  `https://vectros.ai/claims/issuer_challenge` — fixed by the platform and never chosen by the registrant.
+  Configure an admin-controlled rule at your identity provider (an Auth0 Action, an Okta inline hook, an
+  Entra claims-mapping policy, a Keycloak protocol mapper) that adds it to the tokens it issues, set to
+  `verificationNonce`. Never map it from an attribute your end users can edit. The challenge expires after
+  7 days; an expired registration can no longer be verified — delete it and register again.
+- **`IssuerResponse.status` can now be `pending_verification`** (alongside `active` and `suspended`).
+
+### Changed
+
+- **BREAKING — a trusted-issuer registration without `restrictedToDomain` is created
+  `pending_verification` and accepts no token until `verifyIssuer` succeeds.** Until then a token exchange
+  against it is refused exactly like an unregistered issuer (`404`), and `PUT` refuses any status change on
+  it (`400`) — including `active` — so verification cannot be skipped. Registrations created before this
+  release are unaffected and stay `active`. A registration that names a verified `restrictedToDomain`
+  is `active` at once, as before: it routes only that domain's users, so it needs no proof of the issuer.
+- **A registration without `restrictedToDomain` claims its `(issuer, audience)` pair only once
+  `verifyIssuer` succeeds** — a registration scoped with `restrictedToDomain` still claims its
+  `(issuer, audience, domain)` triple at registration. A pair another active registration already
+  holds is refused at `verifyIssuer` instead (`400`).
+- A registration awaiting verification also holds its app context: one app context may still have at most
+  one registration, and the refusal for a second now says that a registration awaiting verification counts.
+- **`CREDIT_LIMIT_EXCEEDED`, `PRINCIPAL_QUOTA_EXCEEDED`, `TIMEOUT` and `SCRIPT_ERROR` trigger failures are
+  now reported as `retryable: false`.** `GET /v1/trigger-failures` records the failure, and the
+  `trigger.failed` webhook fires, as soon as one of these four occurs, instead of after several redelivery
+  attempts — and a later-firing trigger rule on the same record is no longer held up waiting on one of
+  them. A `TIMEOUT` failure is now billed for a single execution attempt. A failure row recorded before
+  this release keeps the `retryable` value it was written with.
+
+### Fixed
+
+- **Clearing `restrictedToDomain` (`PUT restrictedToDomain: ""`) is now refused (`400`) unless the
+  registration holds the unrestricted `(issuer, audience)` pair** — that is, unless it was registered
+  without a domain and verified. To move to an unrestricted registration, register a new issuer without
+  `restrictedToDomain` and verify it.
+
 ## 0.44.0 — 2026-09-17
 
 This release includes **four breaking changes to existing response shapes** and several further

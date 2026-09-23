@@ -2104,7 +2104,7 @@ export class AuthClient {
     }
 
     /**
-     * Updates the mutable fields of a registered issuer: `subClaim`, `emailClaim`, `userinfoUri`, `capturedClaims`, `restrictedToDomain` (a new non-blank value must already be a VERIFIED domain for your account; an empty string clears it back to domain-less; see `IssuerUpdateRequest.restrictedToDomain` for the full semantics), `status` (`active`/`suspended` — a suspended issuer's tokens are rejected identically to an unregistered issuer at exchange time), and `selfSignupPolicies`. Fields omitted from the body are left unchanged (partial update). `issuer`, `jwksUri`, `audience`, and `contextId` are trust-anchor / routing-pin fields and are immutable via this route — supplying a value that differs from the current registration is rejected with 400; supplying the current value back is a no-op. Rotating a trust anchor requires deleting and re-registering the issuer, which is itself refused while any user is bound through it. **`subClaim` is identity-determining, not merely cosmetic**: it names which verified JWT claim is read as the federated user's identifier, so changing it on an issuer that already has bound users would silently re-identify (or, under self-signup, orphan) every one of them — changing it is therefore refused once any user has bound through this issuer, the same guard `DELETE` already applies, and is only free before the first real login. Requires a root API key or the bootstrap's provisioning capability, gated identically to every other operation on this surface. A credential confined to one app context may only update an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId. A root API key may update any issuer.
+     * Updates the mutable fields of a registered issuer: `subClaim`, `emailClaim`, `userinfoUri`, `capturedClaims`, `restrictedToDomain` (a new non-blank value must already be a VERIFIED domain for your account; an empty string clears it back to domain-less; see `IssuerUpdateRequest.restrictedToDomain` for the full semantics), `status` (`active`/`suspended` — a registration awaiting verification (`pending_verification`) accepts no status change until it is verified; a suspended issuer's tokens are rejected identically to an unregistered issuer at exchange time), and `selfSignupPolicies`. Fields omitted from the body are left unchanged (partial update). `issuer`, `jwksUri`, `audience`, and `contextId` are trust-anchor / routing-pin fields and are immutable via this route — supplying a value that differs from the current registration is rejected with 400; supplying the current value back is a no-op. Rotating a trust anchor requires deleting and re-registering the issuer, which is itself refused while any user is bound through it. **`subClaim` is identity-determining, not merely cosmetic**: it names which verified JWT claim is read as the federated user's identifier, so changing it on an issuer that already has bound users would silently re-identify (or, under self-signup, orphan) every one of them — changing it is therefore refused once any user has bound through this issuer, the same guard `DELETE` already applies, and is only free before the first real login. Requires a root API key or the bootstrap's provisioning capability, gated identically to every other operation on this surface. A credential confined to one app context may only update an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId. A root API key may update any issuer.
      *
      * @param {Vectros.IssuerUpdateRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2334,7 +2334,7 @@ export class AuthClient {
     }
 
     /**
-     * Registers a trusted third-party IdP issuer that BYO-IdP token exchange (`POST /v1/auth/token/exchange`) may accept a `subject_token` from. Requires a root API key or the CLI bootstrap's provisioning capability — never an ordinary partner-grantable scope. A credential authorized only via the provisioning capability may register only against the app context it is bound to; naming a different one returns 403. A root API key is unaffected and may register against any of its contexts. Idempotent by `issuerId` within your tenant; the `(issuer, audience)` pair must not already be registered by a different issuerId/tenant. If `issuerId` collides with a registration owned by a different app context than the one you're confined to, the request fails with 400 rather than returning that context's configuration. An app context may have at most one active issuer — deregister the existing one first if you need to replace it. One issuer MAY serve several contexts today, each via its own registration row with a distinct `audience`. Optionally name `restrictedToDomain` to scope this registration's (issuer, audience) uniqueness to a specific VERIFIED domain rather than the bare pair — see that field's own description for the full contract, including why it does NOT protect a shared/consumer-IdP registration with no company-domain population.
+     * Registers a trusted third-party IdP issuer that BYO-IdP token exchange (`POST /v1/auth/token/exchange`) may accept a `subject_token` from. Requires a root API key or the CLI bootstrap's provisioning capability — never an ordinary partner-grantable scope. A credential authorized only via the provisioning capability may register only against the app context it is bound to; naming a different one returns 403. A root API key is unaffected and may register against any of its contexts. A registration without `restrictedToDomain` is created `pending_verification` with a one-time challenge (`verificationClaim`, `verificationNonce`, `verificationExpiresAt`) and accepts no token until you prove you control the issuer with `POST /v1/auth/issuers/{issuerId}/verify`; it claims no `(issuer, audience)` pair until then, so registering never reveals whether another tenant holds one. A registration scoped to an already-verified domain with `restrictedToDomain` is `active` at once. Idempotent by `issuerId` within your tenant. If `issuerId` collides with a registration owned by a different app context than the one you're confined to, the request fails with 400 rather than returning that context's configuration. An app context may have at most one active issuer — deregister the existing one first if you need to replace it. One issuer MAY serve several contexts today, each via its own registration row with a distinct `audience`. Optionally name `restrictedToDomain` to scope this registration's (issuer, audience) uniqueness to a specific VERIFIED domain rather than the bare pair — see that field's own description. A domain-scoped registration proves control of the DOMAIN, not of the issuer itself: it routes only tokens carrying that domain's `hd` claim.
      *
      * @param {Vectros.IssuerRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2409,6 +2409,93 @@ export class AuthClient {
         }
 
         return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/auth/issuers");
+    }
+
+    /**
+     * Proves you administer the IdP application a `pending_verification` registration names, activating it. A registration created without `restrictedToDomain` accepts no tokens until this succeeds. Configure your IdP, with an admin-controlled rule (an Auth0 Action, an Okta inline hook, an Entra claims-mapping policy, a Keycloak protocol mapper), to add the registration's `verificationClaim` to the tokens it issues, set to its `verificationNonce`; sign in once; and send that token here. The `jwksUri` you registered must be exactly the `jwks_uri` your issuer's OpenID Connect discovery document (`<issuer>/.well-known/openid-configuration`) publishes, and the token must verify against that key set — an issuer that publishes no discovery document cannot be verified this way. The token is checked and discarded; it is never stored. The `(issuer, audience)` pair is claimed at this moment, so a pair another registration already holds is refused with 400. A challenge expires 7 days after registration; an expired registration cannot be verified — delete it and register again. Requires a root API key or the bootstrap's provisioning capability, gated identically to every other operation on this surface. A credential confined to one app context may only verify an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId.
+     *
+     * @param {Vectros.IssuerVerifyRequest} request
+     * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     *
+     * @example
+     *     await client.auth.verifyIssuer({
+     *         issuerId: "auth0-prod",
+     *         token: "token"
+     *     })
+     */
+    public verifyIssuer(
+        request: Vectros.IssuerVerifyRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.IssuerResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__verifyIssuer(request, requestOptions));
+    }
+
+    private async __verifyIssuer(
+        request: Vectros.IssuerVerifyRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.IssuerResponse>> {
+        const { issuerId, ..._body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/auth/issuers/${core.url.encodePathParam(issuerId)}/verify`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: _body,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.IssuerResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/auth/issuers/{issuerId}/verify",
+        );
     }
 
     /**

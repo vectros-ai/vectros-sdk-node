@@ -25,12 +25,12 @@ export interface IssuerUpdateRequest {
     emailClaim?: string;
     /** Safe field — updatable. The IdP's OIDC userinfo endpoint, used as a fallback email-resolution source when `emailClaim` misses on the presented access token. Omit to leave unchanged. See `IssuerRequest.userinfoUri` for the full semantics. */
     userinfoUri?: string;
-    /** Safe field — updatable. `active` or `suspended`. Setting `suspended` causes this issuer's tokens to be rejected at exchange time identically to an unregistered issuer — existing bound users are unaffected until they next need a fresh exchange. Omit to leave unchanged. */
+    /** Safe field — updatable. `active` or `suspended`. Setting `suspended` causes this issuer's tokens to be rejected at exchange time identically to an unregistered issuer — existing bound users are unaffected until they next need a fresh exchange. A registration in `pending_verification` accepts no status change at all (only its own current status echoed back is tolerated) — prove control of the issuer with `POST /v1/auth/issuers/{issuerId}/verify` first — and `pending_verification` itself can never be set. Omit to leave unchanged. */
     status?: string;
     /** Safe field — updatable. Omit to leave unchanged; pass an empty list to disable self-signup entirely. See `IssuerRequest.selfSignupPolicies` for the full semantics — the same elevated-role restriction applies here. */
     selfSignupPolicies?: Vectros.SelfSignupPolicy[];
     /** Safe field — updatable. Omit to leave unchanged; pass an empty list to stop capturing any claim beyond email. See `IssuerRequest.capturedClaims` for the full semantics. */
     capturedClaims?: string[];
-    /** Safe field — updatable. A NEW non-blank value must already be a VERIFIED domain for your account (same requirement as at registration); an empty string clears this issuer to domain-less (unrestricted). Omit to leave unchanged. See `IssuerRequest.restrictedToDomain` for the full semantics, including why this field is updatable while issuer/jwksUri/audience/contextId are not. */
+    /** Safe field — updatable. A NEW non-blank value must already be a VERIFIED domain for your account (same requirement as at registration); an empty string clears this issuer to domain-less (unrestricted) — refused with 400 unless this registration has itself proven control of the unrestricted (issuer, audience) pair (it was registered without a domain and verified); a registration created scoped to a domain must instead register a new issuer without `restrictedToDomain` and verify it. Refused on a registration awaiting verification. Omit to leave unchanged. See `IssuerRequest.restrictedToDomain` for the full semantics, including why this field is updatable while issuer/jwksUri/audience/contextId are not. */
     restrictedToDomain?: string;
 }

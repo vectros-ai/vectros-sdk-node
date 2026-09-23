@@ -22,7 +22,7 @@ export interface IssuerResponse {
     emailClaim?: string | undefined;
     /** The IdP's OIDC userinfo endpoint, used as a fallback email-resolution source. Absent when not configured. */
     userinfoUri?: string | undefined;
-    /** `active` or `suspended`. A suspended issuer is registered but its tokens are no longer accepted for exchange. */
+    /** `active`, `suspended` or `pending_verification`. A suspended issuer is registered but its tokens are no longer accepted for exchange. A registration created WITHOUT `restrictedToDomain` starts as `pending_verification`: it accepts no tokens until you prove you control the issuer with `POST /v1/auth/issuers/{issuerId}/verify` (see the `verification*` fields). A registration scoped to a verified domain is `active` at once. */
     status?: string | undefined;
     /** Timestamp when the issuer was registered, as an ISO-8601 UTC timestamp. */
     createdAt?: string | undefined;
@@ -34,4 +34,10 @@ export interface IssuerResponse {
     capturedClaims?: string[] | undefined;
     /** The verified domain this issuer's (issuer, audience) uniqueness is scoped to, if opted into. Absent when this registration is domain-less (the unrestricted, unscoped-to-any-population default). */
     restrictedToDomain?: string | undefined;
+    /** Present only while `status` is `pending_verification`. The name of the token claim your IdP must stamp `verificationNonce` into. Fixed by the platform; configure an admin-controlled rule at your IdP (an Auth0 Action, an Okta inline hook, an Entra claims-mapping policy, a Keycloak protocol mapper) that adds it — never map it from an attribute your end users can edit. */
+    verificationClaim?: string | undefined;
+    /** Present only while `status` is `pending_verification`. The one-time value your IdP's rule must place in the `verificationClaim` claim. Not a credential: it proves nothing unless it arrives inside a token signed by the issuer's own keys. */
+    verificationNonce?: string | undefined;
+    /** Present only while `status` is `pending_verification`. When the challenge expires, as an ISO-8601 UTC timestamp. An expired registration can no longer be verified; delete it and register again. */
+    verificationExpiresAt?: string | undefined;
 }
