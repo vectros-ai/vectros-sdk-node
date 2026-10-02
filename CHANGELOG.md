@@ -9,6 +9,200 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.46.0 — 2026-10-01
+
+This release has **four breaking changes**, and several further changes make a request that succeeded before fail.
+Read every entry marked **BREAKING**, and every entry that says it changes an outcome you may be relying on, if the
+surface is part of your integration.
+
+The four breaking changes:
+1. `POST /v1/documents` and `POST /v1/documents/upload` refuse an `externalId` supplied without a `schemaId`
+   unless the request passes `confirmUntyped=true`.
+2. The TypeScript and Java request for `PATCH /v1/documents/{id}` has a new shape, so existing calls do not
+   compile; in Python, a call that passes `index_mode` or `external_id` raises `TypeError`.
+3. The model alias `claude-opus-4-8` is retired: a request that names it without `providerAlias` returns `400`.
+   `claude-opus-5-5` replaces it.
+4. `hasMore` is a required field of the `search_results` event in the generated types, so code that constructs the
+   event must supply it.
+
+The further changes that make a request that succeeded before fail or behave differently: creating an app
+context beyond 100, a RAG `search.limit` outside 1-100, a RAG `instructions` and `query` over the size limit, a
+non-`https` or IP-literal `acceptUrl` when no email is sent, `auditDisposition: "purge"` for a custom-namespace
+subject, a partial erasure that keeps the identity, a trigger rule that keeps its saved role grant, a stored
+`documents:<ops>:<type>` scope entry that used to be ignored, `DELETE` returning `409` under contention, and
+webhooks whose domain is not verified.
+
+### Changed
+
+- **BREAKING — `POST /v1/documents` and `POST /v1/documents/upload` refuse a request that supplies `externalId`
+  without `schemaId`, unless it also sets `confirmUntyped=true`.** `externalId` is unique per schema, so a request
+  without `schemaId` would create or update a document in the untyped namespace instead of the typed document you
+  meant; it is refused with a `400` that names both ways out. This covers idempotent re-ingests, `?upsert=true`
+  and re-uploads. A request with neither `externalId` nor `schemaId` is unaffected. **To migrate:** pass the
+  `schemaId` of the typed document, or `confirmUntyped` to confirm that an untyped document is intended.
+  - **TypeScript:** `ingestDocument({ body: { title, externalId } })` becomes
+    `ingestDocument({ confirmUntyped: true, body: { title, externalId } })`.
+  - **Python:** `ingest_document(title=title, external_id=external_id)` becomes
+    `ingest_document(title=title, external_id=external_id, confirm_untyped=True)`.
+  - **Java:** `IngestDocumentRequest.builder().body(body).build()` becomes
+    `IngestDocumentRequest.builder().body(body).confirmUntyped(true).build()`; a call to the
+    `ingestDocument(DocumentRequest)` overload moves to `ingestDocument(IngestDocumentRequest)`, which can carry
+    the flag.
+
+  The upload requests take `confirmUntyped` in the same way. Scripts and trigger rules that call
+  `vectros.documents.create` are unaffected.
+
+- **BREAKING — the TypeScript and Java request for `PATCH /v1/documents/{id}` has its own shape, in which every
+  field is optional.** A merge patch such as `{ "status": "ARCHIVED" }` compiles and sends without
+  re-sending the document's `title`. The wire contract is unchanged, and `POST` and `PUT`, where `title` is
+  required, are unaffected. The patch request has no `externalId` or `indexMode`. **To migrate:**
+  - **TypeScript:** pass the fields beside `id` instead of under `body`:
+    `patchDocument({ id, body: { title: 'x' } })` becomes `patchDocument({ id, title: 'x' })`. The request type
+    `PatchDocumentRequest` is now `DocumentPatchRequest`.
+  - **Java:** build a `DocumentPatchRequest` with the fields directly, in place of wrapping a `DocumentRequest`
+    in the removed `PatchDocumentRequest`: `DocumentPatchRequest.builder().title("x").build()`.
+    `patchDocument(id)` with no request is also available.
+  - **Python:** the keyword arguments are unchanged except that `title` is optional and `index_mode` and
+    `external_id` are removed, so a call that passes them raises `TypeError`. `status` is typed
+    `DocumentPatchRequestStatus`.
+
+- **BREAKING — the model alias `claude-opus-4-8` is retired; `claude-opus-5-5` replaces it.** A request that names
+  `claude-opus-4-8` on `POST /v1/chat`, `POST /v1/rag` or `POST /v1/documents/{id}/ask` without `providerAlias`
+  returns `400`, and
+  `GET /v1/models` does not list it. `claude-opus-5-5` is available on the same plans at lower credit rates.
+  **To migrate:** send `claude-opus-5-5`, and update any model allow-list that names `claude-opus-4-8`.
+  `amazon-nova-2-lite`, `meta-llama-4-scout` and `meta-llama-4-maverick` are also available on every plan, beside
+  `amazon-nova-lite`.
+
+- **BREAKING for code that constructs the event — the `search_results` event of `POST /v1/rag` carries a required
+  `hasMore`.** It is `true` when more matching results may exist than `results` returned: raise `search.limit`
+  (maximum 100) or narrow your filters. `hasMore` is required on `SearchResultsEvent` in TypeScript, as `has_more`
+  in Python, and as a required step of `SearchResultsEvent.builder()` in Java. Code that only reads events from a 0.46.0 API is
+  unaffected.
+
+- **`POST /v1/app-contexts` refuses to create an app context once an environment already holds 100 of them.** The
+  refusal is a `402` with errorCode `SUBSCRIPTION_LIMIT_EXCEEDED`. Test and live are counted separately, the
+  `default` and reserved contexts count, a context that is being deleted counts until it is removed, and a request
+  for a `contextId` that already exists is unaffected. An environment that already holds more keeps its contexts
+  and cannot create more. **This changes an outcome you may be
+  relying on** if you create app contexts without bound.
+
+- **`POST /v1/rag`'s `search.limit` accepts 1-100, and a value outside that range returns `400`.** The maximum is
+  100, matching `POST /v1/search`, and a request for 51 to 100 results is served in full. **This changes an outcome you may be relying on:** a value of 0 or below, or
+  above 100, is refused.
+
+- **`POST /v1/rag`'s `instructions` and `query` have a combined size limit** of roughly 8,000 estimated tokens
+  (about 32K characters); a larger request returns `400`. These fields are for a question and prompt-shaping
+  text. Put large context in your indexed content and retrieve it with search. **This changes an outcome you may
+  be relying on** if you send large `instructions` or `query` text.
+
+- **`POST /v1/users/invite` and `POST /v1/users/invite/resend` validate `acceptUrl` whenever it is supplied.** It
+  must be an `https://` URL with a domain-name host, never an IP literal, or the request returns `400`. With
+  `sendEmail=false`, `acceptUrl` remains optional. **This changes an outcome you may be relying on** if you pass
+  a non-`https` `acceptUrl`, for example a mobile deep link, with `sendEmail=false`: use an `https://` landing
+  page that redirects to your scheme, or omit `acceptUrl` and build the accept link from the returned
+  `inviteToken`.
+
+- **A `POST /v1/erasure-requests` that lists only some of your contexts keeps the subject's identity.** The
+  subject's identity (its user or entity record) is account-wide, so it is deleted only by a request that covers
+  every context of your account, by omitting `contextScope` or listing them all; an entity that belongs to a
+  single context is deleted when that context is listed. A partial request erases exactly the listed contexts,
+  including a user subject's access profiles in them, leaves the identity and every unlisted context untouched, and
+  reports `identityRetained: true`; send a final request without `contextScope` to finish. An erasure that fails
+  before the identity is deleted leaves the subject in place and can be resubmitted. Removing the subject's own
+  identity history happens after the identity is deleted and is retried; if it still fails, the request cannot be
+  resubmitted. Omitting `contextScope` (or sending `[]`) sweeps every context of your account, whether or not the
+  subject holds data in it. **This changes an outcome you may be relying on** if you expected a partial request
+  to delete the identity.
+
+- **`auditDisposition: "purge"` is accepted for `user`, `org` and `client` subjects only.** A request for any
+  other subject type (a custom namespace) returns `400` before anything is erased; use `retain-redacted`. **This
+  changes an outcome you may be relying on** if you sent `purge` for such a subject.
+
+- **`purge` removes the audit history of the rows the erasure deleted.** That includes the audit payloads stored
+  outside the database for those rows and, when the request deleted the identity, the subject's own identity
+  history, and excludes the history of a row
+  the erasure kept because another principal also owns it. `purge` finds history through the owner each version
+  carried when it was written, so versions written under a different owner are not found, and the history
+  of an already-deleted row that another owner shared is removed with the erased owner's. Stored audit payloads
+  are deleted asynchronously: the request completes once the audit records are removed and the payloads follow
+  shortly after.
+
+- **A trigger rule composed from roles runs with the role clauses as they were when the rule was last saved.**
+  Clauses added to or changed in a role afterwards apply to the rule when it is saved again; clauses removed from
+  the role stop applying at once. A rule created before 0.46.0 is pinned to its roles as they stand at its first
+  firing after the upgrade. **This changes an outcome you may be relying on** if you widen a role and expect
+  existing rules to follow.
+
+- **`DELETE` on records, documents, folders, entities, schemas, scripts and trigger rules can return `409`
+  (`VERSION_CONFLICT`) when the row keeps changing under every retry.** Nothing is deleted, and the request can be
+  retried. Where the resource keeps history, the delete's history entry is recorded before the call returns. **This
+  changes an outcome you may be relying on** if a `DELETE` that succeeded before can now fail under contention.
+
+- **Webhook target domains are re-verified.** A verified domain is re-checked for its DNS TXT record after a
+  webhook that uses it is created or re-enabled, and periodically from then on. When the checks keep failing the
+  domain becomes `REVOKED` and the webhooks that use it are disabled with `disabledReason` `domain_unverified`. A
+  delivery to a webhook whose domain is not verified fails, and the webhook is disabled. **This changes an
+  outcome you may be relying on** if a webhook's domain loses its TXT record. Re-enabling a webhook requires its domain to be verified at that moment (`403` otherwise); verify
+  it again with `POST /developer/domains/{id}/verify`.
+
+### Added
+
+- **`POST /v1/chat`, `POST /v1/rag` and `POST /v1/documents/{id}/ask` take `providerAlias` — route a request through
+  your own model provider instead of platform-hosted Bedrock.** Set it to the alias of a provider config your
+  account has activated: a customer-supplied Anthropic key, or an OpenAI-compatible endpoint such as a
+  self-hosted vLLM or TGI cluster. The call is served by your provider and sent to the endpoint on that config;
+  `allowGlobalRegion` and your residency settings do not apply to it, and it leaves Vectros's AWS BAA boundary.
+  `model` then names the model on that provider's own id space (an opaque string to Vectros) and falls back to the
+  config's default model; a request with neither returns `400`. Your account must hold the matching risk-acceptance
+  waiver; Vectros activates it for your account and there is no self-service step. An unknown or inactive alias, or
+  a missing waiver, returns `403`. Depending on the config, the provider
+  bills you directly or Vectros bills at the config's rates; `inferenceBalanceCentsCharged` on the `done` event
+  reflects which. The account owner manages provider configs in the developer API and with
+  `vectros provider-config`. A request without `providerAlias` is served by platform-hosted Bedrock.
+
+- **`documents:<ops>:<type>` scope entries are a narrowing grant.** A qualifier applies to `documents` on every
+  operation (`c`, `r`, `u`, `d` and `s`), the way it does for `records` and `entities`: `documents:r:invoice`
+  grants read access to `invoice`-typed documents only, on reads, lists, updates, deletes, search, RAG and document
+  ask. Changing a document's `schemaId` requires a grant over the new type. An untyped document matches only an
+  unqualified `documents:r` grant. Unqualified `documents` grants are unaffected. A stored token, access profile or role scope that already
+  carries a `documents:<ops>:<type>` entry, which was ignored and so granted the unqualified action on every
+  document, now covers only the named type, and a request for another type returns `403`; re-author it as an
+  unqualified entry if you meant all documents. **This changes an outcome you may be relying on.**
+
+- **The erasure certificate carries `identityRetained` (`GET /v1/erasure-requests/{id}`).** It is `true` when the
+  subject's identity was kept because the request did not cover every context, and absent when the identity was
+  deleted. When it is `true`, `identityRowsDeleted` is 0 in every context.
+
+- **Scripts and trigger rules can call `vectros.entities.create`, `get`, `update`, `delete`, `query` and
+  `lookup`.** Each takes the entity namespace as its first argument and is the in-process equivalent of the matching
+  `/v1/entities/{namespace}` call, authorized the same way (`entities:c`, `r`, `u` or `d` on the namespace) under
+  the grant the script executes with: the caller's credential for `POST /v1/scripts/execute`, the rule's grant for
+  a trigger. `update` replaces the entity's mutable fields. A trigger rule's manifest can list these verbs.
+
+- **Account owners can set retention for audit history in the developer portal.** For each environment, and
+  optionally per app context, the owner sets how long audit history, deletion records and read-access log entries
+  are kept (a number of days, or indefinitely) and what happens after that: `delete` removes expired entries,
+  while `retain` and `retain-redacted` keep them. A level that is not set uses the platform default of about seven
+  years with `retain-redacted`, which removes nothing. A shorter period applies to entries written after you set
+  it; entries written before that are kept for at least the platform default. Expired entries are removed by a background
+  pass, not at the instant they expire. The setting is not part of the `/v1` API.
+
+- **The developer API gains two owner-only routes:** `POST /developer/issuers/{issuerId}/verify`, which verifies
+  an issuer that is awaiting verification, and `GET /developer/users/{id}/profiles`, which lists a member's access
+  profiles across app contexts.
+
+### Fixed
+
+- **Erasure removes a user subject's access profiles** in every context it covers, and retries row deletions that
+  contend with other writes instead of failing the request.
+
+- **Archiving or deleting a record or document removes all of its search entries,** including duplicate entries
+  left by a re-index.
+
+- **A `POST /v1/records/batch` with `atomicity: all_or_nothing` that meets a write conflict is retried before
+  `batch_conflict` is returned.**
+
 ## 0.45.0 — 2026-09-22
 
 **One breaking change to an existing flow.** A trusted-issuer registration created **without**

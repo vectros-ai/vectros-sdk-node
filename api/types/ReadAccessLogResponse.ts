@@ -24,9 +24,9 @@ export interface ReadAccessLogResponse {
     revealedSensitive?: boolean | undefined;
     /** The retention disposition this row was recorded under: `retain`, `retain-redacted`, or `delete`. */
     auditDisposition?: string | undefined;
-    /** The earliest this row may be disposed of, recorded at write time (ISO-8601 UTC). Advisory only — it is not an automatic expiry. Null when no retention floor applies. */
+    /** The earliest this row may be disposed of, recorded at write time (ISO-8601 UTC). The retention purge removes a row only when your current retention disposition is `delete` and its retention time has passed; a row is also removed when its app context or account is deleted. Null when no retention duration was set at write time; such a row is then held to at least the platform default (about 7 years) if you later choose `delete`. */
     retainUntil?: string | undefined;
-    /** Reserved for future use — not yet populated, so this is currently always null. When implemented, it will record the basis for the access (e.g. treatment, payment, operations, or an external disclosure) to support a §164.528 accounting. */
+    /** Reserved for future use — not yet populated, so this is currently always null. When implemented, it will record the basis for the access (e.g. treatment, payment, operations, or an external disclosure). */
     recipientRef?: string | undefined;
     /** When the read occurred / the row was recorded (ISO-8601 UTC). */
     createdAt?: string | undefined;

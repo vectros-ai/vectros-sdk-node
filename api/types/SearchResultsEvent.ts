@@ -18,6 +18,8 @@ export interface SearchResultsEvent {
     degraded?: boolean | undefined;
     /** Which retrieval legs were unavailable: `text` (keyword) and/or `vector` (semantic). Empty when retrieval was not degraded. */
     degradedLegs?: string[] | undefined;
+    /** True when more matching results may exist than `results` returned — raise `search.limit` (maximum 100) or narrow your filters. */
+    hasMore: boolean;
 }
 
 export namespace SearchResultsEvent {

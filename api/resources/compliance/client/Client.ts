@@ -15,7 +15,7 @@ export declare namespace ComplianceClient {
 }
 
 /**
- * Subject-data lifecycle — right-to-erasure and data export (GDPR/CCPA)
+ * Subject-data lifecycle — erasure requests; data export is reserved
  */
 export class ComplianceClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<ComplianceClient.Options>;
@@ -25,7 +25,7 @@ export class ComplianceClient {
     }
 
     /**
-     * Submits a right-to-erasure request for a single end-subject (a user, or an identity entity in any namespace). Erasure removes exactly the data the subject solely owns across the declared contexts, plus the subject's identity and lookup rows. It never touches another account's data and never cascades into another subject's data. The request is asynchronous: it returns 202 with a `requestId`; poll `GET /v1/erasure-requests/{id}` until the job completes to obtain the completion certificate. Requires a root API key — a scoped credential is rejected with 403.
+     * Submits an erasure request for a single end-subject (a user, or an identity entity in any namespace). Erasure deletes the records, documents, folders and record schemas the subject solely owns across the declared contexts (and, for a user, its access profiles there), plus its identity and lookup rows when all contexts are covered. Rows co-owned with another owner scope or principal are kept; read-access log entries are not erased. The request is asynchronous: it returns 202 with a `requestId`; poll `GET /v1/erasure-requests/{id}` until the job completes to obtain the completion certificate. Requires a root API key — a scoped credential is rejected with 403.
      *
      * @param {Vectros.ErasureRequest} request
      * @param {ComplianceClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -99,7 +99,7 @@ export class ComplianceClient {
     }
 
     /**
-     * Polls an erasure request by id. While the job is still running this returns its status only; once it completes, the response also includes the verifiable completion certificate (which contexts were swept, per-context deletion counts, and reports of dangling references and shared rows that were left intact). Requires a root API key.
+     * Polls an erasure request by id. While the job is still running this returns its status only; once it completes, the response also includes the completion certificate (which contexts were swept, per-context deletion counts, whether the identity was kept, and reports of dangling references and shared rows left intact). Requires a root API key.
      *
      * @param {Vectros.GetErasureRequestRequest} request
      * @param {ComplianceClient.RequestOptions} requestOptions - Request-specific configuration.

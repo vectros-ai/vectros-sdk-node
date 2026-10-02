@@ -10,6 +10,8 @@
 export interface FileUploadRequest {
     /** When `true` and a document with the same `externalId` already exists, apply the submitted `payload`/`title` to that existing document (a metadata upsert) before re-issuing the presigned URL. The file body is replaced inherently by the re-upload; it cannot be diffed at upload-init. Defaults to `false`. Requires the `documents:u` scope in addition to `documents:c`. */
     upsert?: boolean;
+    /** Required when the request supplies `externalId` but omits `schemaId`. Since externalId uniqueness is scoped per schema, an externalId-bearing request with no `schemaId` would otherwise silently land in a separate UNTYPED slot instead of the typed document the caller likely meant — pass `schemaId` to target the typed document, or `confirmUntyped=true` to confirm a genuinely untyped document is intended. Ignored (has no effect) when `schemaId` is supplied, or when `externalId` is omitted entirely. Defaults to `false`. */
+    confirmUntyped?: boolean;
     /** Original file name, including its extension. Used as the document title when no separate title is provided. */
     fileName: string;
     /** MIME type of the file being uploaded. Used to set the correct Content-Type on the stored object. */

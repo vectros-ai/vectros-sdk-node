@@ -13,7 +13,7 @@ export interface DocumentAskRequest {
     prompt: string;
     /** Optional system prompt that overrides the default. Defaults to a generic instruction to act as a helpful document analyst. */
     instructions?: string;
-    /** Model alias to use, from the list returned by `GET /v1/models`. Defaults to `claude-haiku-4-5`. */
+    /** Model alias to use, from the list returned by `GET /v1/models`. Defaults to `claude-haiku-4-5`. When `providerAlias` is set, this instead names the MODEL on that BYO provider's own id space (opaque to Vectros) — falls back to the provider config's own default model when omitted. */
     model?: string;
     /** Maximum number of tokens to generate. Defaults to 2048; the maximum is 8192. */
     maxTokens?: number;
@@ -21,4 +21,6 @@ export interface DocumentAskRequest {
     temperature?: number;
     /** Opt this request into global (non-US) region serving for lower cost. Requires a signed global-processing waiver on your account that permits per-request override; otherwise the request is rejected with 403. When omitted, the request follows your account's default residency setting. */
     allowGlobalRegion?: boolean;
+    /** Route this request through a BYO (bring-your-own) model provider config instead of platform-hosted Bedrock — the alias of a provider config your account has activated (a customer-supplied Anthropic key or OpenAI-compatible endpoint). Requires the corresponding risk waiver on your account; otherwise, or if the alias is unknown or inactive, the request is rejected with 403. The request is sent to the endpoint on that config: `allowGlobalRegion` and your residency settings do not apply, and the provider determines where it is processed. If neither `model` nor the config's default model is set, the request is rejected with 400. When omitted, the request is served by platform-hosted Bedrock — this field is entirely additive. */
+    providerAlias?: string;
 }

@@ -8,7 +8,7 @@ import type * as Vectros from "../index.js";
 export interface RagSearch {
     /** Retrieval mode: `HYBRID` combines keyword and semantic search, `SEMANTIC` uses vector similarity only, `TEXT` uses keyword (BM25) matching only. Defaults to `HYBRID`. */
     mode?: RagSearch.Mode | undefined;
-    /** Maximum number of results to retrieve before building the prompt. Defaults to 10; the maximum is 50. */
+    /** Maximum number of results to retrieve before building the prompt. Defaults to 10; the maximum is 100. Values outside 1-100 are rejected with a 400 (not silently clamped). */
     limit?: number | undefined;
     /** Field filters to apply to your indexed content, as a map of field name to required value. */
     filters?: Record<string, Vectros.FilterValue> | undefined;
