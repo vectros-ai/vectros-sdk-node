@@ -25,7 +25,7 @@ export class InferenceClient {
     }
 
     /**
-     * Returns every inference model available to you, including each model's context window, the plan tiers it's available on, and the exact credit rates charged per 1K input and output tokens. Use this to populate model pickers and to validate a request before calling `/v1/chat`, `/v1/rag`, or `/v1/documents/{id}/ask`.
+     * Returns the whole platform model catalog, whatever your plan: `availableOn` names each model's plan tiers. Each entry also carries the context window and the exact credit rates charged per 1K input and output tokens. A model reached through a `providerAlias` is not listed. Use this to populate model pickers and to validate a request before calling `/v1/chat`, `/v1/rag`, or `/v1/documents/{id}/ask`.
      *
      * @param {InferenceClient.RequestOptions} requestOptions - Request-specific configuration.
      *
@@ -140,6 +140,10 @@ export class InferenceClient {
                     throw new Vectros.PaymentRequiredError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 413:
+                    throw new Vectros.ContentTooLargeError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -301,6 +305,10 @@ export class InferenceClient {
                     throw new Vectros.PaymentRequiredError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 413:
+                    throw new Vectros.ContentTooLargeError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 case 500:

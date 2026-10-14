@@ -1098,6 +1098,7 @@ export class IdentityClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -1160,6 +1161,8 @@ export class IdentityClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -1248,6 +1251,7 @@ export class IdentityClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -1304,6 +1308,8 @@ export class IdentityClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:

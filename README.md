@@ -34,6 +34,8 @@ const results = await client.search.content({
 const doc = await client.documents.ingestDocument({
   body: {
     title: "Patient Intake Form — Jane Doe",
+    text: "Patient presented with symptoms of...",
+    indexMode: "HYBRID",
   },
 });
 
@@ -50,11 +52,12 @@ const record = await client.records.createRecord({
 ## Authentication
 
 The SDK sends whatever credential you pass in the `Authorization: Bearer <token>`
-header. Two credential types are accepted:
+header. Three credential types are accepted:
 
 | Type | Prefix | Lifetime | Use from |
 |------|--------|----------|----------|
 | **API key** | `sk_live_*` / `sk_test_*` | Long-lived | **Server only** — full tenant access |
+| **Scoped API key** | `ssk_live_*` / `ssk_test_*` | Long-lived | **Server only** — narrowed to the scopes of an access profile |
 | **Scoped token** | `st_*` | Short-lived | **Server or browser** — narrowed scope, auto-expiring |
 
 Put an API key only on your server. For browser code, mint a short-lived scoped
@@ -83,8 +86,8 @@ browser token-minting pattern.
 - **Schemas** — `client.schemas` — define and evolve record/document schemas.
 - **Scripts** — `client.scripts` — push, list, retrieve and delete versioned script
   object source, and **execute** a stored script synchronously as one atomic
-  transaction. Each push creates a new immutable version; there is no update
-  surface.
+  transaction. Each push creates a new immutable version; a stored version
+  cannot be edited (the update call is always refused).
 - **Triggers** — `client.triggers` — declare, list, retrieve, reconcile, and
   delete async trigger rules ("when a schema record fires this event, invoke
   this script version under this grant"), and list the trigger executions that
@@ -97,8 +100,9 @@ browser token-minting pattern.
 
 ## Rate limits
 
-Requests are rate limited per account on a fixed one-minute window — writes, searches, and
-inference count against it; reads do not. When you exceed the limit the API returns HTTP `429`
+Requests are rate limited per environment (your live and test tenants count separately) on a
+fixed one-minute window — writes, deletes, searches, `POST`-shaped lookups (lookup and batch get), and
+inference count against it; plain `GET` and `HEAD` reads do not. When you exceed the limit the API returns HTTP `429`
 with a `Retry-After` header (seconds until the window resets) plus `X-RateLimit-Limit` and
 `X-RateLimit-Remaining`. Honor `Retry-After` (or back off exponentially with jitter), and pace
 bulk work so your steady rate stays under your plan's per-minute budget. See the

@@ -3,11 +3,11 @@
 import type * as Vectros from "../index.js";
 
 /**
- * The list of available inference models plus the default model alias.
+ * The platform model catalog plus the default model alias.
  */
 export interface ModelsResponse {
-    /** The available inference models. */
+    /** The models in the platform catalog. */
     models: Vectros.ModelInfo[];
-    /** Model alias used when a request omits the `model` field. */
+    /** Model alias used when a request omits the `model` field. It is `claude-haiku-5-5`. `claude-haiku-4-5` remains available: name it to use that model. */
     defaultModel: string;
 }

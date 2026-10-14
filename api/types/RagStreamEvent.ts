@@ -3,7 +3,7 @@
 import type * as Vectros from "../index.js";
 
 /**
- * A single Server-Sent Event from `POST /v1/rag`. The `type` field discriminates which event type this is (the `event` field carries the same value for backward compatibility).
+ * A single Server-Sent Event from `POST /v1/rag`. The `type` field discriminates which event type this is (the `event` field carries the same value for backward compatibility). The stream may also carry Server-Sent Events comment lines (a line that starts with a colon, such as `: keepalive`): one as the stream opens and then about every 15 seconds while the model is working. A stream parser you write yourself must skip them. None follows the terminal `done` or `error` event.
  */
 export type RagStreamEvent =
     | Vectros.RagStreamEvent.SearchResults

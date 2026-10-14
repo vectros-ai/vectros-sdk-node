@@ -9,6 +9,180 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.47.0 — 2026-10-12
+
+This release changes the default model, adds two models, lets streamed answers run for up to five minutes, and
+changes what a request that names a `providerAlias` (a model provider you configured yourself) receives. It adds no
+operation to the SDKs. The generated SDKs gain one optional field in the model catalog (`longContext`, of the new type `LongContextPricing`, on one model), two
+optional fields on the read-access record (`destinationAlias` and `destinationHost`), the documented `404` and `413`
+responses of `POST /v1/chat` and `POST /v1/rag`, the documented `409` responses of `POST /v1/users` (with `?upsert=true`) and `PUT /v1/users/{id}`, the documented `400` of `POST /v1/chat` for a conversation that ends with an `assistant` message or cannot fit the context window, and updated descriptions of the three streaming routes, `POST /v1/users`, `PUT /v1/users/{id}`, `GET /v1/models` and of `model`, `temperature`, `topP`,
+`providerAlias`, `query`, `instructions`, `defaultModel`, the credit-rate fields of the model catalog, and the `403` responses of the three streaming routes and the `413` response of `POST /v1/documents/{id}/ask`.
+
+It has **four breaking changes**, and several further changes make a request that succeeded before fail or cost more.
+Each affects only the callers it names; read every entry marked **BREAKING** and every entry that says it changes an
+outcome you may be relying on.
+
+### Breaking changes
+
+- **BREAKING: a request that omits both `model` and `providerAlias` is now served by `claude-haiku-5-5` (Claude Haiku
+  5.5); it was `claude-haiku-4-5`.** This applies to `POST /v1/chat`, `POST /v1/rag` and `POST /v1/documents/{id}/ask`,
+  and `GET /v1/models` reports the new `defaultModel`. For such a request:
+  - `temperature` and `topP` are ignored.
+  - The model can reason before it answers. The reasoning is not streamed, counts against `maxTokens` together with the
+    answer and is billed as output, so a small `maxTokens` can return little or no text: the stream ends with `done` and
+    an output-token count at or near `maxTokens`. Leave headroom (1024 or more for a short answer).
+  - `POST /v1/chat` returns `400` when the last message does not have role `user` (for example an `assistant` prefill), before anything is
+    charged.
+  - The price per token falls to a tenth for a prompt of up to 100,000 tokens (see the entry on `claude-haiku-5-5` under
+    Added). The new model's tokenizer counts about 30% more tokens for the same text, so the same text costs about 87%
+    less, before reasoning tokens, which are billed as output.
+  - The retrieved-context budget of `POST /v1/rag` follows the model's context window of 1,000,000 tokens (it was
+    200,000), so a retrieval that filled the old budget can now be larger, with a larger prompt, charge and balance hold.
+
+  **Migration:** name `claude-haiku-4-5` in `model` to keep the previous behaviour. It stays in the catalog, on every
+  plan, and a request that names it is served by it.
+- **BREAKING for accounts that have accepted the Business Associate Agreement with Vectros in the developer portal: a
+  request that names a `providerAlias` is refused with `403` until an owner has attested the provider config.** The attestation states that the account
+  holds its own agreement with the provider at the config's endpoint. Until it is recorded, `POST /v1/chat`,
+  `POST /v1/documents/{id}/ask` and `POST /v1/rag` answer `403` with a message that says an attestation is needed. An
+  owner records it in the developer portal (Model Providers) or with
+  `POST /developer/provider-configs/{id}/baa-attestation`. The attestation covers the endpoint address and provider
+  type saved on the config: changing either withdraws it, and calls are refused until an owner attests again. It
+  applies to a waiver Vectros granted and to a test tenant. If Vectros cannot establish whether the account has accepted
+  the agreement, the request is refused. An account that has not accepted it is unaffected.
+- **BREAKING for a provider config stored with the `PLATFORM_BILLED` billing mode: it is refused with `403`.** A
+  provider config is now always billed by your provider (`CUSTOMER_DIRECT`). The `PLATFORM_BILLED` mode and the
+  `platformTokenFactor` and `platformOutputWeight` fields of a provider config no longer exist, and a call through a routed config always
+  reports `inferenceBalanceCentsCharged` of `0`. Update the config to `CUSTOMER_DIRECT` or recreate it.
+- **BREAKING for a stream parser you wrote yourself: a streamed answer from `POST /v1/chat`, `POST /v1/rag` and
+  `POST /v1/documents/{id}/ask` may now carry comment lines.** A comment line starts with a colon (the platform sends
+  `: keepalive`): one as the stream opens, before the first event, and then about every 15 seconds until the `done` or
+  `error` event, between events and while the model is still working. Comment lines are part of the Server-Sent Events
+  format and a conforming reader ignores them; the TypeScript, Python and Java SDKs skip the platform's `: keepalive` line, and no event changes. **A parser
+  you wrote yourself must skip any line that starts with a colon and must not treat a block with no `data:` line as an
+  event.** No comment line follows the `done` or `error` event, and none is counted as output or billed.
+
+### Added
+
+- **`claude-haiku-5-5` (Claude Haiku 5.5) is in the model catalog, on every plan, priced by the length of the
+  prompt.** A request whose prompt is up to 100,000 tokens is charged $0.10 per million input tokens and $0.50 per
+  million output tokens (0.01 and 0.05 credits per 1,000 tokens). A request whose prompt is longer than 100,000 tokens is
+  charged 5 times those rates on every token of that request, input and output. The existing 10% premium on US-served
+  requests applies to both. `GET /v1/models` lists its context window of 1,000,000 tokens, its standard rates in
+  `inputCreditsPer1kTokens`, `outputCreditsPer1kTokens` and `regionPricing`, and the rates for a longer prompt in a new
+  optional `longContext` object (`promptTokensOver`, `multiplier`, and `base` and `us` rates); no other model has that
+  object. The length of the prompt is the one the model provider reports when the call completes (if the connection is
+  closed first, the platform's estimate is used). The balance hold taken before the call assumes the higher rate when the
+  prompt looks near or over the line, and the unused part is refunded, so a balance-mode account whose balance covers the
+  real cost but not the held amount can be refused with `402`. As for every model, token cost is rounded to whole cents per call, so a small
+  call costs 0 cents in tokens and only the per-call platform fee applies. The model can reason before it answers; the
+  reasoning is not streamed, counts against `maxTokens` and is billed as output, so leave headroom in `maxTokens`.
+- **`claude-sonnet-5-5` (Claude Sonnet 5.5) is in the model catalog, on the Starter plan and up** (the same plans as
+  `claude-sonnet-5`), with a context window of 1,000,000 tokens, billed on the same pass-through basis as the other Claude models, at $2 per million input tokens and $10 per million
+  output tokens (0.2 and 1.0 credits per 1,000 tokens), with the existing 10% premium on US-served requests. `temperature`
+  and `topP` are ignored for it, and `POST /v1/chat` answers `400`, before anything is charged, to a conversation that
+  ends with an `assistant` message.
+- **The read-access record names where a routed call delivered what it disclosed.** For a disclosure into a request that
+  named a `providerAlias` (`POST /v1/rag`, `POST /v1/documents/{id}/ask`), the record carries `destinationAlias` (the
+  config's alias) and `destinationHost` (the host of the endpoint, no path). Both are `null` for every other read,
+  including a request served by the platform's own models.
+
+### Changed
+
+- **An account owner now accepts the risk waiver for routing to your own provider in the developer portal (Model
+  Providers), separately for the live and the test environment, and can revoke it there.** A waiver accepted against a
+  text that has since changed no longer counts, and revoking a waiver switches off the provider configs that depend on
+  it; a request that names a `providerAlias` is then refused with `403`. A waiver that Vectros granted to your tenant, for which your tenant has no signed acceptance, is not affected by a change of the text; an owner can still revoke it. Signing again does not switch the provider configs back on; switch each one on again. A change in whether a waiver is in force takes effect
+  within moments.
+- **Changes an outcome you may be relying on: a provider config you set up yourself is validated when you create or
+  update it.** `billingMode` must be `CUSTOMER_DIRECT` (the default when omitted), `waiverType` must be
+  `byo-model-inference:customer-key`, and the endpoint must use port 443 and carry no credentials, query or fragment, so a self-hosted endpoint on another port is refused. The alias is 1 to 64 lowercase letters, digits, `-`
+  or `_`; changing the provider type needs the endpoint stated in the same request (an empty string means the Anthropic default); changing the endpoint host needs the provider key entered again; the key is printable ASCII of at most 4096
+  characters; and a tenant can hold at most 25 provider configs. A request outside these rules answers `400`. An alias, endpoint or waiver type the config already holds is accepted unchanged; `billingMode` must be `CUSTOMER_DIRECT` on every save. A save that loses a race with another change
+  answers `409` (it answered `404`).
+- **Changes an outcome you may be relying on: a routed call re-checks the address of the provider's endpoint when it
+  opens a connection.** A call to a provider whose endpoint resolves to
+  an address that is not publicly routable, and a provider response larger than the platform's size limits, end the stream with an `error` event (code `inference_error`).
+- **`POST /v1/chat` answers `400`, before anything is charged, to a conversation that ends with an `assistant`
+  message on `claude-sonnet-5` and `claude-opus-5-5`;** it ended the stream with an `error` event (code `inference_error`).
+- **Changes an outcome you may be relying on: webhook registration and delivery, domain registration, a provider config's
+  endpoint and the fetch of an issuer's key set refuse a destination that resolves to a special-purpose address block** (for example documentation, benchmarking and reserved ranges, and the NAT64, 6to4 and Teredo IPv6 ranges). A registered webhook whose host resolves there is no longer
+  delivered to and is disabled with `disabledReason` `ssrf_blocked`.
+- **A streaming request (`POST /v1/chat`, `POST /v1/rag`, `POST /v1/documents/{id}/ask`) can run for up to 5 minutes
+  while it keeps sending data.** A long generation (a large
+  `maxTokens`) now completes. A call served by the platform's own models, and a call routed to your own provider
+  (`providerAlias`) even if the provider is still sending, ends after at most 5 minutes in total: the stream ends with an `error`
+  event and nothing is billed for it.
+- **`POST /v1/chat` accepts a request body of up to 1 MiB (1,048,576 bytes); the limit was 8 KB.** A longer conversation,
+  a prompt with supplied context, or a prompt long enough to reach the 100,000-token pricing tier of `claude-haiku-5-5`
+  can now be sent. `POST /v1/documents/{id}/ask` stays limited to 1 MiB. A chat or document-ask body over 1 MiB is refused with `413` and the value `PAYLOAD_TOO_LARGE`, in the field
+  `code` when the edge firewall answers and `errorCode` when the platform does (read either), before anything is charged.
+  `POST /v1/chat` also refuses, with `400` and `errorCode: CONTEXT_WINDOW_EXCEEDED`, a conversation that cannot fit the
+  model's context window, before anything is charged; the check compares an estimate of the conversation plus `maxTokens`
+  with the model's `contextWindow` from `GET /v1/models`, so it is approximate near the limit, and a call routed to your
+  own provider is not checked. `POST /v1/rag` is unchanged: its request body is limited to 8 KB, so a large RAG context
+  belongs in your indexed content.
+- **A `POST /v1/chat` prompt may contain code, URLs and file paths; it is no longer refused for them.** Chat prompts are
+  passed to the model as they are. `POST /v1/rag` can still answer `403` for such text.
+- **The price of `claude-sonnet-5` is lowered from $3 / $15 to $2 / $10 per million input / output tokens**, the same as
+  `claude-sonnet-5-5`. This applies to calls billed to your inference balance or usage; the existing 10% premium on
+  US-served requests is unchanged. `GET /v1/models` reports the new rates.
+- **Changes an outcome you may be relying on: `claude-sonnet-5` and `claude-opus-5-5` report a context window of
+  1,000,000 tokens (it was 200,000).** The retrieved-context budget of `POST /v1/rag` follows it, so a retrieval that
+  filled the old budget can now be larger, with a larger charge and balance hold. The size of a retrieval stays in your
+  hands through `search.limit` and `maxTokens`.
+- **Changes an outcome you may be relying on: the platform's estimate of a prompt's size is now per model.** For
+  `claude-haiku-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5` and `claude-opus-5-5`, whose tokenizer counts more tokens
+  for the same text, the estimate is larger (for `claude-sonnet-5` and `claude-opus-5-5`, larger than before). It sizes
+  the balance hold taken before a call (still refunded down to the actual cost, but a larger hold can be refused with
+  `402` on a balance that is close to it), the retrieved-context budget of `POST /v1/rag` (less text fits the same token
+  window), and the input and output billed for a call whose client disconnects before the provider reports its usage. A
+  call that completes is billed on the provider's reported usage.
+- **`GET /developer/me` accepts `?tenant=test|live` and returns your own principal in that tenant,** so the CLI's
+  `--principal me` resolves correctly in the test tenant. A value other than `test` or `live` answers `400`, and a
+  tenant where you have no membership answers `404`.
+- **The per-1,000-token rates and `regionPremiumFactor` in `GET /v1/models` are exact decimals for every model** (for
+  example `1.1`, not `1.100000023841858`).
+- **API reference: documented responses and limits.** `PUT /v1/users/{id}` and `POST /v1/users?upsert=true` document
+  their `409` (`errorCode` `VERSION_CONFLICT`). `POST /v1/chat`, `POST /v1/rag` and `POST /v1/documents/{id}/ask` document
+  the `404` for an app context that is being deleted, the `403` for a provider config with an unsupported billing mode,
+  that a stream can end with an `error` event instead of `done`, and that a stream can carry comment lines. `POST /v1/chat`
+  documents its `400` for a conversation that ends with an `assistant` message and for `errorCode`
+  `CONTEXT_WINDOW_EXCEEDED`. `POST /v1/rag` documents its 8 KB request-body limit for `query` and `instructions`, and
+  `GET /v1/models` documents that it lists the whole catalog whatever your plan.
+
+### Fixed
+
+- **A request body that is not JSON returns `400` with the message `Malformed JSON body` on `POST /v1/chat`,
+  `POST /v1/rag` and `POST /v1/documents/{id}/ask`, and `400` (`Invalid request body`, or `Invalid request body at field '<name>'` for a value of the wrong type) on `POST /v1/users` and `PUT /v1/users/{id}`.** It returned `500`. The same holds for the developer API routes that create or change a domain,
+  a webhook or a provider config.
+- **A request for `claude-sonnet-5` or `claude-opus-5-5` on `POST /v1/chat`, `POST /v1/documents/{id}/ask` or
+  `POST /v1/rag` no longer fails with an `inference_error` event when `temperature` is omitted or greater than 0.**
+  These models do not accept a temperature setting, so `temperature` and `topP` (`topP` exists on `POST /v1/chat` only)
+  are ignored for them, and they sample at their own default. The descriptions of `temperature` and `topP` say so.
+- **A failure the platform did not anticipate while it called the model, and a call the platform interrupts while it is
+  streaming, send an `error` event (code `inference_error`) and no `done` event, with no charge.** The
+  cost hold on the call is released before the stream closes, and the platform cancels its request to the model. A client that already handles the `error` event needs no change.
+- **A request to a model that reasons before it answers, such as `claude-opus-5-5`, no longer ends with an `inference_error`
+  event when the model sends nothing for more than 30 seconds while it reasons.**
+- **A request with enough inference balance is no longer refused with `402` (`Insufficient inference balance`) while
+  another operation on your account updates the balance.** A balance that is too low is still refused.
+- **The API logs page shows the real duration of a call to `POST /v1/chat`, `POST /v1/documents/{id}/ask` or
+  `POST /v1/rag`, and every call has its entry,** including a streamed call or one that was refused. The entry for a
+  call that failed after the stream started records the status your client received, `200`.
+- **Adding a payment method on the developer Billing page works, and the card you save becomes the default payment
+  method.** The page answered with an error; now the Billing page shows the saved card and inference auto-recharge uses
+  it.
+- **`PUT /v1/users/{id}` and `POST /v1/users?upsert=true` no longer fail with `500` when a `DELETE` of the same user
+  arrives at the same moment.** Once the delete has committed, `PUT` answers `404` and the user stays deleted (a `PUT` that
+  activates an invited user is not covered). `?upsert=true` answers `409` with `errorCode: VERSION_CONFLICT` when it meets
+  the delete while it updates. If another write keeps changing the user while either call updates it, the call answers `409` with `errorCode: VERSION_CONFLICT`
+  and writes nothing; send the request again. A rename to an `externalId` another user already holds answers `400`.
+- **The quick start in each SDK's README ingests a document with a `title`, the `text` the API requires and an `indexMode`
+  (required unless the schema supplies a default), lists the scoped API key (`ssk_*`) among the credentials the API
+  accepts, states that the rate limit counts per environment and that writes, deletes, searches, `POST`-shaped lookups
+  and inference count against it, and gives the Java client a base URL.**
+
 ## 0.46.0 — 2026-10-01
 
 This release has **four breaking changes**, and several further changes make a request that succeeded before fail.

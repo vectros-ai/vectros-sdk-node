@@ -3,7 +3,7 @@
 import type * as Vectros from "../index.js";
 
 /**
- * The available inference models.
+ * The models in the platform catalog.
  */
 export interface ModelInfo {
     /** Stable model alias. Pass this as the `model` field on `/v1/chat` and other inference endpoints. */
@@ -16,9 +16,10 @@ export interface ModelInfo {
     contextWindow: number;
     /** Plan tiers on which this model is available (a subset of: free, starter, pro, scale, enterprise). */
     availableOn: string[];
-    /** Base (non-US) credit rate per 1K input tokens; 1 credit = 1 cent. Requests are served from a US region by default and billed `regionPricing.us` (this value multiplied by `regionPremiumFactor`). See `regionPricing` for both the US and base rates. */
+    /** Base (non-US) credit rate per 1K input tokens; 1 credit = 1 cent. Requests are served from a US region by default and billed `regionPricing.us` (this value multiplied by `regionPremiumFactor`). See `regionPricing` for both the US and base rates. For a model that has `longContext` pricing, this is the rate for a prompt of up to `longContext.promptTokensOver` tokens. */
     inputCreditsPer1kTokens: number;
-    /** Base (non-US) credit rate per 1K output tokens; 1 credit = 1 cent. The default US-served rate is this value multiplied by `regionPremiumFactor`; see `regionPricing` for both rates. */
+    /** Base (non-US) credit rate per 1K output tokens; 1 credit = 1 cent. The default US-served rate is this value multiplied by `regionPremiumFactor`; see `regionPricing` for both rates. For a model that has `longContext` pricing, this is the rate for a prompt of up to `longContext.promptTokensOver` tokens. */
     outputCreditsPer1kTokens: number;
     regionPricing: Vectros.RegionPricing;
+    longContext?: Vectros.LongContextPricing | undefined;
 }

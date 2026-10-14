@@ -28,6 +28,10 @@ export interface ReadAccessLogResponse {
     retainUntil?: string | undefined;
     /** Reserved for future use — not yet populated, so this is currently always null. When implemented, it will record the basis for the access (e.g. treatment, payment, operations, or an external disclosure). */
     recipientRef?: string | undefined;
+    /** For a disclosure into a model call that you routed to your own model provider (a `providerAlias` request): the alias of the provider configuration the call was sent through. It is recorded when the content is disclosed to the call, before the provider answers. Null for every other read. */
+    destinationAlias?: string | undefined;
+    /** For a disclosure into a routed model call: the host of the endpoint address the call is sent to, as saved on the provider configuration when the call was made (host only, no path). Null for every other read. */
+    destinationHost?: string | undefined;
     /** When the read occurred / the row was recorded (ISO-8601 UTC). */
     createdAt?: string | undefined;
 }
