@@ -24,7 +24,7 @@ export interface UserResponse {
     schemaVersion?: number | undefined;
     /** When the user was created, as an ISO-8601 UTC timestamp. */
     createdAt?: string | undefined;
-    /** The user's identifier in your own authentication system (for example, a Cognito sub or Auth0 user ID). This is set when an invitation is accepted via PUT /v1/users/{id} with status=ACTIVE, and is null until the user is activated. */
+    /** The user's identifier in your own authentication system (for example, a Cognito sub or Auth0 user ID). It is set when the person accepts the emailed invitation link, or redeems `inviteToken` at the token-exchange endpoint, which binds it; it is null until the user is activated. A subject stored through `PUT /v1/users/{id}` is not bound that way and does not make the person a member of your account: it is ignored for the tenant claims in sign-in tokens, the developer portal's memberships list and tenant switching, and an ownership transfer. To give such a person access, delete the user and invite them again; accepting the invitation binds the subject and counts it. */
     externalSubject?: string | undefined;
 }
 

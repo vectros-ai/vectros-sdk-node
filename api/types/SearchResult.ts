@@ -12,7 +12,7 @@ export interface SearchResult {
     score?: number | undefined;
     /** The keyword (BM25) relevance component of the score. Non-zero in HYBRID mode when the keyword engine contributes to the match. In TEXT mode this is a rank-derived value reflecting the result's relative position, not a raw BM25 magnitude — treat it as meaningful for ordering within this response, not as a score comparable across requests or against other modes. */
     textScore?: number | undefined;
-    /** The semantic (vector similarity) component of the score. Non-zero when the search mode is SEMANTIC or HYBRID. */
+    /** The semantic (vector similarity) component of the score. 0 when the match came from keyword search only. */
     semanticScore?: number | undefined;
     /** The exact text chunk that matched the query. Pass this to your model as the retrieved context. */
     chunkText?: string | undefined;

@@ -3,14 +3,14 @@
 import type * as Vectros from "../index.js";
 
 /**
- * The models in the platform catalog.
+ * One model in the catalog.
  */
 export interface ModelInfo {
     /** Stable model alias. Pass this as the `model` field on `/v1/chat` and other inference endpoints. */
     id: string;
     /** Human-readable display name for the model. */
     name: string;
-    /** Name of the model vendor (for example, Anthropic or AWS), suitable for display in a model picker. */
+    /** Name of the model vendor (for example Anthropic, Amazon or Meta), suitable for display in a model picker. */
     provider: string;
     /** Maximum context window, in tokens. */
     contextWindow: number;

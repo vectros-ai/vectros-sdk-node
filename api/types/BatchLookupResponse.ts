@@ -3,7 +3,7 @@
 import type * as Vectros from "../index.js";
 
 /**
- * The result of a batch lookup: one result group per lookup you submitted. Returned with HTTP 200 even when some lookups did not resolve, so inspect each result's status.
+ * Reserved shape: the result of a batch lookup, one result group per lookup you submitted, which the endpoint would return with HTTP 200 even when some lookups did not resolve. The endpoint currently answers 501.
  */
 export interface BatchLookupResponse {
     /** One result group per lookup you submitted. Match each group to its input using the `ref` field. */

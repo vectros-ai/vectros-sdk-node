@@ -26,4 +26,15 @@ export interface ChatRequest {
     allowGlobalRegion?: boolean;
     /** Route this request through a BYO (bring-your-own) model provider config instead of platform-hosted Bedrock — the alias of a provider config your account has activated (a customer-supplied Anthropic key or OpenAI-compatible endpoint). Requires the corresponding risk waiver on your account and, if the account has accepted the Business Associate Agreement in the developer portal (or Vectros cannot establish whether it has), a current attestation on that provider config; otherwise, or if the alias is unknown or inactive, the request is rejected with 403. The request is sent to the endpoint on that config: `allowGlobalRegion` and your residency settings do not apply, and the provider determines where it is processed. If neither `model` nor the config's default model is set, the request is rejected with 400. When omitted, the request is served by platform-hosted Bedrock — this field is entirely additive. */
     providerAlias?: string;
+    /** Whether to receive the model's reasoning. `omit` (the default) leaves the stream exactly as it was: reasoning is not sent. `stream` sends it as `reasoning_delta` events ahead of the `content_delta` events of the answer, for a model that reasons; a model that does not reason sends none. Reasoning counts against `maxTokens` and is billed as output whether or not you receive it, and `done` is unchanged. Vectros does not log or store the reasoning. The reasoning can quote your documents or messages, so treat it as you treat the answer. Applies to platform-hosted models; a request routed through `providerAlias` ignores it. */
+    reasoning?: ChatRequest.Reasoning;
+}
+
+export namespace ChatRequest {
+    /** Whether to receive the model's reasoning. `omit` (the default) leaves the stream exactly as it was: reasoning is not sent. `stream` sends it as `reasoning_delta` events ahead of the `content_delta` events of the answer, for a model that reasons; a model that does not reason sends none. Reasoning counts against `maxTokens` and is billed as output whether or not you receive it, and `done` is unchanged. Vectros does not log or store the reasoning. The reasoning can quote your documents or messages, so treat it as you treat the answer. Applies to platform-hosted models; a request routed through `providerAlias` ignores it. */
+    export const Reasoning = {
+        Omit: "omit",
+        Stream: "stream",
+    } as const;
+    export type Reasoning = (typeof Reasoning)[keyof typeof Reasoning];
 }

@@ -14,11 +14,11 @@ export interface DoneEvent {
     model: string;
     /** Credits debited from your monthly plan allowance for this call's per-call platform overhead. One credit equals one cent. */
     platformCreditsCharged: number;
-    /** Cents debited from your pre-paid inference balance for the model's token cost. */
+    /** Cents of model token cost for this call. Settled against your pre-paid inference balance (or added to your period usage on usage billing); 0 for a call routed through `providerAlias`. */
     inferenceBalanceCentsCharged: number;
-    /** Number of input tokens served from the prompt cache. Present only when prompt caching applied to this call. Prompt caching is not yet used; this field is reserved for forward compatibility. */
+    /** Number of input tokens served from the prompt cache. Present only when the call reports a non-zero count. */
     cacheReadTokens?: number | undefined;
-    /** Number of tokens written to the prompt cache. Present only when prompt caching applied to this call. Prompt caching is not yet used; this field is reserved for forward compatibility. */
+    /** Number of input tokens written to the prompt cache. Present only when the call reports a non-zero count. */
     cacheCreateTokens?: number | undefined;
 }
 

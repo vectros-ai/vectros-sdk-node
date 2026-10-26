@@ -22,7 +22,7 @@ export interface SchemaResponse {
     lookupFields?: Vectros.LookupDef[] | undefined;
     /** UI rendering hints keyed by field id. */
     renderHints?: Record<string, Vectros.RenderHintDef> | undefined;
-    /** Feature flags for this schema. `auditHistory` (default true) controls whether a change-history (version) trail is kept for this type's data; it never affects the records themselves. `readAccessLog` (default false) controls accounting-of-disclosures logging for reads of this type's records. */
+    /** Feature flags for this schema. `auditHistory` (default true) controls whether a change-history (version) trail is kept for this type's data; it never affects the records themselves. `readAccessLog` (default false) controls accounting-of-disclosures logging for reads of this type's records. `ttlEligible` (default false) lets records of this type carry `expiresAt`. `triggersEnabled` (default false) lets trigger rules fire on this type. */
     capabilities?: Record<string, boolean> | undefined;
     /** Payload storage profile: STANDARD (externalize large payloads to S3), LOW_LATENCY (always store inline), or LARGE_PAYLOAD (always externalize). Defaults to STANDARD. */
     storageProfile?: SchemaResponse.StorageProfile | undefined;

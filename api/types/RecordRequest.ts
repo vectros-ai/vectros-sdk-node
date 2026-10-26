@@ -24,7 +24,7 @@ export interface RecordRequest {
     indexMode?: RecordRequest.IndexMode | undefined;
     /** Optional absolute expiry, as an ISO-8601 UTC timestamp. When set, the record is automatically deleted at (or shortly after) this time — removed from search and storage, the same as an explicit delete. Requires the schema to opt in with `capabilities.ttlEligible: true` (else the request is rejected). Must be at least 10 minutes in the future. Omit to leave the record's expiry unchanged; records have no expiry by default. */
     expiresAt?: string | undefined;
-    /** Optimistic-concurrency token. Pass the `version` you last read (from a fetch or a prior write response) to make this update conditional — it is rejected with 409 VERSION_CONFLICT if the record was modified since, leaving the stored record untouched. Omit it for last-write-wins (the default). Ignored on create. */
+    /** Optimistic-concurrency token. Pass the `version` you last read (from a fetch or a prior write response) to make this update conditional — it is rejected with 409 VERSION_CONFLICT if the record was modified since, leaving the stored record untouched. Omit it to update whatever version is stored; an update that collides with another write to the same record while it is being applied is still rejected with `409 VERSION_CONFLICT`. Ignored when the request creates the record; with `?upsert=true` on an existing record it makes the update conditional. */
     expectedVersion?: number | undefined;
 }
 

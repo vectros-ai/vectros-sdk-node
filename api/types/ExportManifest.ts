@@ -6,7 +6,7 @@
 export interface ExportManifest {
     /** Schema version of the manifest and payload, for forward-compatible parsing. It is bumped whenever the exported row schema changes, so branch your parsing logic on this value. */
     formatVersion?: string | undefined;
-    /** Serialization format of the payload. NDJSON (newline-delimited JSON, one row per line) is currently the only supported format. */
+    /** Serialization format of the payload. NDJSON (newline-delimited JSON, one row per line) is the only supported format. */
     format?: ExportManifest.Format | undefined;
     /** Total uncompressed size of the export payload, in bytes. */
     sizeBytes?: number | undefined;
@@ -23,7 +23,7 @@ export interface ExportManifest {
 }
 
 export namespace ExportManifest {
-    /** Serialization format of the payload. NDJSON (newline-delimited JSON, one row per line) is currently the only supported format. */
+    /** Serialization format of the payload. NDJSON (newline-delimited JSON, one row per line) is the only supported format. */
     export const Format = {
         Ndjson: "ndjson",
     } as const;

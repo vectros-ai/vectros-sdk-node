@@ -18,7 +18,7 @@ export interface RoleResponse {
     name?: string | undefined;
     /** An optional free-text description of what the role grants. */
     description?: string | undefined;
-    /** The role's permissions, expressed as one or more scope clauses. An action is permitted if any clause allows it and that clause's data scope matches the target — with two exceptions. An identity entity's own-namespace dimension when creating it is server-assigned and therefore exempt from the match at creation time only; and a clause naming a `granted_capabilities` entry this release does not recognize is denied entirely, so none of its actions apply. */
+    /** The role's permissions, expressed as one or more scope clauses. An action is permitted if any clause allows it and that clause's data scope matches the target — with two exceptions. An identity entity's own-namespace dimension when creating it is server-assigned and therefore exempt from the match at creation time only; and a clause naming a `granted_capabilities` entry the API does not recognize is denied entirely, so none of its actions apply. */
     scopes?: Vectros.ScopeClause[] | undefined;
     /** Which values, per `scope:<namespace>`, a holder of this role may assume via `POST /v1/auth/token/assume`. Absent when the role grants no assumption of anything (the common case). */
     assumable?: Record<string, unknown> | undefined;

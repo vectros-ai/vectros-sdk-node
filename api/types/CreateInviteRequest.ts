@@ -13,11 +13,11 @@ export interface CreateInviteRequest {
     accessProfile: Vectros.AccessProfileSpec;
     /** Invitee's first name. Optional; used to personalize the invitation email greeting. */
     firstName?: string | undefined;
-    /** Invitee's last name. Optional; accepted but not currently stored or returned. */
+    /** Invitee's last name. Optional; accepted and ignored. */
     lastName?: string | undefined;
     /** Your landing page where the invitee accepts the invitation. Required when `sendEmail` is true. The invitation token is appended as a `t` query parameter. Must be an https URL with a domain-name host (IP-literal hosts are rejected). */
     acceptUrl?: string | undefined;
-    /** Display name shown in the From header of the invitation email. Defaults to `Vectros`. Maximum 100 characters; must not contain newlines. */
+    /** Display name shown in the From header of the invitation email. When omitted, the app context's `companyName` is used, then its `name`. Maximum 100 characters; must not contain newlines. */
     fromName?: string | undefined;
     /** How long the invitation token stays valid, in seconds. Defaults to 604800 (7 days). Must be between 3600 (1 hour) and 2592000 (30 days). */
     ttlSeconds?: number | undefined;

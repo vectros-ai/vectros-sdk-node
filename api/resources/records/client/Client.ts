@@ -97,7 +97,7 @@ export class RecordsClient {
     }
 
     /**
-     * Reserved endpoint for batch lookup and reference resolution. The published response shape correlates results to each input and carries a per-item status envelope. It currently returns 501 (not implemented). The documented 200 response schema is the stable shape this endpoint will use once available. Requires the `records:r` scope.
+     * Reserved endpoint for batch lookup and reference resolution. With the `records:r` scope it answers 501 (not implemented). The published response shape correlates results to each input and carries a per-item status envelope. Requires the `records:r` scope.
      *
      * @param {Vectros.BatchLookupRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -169,7 +169,7 @@ export class RecordsClient {
     }
 
     /**
-     * Writes up to 50 records (or 50 with `atomicity: all_or_nothing`) in a single request. Each item in `items` has exactly the same shape, and goes through exactly the same validation, authorization and idempotency rules, as the body of a single `POST /v1/records` — including schema validation, `externalId` idempotency, unique-field enforcement, and the `records:c:<type>` scope check, which is applied per item against that item's own record type. A batch is not a way to write a type your credential could not write one at a time.
+     * Writes up to 50 records per request in `best_effort` mode and up to 50 with `atomicity: all_or_nothing`, in a single request. Each item in `items` has exactly the same shape, and goes through exactly the same validation, authorization and idempotency rules, as the body of a single `POST /v1/records` — including schema validation, `externalId` idempotency, unique-field enforcement, and the `records:c:<type>` scope check, which is applied per item against that item's own record type. A batch is not a way to write a type your credential could not write one at a time.
      *
      * `atomicity` selects how the batch commits. `best_effort` (the default) writes each item independently: some can succeed while others fail, and each item's own outcome is reported. `all_or_nothing` commits every item in one transaction — if any item fails, no record is created or updated at all, and every item that was itself fine reports `not_committed` while the ones that failed report why. Because the transaction is bounded by the number of underlying storage rows rather than by the number of records, a large `all_or_nothing` batch can be refused as too large to commit atomically even when it is within the item limit; the error says so, and nothing is written when it happens.
      *
@@ -338,6 +338,8 @@ export class RecordsClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -407,6 +409,10 @@ export class RecordsClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -583,6 +589,7 @@ export class RecordsClient {
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -631,6 +638,8 @@ export class RecordsClient {
             switch (_response.error.statusCode) {
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -646,7 +655,7 @@ export class RecordsClient {
     }
 
     /**
-     * Partially updates a record using an RFC 7386 JSON Merge Patch. The `payload` object is deep-merged into the existing payload: keys you send overwrite (recursing into nested objects), a key set to null is deleted, and keys you omit are left unchanged — so you can change a single field without re-sending the rest (unlike the full-replacement PUT). Top-level fields (`status`, `folderId`, `userId`, `scopes`) are set when present and left unchanged when omitted; sending a top-level field as null is rejected (clearing a top-level field is not supported in this release — omit it instead). `typeName`, `schemaId`, `externalId`, and `indexMode` are immutable and rejected if present. The merged result is validated against the schema. Pass `expectedVersion` to make the patch conditional (optimistic concurrency, 409 on conflict). Requires the `records:u:<type>` scope.
+     * Partially updates a record using an RFC 7386 JSON Merge Patch. The `payload` object is deep-merged into the existing payload: keys you send overwrite (recursing into nested objects), a key set to null is deleted, and keys you omit are left unchanged — so you can change a single field without re-sending the rest (unlike the full-replacement PUT). Top-level fields (`status`, `folderId`, `userId`, `scopes`) are set when present and left unchanged when omitted; sending a top-level field as null is rejected (clearing a top-level field is not supported — omit it instead). `typeName`, `schemaId`, `externalId`, and `indexMode` are immutable and rejected if present. The merged result is validated against the schema. Pass `expectedVersion` to make the patch conditional (optimistic concurrency, 409 on conflict). Requires the `records:u:<type>` scope.
      *
      * @param {Vectros.PatchRecordRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.

@@ -12,11 +12,11 @@ export interface AppContextRequest {
     description?: string | undefined;
     /** Optional display name for the organization deploying this app context — distinct from `name`, which is the app's own identity. Used to personalize platform-sent correspondence (e.g. sub-user invitation emails) with your own branding instead of a generic app name. */
     companyName?: string | undefined;
-    /** Declares the per-principal metering axis for this app context — enables visibility into and (with `principalUsageCap`) enforcement of per-principal usage within this context. Either `user` (per end-user) or `scope:<namespace>` (per declared namespace, e.g. `scope:org`). Omit to leave context-only accounting unchanged (the default). Only takes effect for a partner with the corresponding account-level feature enabled. */
+    /** Declares the per-principal metering axis for this app context — enables visibility into and (with `principalUsageCap`) enforcement of per-principal usage within this context. Either `user` (per end-user) or `scope:<namespace>` (per declared namespace, e.g. `scope:org`). Omit to leave context-only accounting unchanged (the default). Only takes effect for an account with the corresponding feature enabled. */
     meteringAxis?: string | undefined;
-    /** Per-principal, per-minute request cap, for the opt-in per-principal burst-protection feature. Only takes effect for a partner with that feature enabled on their account. Omit to leave unset. */
+    /** Per-principal, per-minute request cap, for the opt-in per-principal burst-protection feature. Only takes effect for an account with that feature enabled. Omit to leave unset. */
     principalBurstLimit?: number | undefined;
-    /** Per-principal, per-billing-period operation cap, for the opt-in per-principal usage/quota feature. Omit to track per-principal usage without enforcing a cap. Only takes effect for a partner with that feature enabled on their account. */
+    /** Per-principal, per-billing-period operation cap, for the opt-in per-principal usage/quota feature. Omit to track per-principal usage without enforcing a cap. Only takes effect for an account with that feature enabled. */
     principalUsageCap?: number | undefined;
     /** Whether read-access logging is on by default for this context. A schema that sets `capabilities.readAccessLog` overrides it; a schema that does not inherits it. Omit to leave unchanged. */
     readAccessLogDefault?: boolean | undefined;

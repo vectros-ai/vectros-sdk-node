@@ -27,13 +27,13 @@ export interface SearchRequest {
     filters?: Record<string, Vectros.FilterValue>;
     /** How query terms are matched by the keyword engine when the mode is TEXT or HYBRID. OR matches content containing any query term (broadest recall). AND requires every term to be present (higher precision). PHRASE requires the terms to appear as a contiguous sequence. COMPLEX enables the full query syntax, including boolean operators, field-scoped queries, and range filters. When omitted, defaults to PHRASE (with a slop of 3) in HYBRID mode and OR in TEXT mode. */
     textMode?: SearchRequest.TextMode;
-    /** The minimum semantic similarity score a result must have to be included, on a scale of 0.0 to 1.0. Results scoring below this threshold are dropped. Applies when the mode is SEMANTIC or HYBRID. */
+    /** The minimum semantic similarity score a result must have to be included, on a scale of 0.0 to 1.0. Results scoring below this threshold are dropped. Applies when the mode is SEMANTIC or HYBRID. Defaults to 0.15 when omitted. */
     minSimilarity?: number;
-    /** A relative relevance floor for the keyword leg, given as a fraction from 0 to 1 of the TOP result's score — results scoring below (top score × this value) are dropped. Keyword scores are unbounded and depend on the query, so this is a relative cutoff rather than an absolute score: for example, 0.5 keeps only results at least half as relevant as the best hit. Applies when the mode is TEXT or HYBRID. Omit it (or use a value of 0 or less) to keep all keyword matches. */
+    /** A relative relevance floor for the keyword leg, given as a fraction from 0 to 1 of the TOP result's score — results scoring below (top score × this value) are dropped. Keyword scores are unbounded and depend on the query, so this is a relative cutoff rather than an absolute score: for example, 0.5 keeps only results at least half as relevant as the best hit. Applies when the mode is HYBRID. Defaults to 0.3 when omitted; send 0 to keep all keyword matches. */
     minTextRelevance?: number;
     /** The phrase-match slop: the number of intervening positions allowed between query terms when `textMode` is PHRASE (0 means the terms must be exactly adjacent). Ignored for the other text modes. */
     slop?: number;
-    /** When true, returns at most one chunk per source item, so a single document or record cannot appear more than once in the results. */
+    /** When true, returns at most one chunk per source item, so a single document or record cannot appear more than once in the results. Defaults to true. */
     uniqueDocuments?: boolean;
     /** Narrow results to specific content types. When omitted, empty, or set to both values, the search returns all content (documents and records) in a single unified result set, which is the default behavior. Each returned result carries a `sourceType` discriminator so you can tell documents and records apart. Pass `["documents"]` for documents only, or `["records"]` for records only. */
     contentTypes?: SearchRequest.ContentTypes.Item[];

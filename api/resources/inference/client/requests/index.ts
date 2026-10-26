@@ -1,3 +1,3 @@
-export type { ChatRequest } from "./ChatRequest.js";
-export type { DocumentAskRequest } from "./DocumentAskRequest.js";
-export type { RagRequest } from "./RagRequest.js";
+export { ChatRequest } from "./ChatRequest.js";
+export { DocumentAskRequest } from "./DocumentAskRequest.js";
+export { RagRequest } from "./RagRequest.js";

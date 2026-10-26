@@ -12,11 +12,11 @@ export interface CreditBreakdown {
     searchIngest?: number | undefined;
     /** searchIngest in milli-credit precision (exact) */
     searchIngestMilli?: number | undefined;
-    /** Credits consumed by document downloads */
+    /** Credits consumed by document writes and deletes. Document downloads are charged on `dataOut`. */
     documents?: number | undefined;
     /** documents in milli-credit precision (exact) */
     documentsMilli?: number | undefined;
-    /** Credits consumed by record writes */
+    /** Credits consumed by record writes and deletes */
     records?: number | undefined;
     /** records in milli-credit precision (exact) */
     recordsMilli?: number | undefined;

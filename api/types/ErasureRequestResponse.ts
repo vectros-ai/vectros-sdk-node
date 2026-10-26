@@ -18,7 +18,7 @@ export interface ErasureRequestResponse {
     createdAt?: string | undefined;
     /** When the erasure finished, as an ISO-8601 UTC timestamp. Null until `status` is `completed`. */
     completedAt?: string | undefined;
-    /** Reason the erasure failed, suitable for display or programmatic handling so you do not have to inspect logs. Present only when `status` is `failed`; null otherwise. */
+    /** Free text describing why the erasure failed. Its wording is not stable, so do not branch on it. Present only when `status` is `failed`; null otherwise. */
     failureReason?: string | undefined;
     certificate?: Vectros.ErasureCertificate | undefined;
 }

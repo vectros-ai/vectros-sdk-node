@@ -20,6 +20,10 @@ export interface RagSearchResult {
     contextText?: string | undefined;
     /** A display-ready snippet with the matched query terms emphasized — suitable for search-result UIs. */
     snippet?: string | undefined;
+    /** Whether the result is a document (`PartnerDocument`) or a record (`GenericRecord`). */
+    sourceType?: string | undefined;
+    /** The name of the schema type the matched item is bound to: the record type of a record, or the schema type of a document that has a schema. Null for a document ingested without a schema. */
+    typeName?: string | undefined;
     /** Metadata you supplied on the source document, such as its title, folder id, or custom tags. */
     metadata?: Record<string, unknown> | undefined;
     /** The result's creation timestamp, as an ISO-8601 UTC timestamp. */

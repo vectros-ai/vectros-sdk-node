@@ -6,6 +6,6 @@ import type * as Vectros from "../index.js";
  * A standard JWKS document (RFC 7517) containing the public-key material used to verify platform-signed JWTs.
  */
 export interface JwksResponse {
-    /** The set of JSON Web Keys. Today this contains a single P-256 EC public key; the array can hold more than one key during a rotation. */
+    /** The set of JSON Web Keys. It contains a single P-256 EC public key. */
     keys?: Vectros.Jwk[] | undefined;
 }

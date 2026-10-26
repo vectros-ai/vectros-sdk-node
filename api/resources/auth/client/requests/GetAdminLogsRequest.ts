@@ -25,6 +25,6 @@ export interface GetAdminLogsRequest {
     contextId?: string;
     /** If true, return only requests with a status of 400 or higher. */
     errorsOnly?: boolean;
-    /** Maximum number of log entries to return per page (1–500; defaults to 200). */
+    /** Maximum number of log entries to return (1–500; defaults to 200). There is no cursor. A credential confined to one app context sees only that context's entries. */
     limit?: number;
 }

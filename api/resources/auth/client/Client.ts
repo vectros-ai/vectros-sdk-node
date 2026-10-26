@@ -247,7 +247,7 @@ export class AuthClient {
     }
 
     /**
-     * Creates a scoped API key (an `ssk_*` secret) that inherits its permissions from an existing access profile in your account. The call is idempotent on the combination of tenant, context, user, and key name: re-issuing the same request returns the existing key WITHOUT re-disclosing its raw secret. The raw key is returned ONLY in this response — store it securely, as it cannot be retrieved again. Requires the `keys:c` scope. If you use a scoped credential, `keys:c` alone is not sufficient: because the minted key is durably bound to the profile you name, the profile's effective scopes may not exceed your own, and you may only mint against a profile whose `identityOverrides` values your own identity holds. Minting a key bound to your OWN principal needs nothing further; minting one bound to a DIFFERENT principal additionally requires the `delegate-mint` capability (`granted_capabilities`) on your credential — without it the request is refused. A root API key (`sk_`) is exempt from all three bounds. The profile you name must be `active` AND the user you name must not be `SUSPENDED`: either is refused with `409`, and no root exemption applies to that. Both refusals stop ISSUANCE only. Suspending the profile additionally stops credentials already bound to it, within about five minutes; suspending the user does not stop their existing keys at all. A `PENDING` user is fine.
+     * Creates a scoped API key (an `ssk_*` secret) that inherits its permissions from an existing access profile in your account. The call is idempotent on the combination of tenant, context, user, and key name: re-issuing the same request returns the existing key WITHOUT re-disclosing its raw secret. The raw key is returned ONLY in this response — store it securely, as it cannot be retrieved again. Requires the `keys:c` scope. If you use a scoped credential, `keys:c` alone is not sufficient: because the minted key is durably bound to the profile you name, the profile's effective scopes may not exceed your own, and you may only mint against a profile whose `identityOverrides` values your own identity holds. Minting a key bound to your OWN principal needs nothing further; minting one bound to a DIFFERENT principal additionally requires the `delegate-mint` capability (`granted_capabilities`) on your credential — without it the request is refused. A root API key (`sk_`) is exempt from all three bounds. The profile you name must be `active` AND the user you name must not be `SUSPENDED`: either is refused with `409`, and no root exemption applies to that. Both refusals stop ISSUANCE only. Suspending the profile or the user additionally stops credentials already bound to it, within about five minutes. A `PENDING` user is fine.
      *
      * @param {Vectros.CreateScopedKeyRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -653,6 +653,7 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -718,6 +719,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -818,6 +821,8 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.PaymentRequiredError}
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -883,6 +888,10 @@ export class AuthClient {
                     throw new Vectros.PaymentRequiredError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -988,6 +997,7 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -1057,6 +1067,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -1160,6 +1172,7 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -1219,6 +1232,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -1389,13 +1404,14 @@ export class AuthClient {
     }
 
     /**
-     * Updates an app context. This is a partial update: any field you omit (or send as null) keeps its existing value. The `contextId` is immutable and is taken from the URL path, so any `contextId` in the request body is ignored. Patchable fields: `name`, `description`, `companyName`; the per-principal metering trio (`meteringAxis`, `principalBurstLimit`, `principalUsageCap` — only takes effect for a partner with the corresponding account-level feature enabled); `readAccessLogDefault` (the PHI read-access-logging context default); and `identityProjectionClaims` (requires the platform provisioning capability on top of the ordinary scope below — see its own field description). Requires the `app-contexts:u` scope.
+     * Updates an app context. This is a partial update: any field you omit (or send as null) keeps its existing value. The `contextId` is immutable and is taken from the URL path, so any `contextId` in the request body is ignored. Patchable fields: `name`, `description`, `companyName`; the per-principal metering trio (`meteringAxis`, `principalBurstLimit`, `principalUsageCap` — only takes effect for an account with the corresponding feature enabled); `readAccessLogDefault` (the PHI read-access-logging context default); and `identityProjectionClaims` (requires the platform provisioning capability on top of the ordinary scope below — see its own field description). Requires the `app-contexts:u` scope.
      *
      * @param {Vectros.UpdateAppContextRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -1453,6 +1469,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -1637,6 +1655,7 @@ export class AuthClient {
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -1698,6 +1717,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -1725,6 +1746,7 @@ export class AuthClient {
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -1776,6 +1798,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -2115,6 +2139,7 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -2170,6 +2195,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -2185,7 +2212,7 @@ export class AuthClient {
     }
 
     /**
-     * Deregisters a trusted third-party IdP issuer. Requires a root API key or the bootstrap's provisioning capability. A credential confined to one app context may only deregister an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId. A root API key may deregister any issuer. Refused if any user account was ever created or matched via this issuer (by a prior self-signup or accepted invite, through `POST /v1/auth/token/exchange`) — that access cannot be silently orphaned. This is unconditional on the affected users' `status`: suspending them first does not lift the refusal. **A bound registration cannot be replaced, self-service, within its own app context**: registering a replacement issuer under a different issuerId in the SAME context also fails, because the context's one-active-issuer claim is released only when THIS registration is deleted. Two real options: suspend this issuer (stops new exchanges immediately) and register a replacement under a DIFFERENT app context — note that targets a different context, so this context's existing users/roles/access profiles are not carried over; or contact your platform operator, who can force-release this registration so a replacement may be registered in the SAME context under a new issuerId. **The operator path is not a lighter-weight alternative to the first — it PERMANENTLY RETIRES this issuerId and leaves every bound user unable to ever exchange through it again; it does not preserve continuity for them any better than registering under a different context does.** An issuer that has never been used for an exchange (no bound users yet) can always be deregistered.
+     * Deregisters a trusted third-party IdP issuer. Requires a root API key or the bootstrap's provisioning capability. A credential confined to one app context may only deregister an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId. A root API key may deregister any issuer. Refused if any user account was ever created or matched via this issuer (by a prior self-signup or accepted invite, through `POST /v1/auth/token/exchange`) — that access cannot be silently orphaned. This is unconditional on the affected users' `status`: suspending them first does not lift the refusal. **A bound registration cannot be replaced, self-service, within its own app context**: registering a replacement issuer under a different issuerId in the SAME context also fails, because the context's one-active-issuer claim is released only when THIS registration is deleted. Two real options: suspend this issuer (stops new exchanges immediately) and register a replacement under a DIFFERENT app context — note that targets a different context, so this context's existing users/roles/access profiles are not carried over; or contact support, who can force-release this registration so a replacement may be registered in the SAME context under a new issuerId. **The support path is not a lighter-weight alternative to the first — it PERMANENTLY RETIRES this issuerId and leaves every bound user unable to ever exchange through it again; it does not preserve continuity for them any better than registering under a different context does.** An issuer that has never been used for an exchange (no bound users yet) can always be deregistered.
      *
      * @param {Vectros.DeleteIssuerRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2337,7 +2364,7 @@ export class AuthClient {
     }
 
     /**
-     * Registers a trusted third-party IdP issuer that BYO-IdP token exchange (`POST /v1/auth/token/exchange`) may accept a `subject_token` from. Requires a root API key or the CLI bootstrap's provisioning capability — never an ordinary partner-grantable scope. A credential authorized only via the provisioning capability may register only against the app context it is bound to; naming a different one returns 403. A root API key is unaffected and may register against any of its contexts. A registration without `restrictedToDomain` is created `pending_verification` with a one-time challenge (`verificationClaim`, `verificationNonce`, `verificationExpiresAt`) and accepts no token until you prove you control the issuer with `POST /v1/auth/issuers/{issuerId}/verify`; it claims no `(issuer, audience)` pair until then, so registering never reveals whether another tenant holds one. A registration scoped to an already-verified domain with `restrictedToDomain` is `active` at once. Idempotent by `issuerId` within your tenant. If `issuerId` collides with a registration owned by a different app context than the one you're confined to, the request fails with 400 rather than returning that context's configuration. An app context may have at most one active issuer — deregister the existing one first if you need to replace it. One issuer MAY serve several contexts today, each via its own registration row with a distinct `audience`. Optionally name `restrictedToDomain` to scope this registration's (issuer, audience) uniqueness to a specific VERIFIED domain rather than the bare pair — see that field's own description. A domain-scoped registration proves control of the DOMAIN, not of the issuer itself: it routes only tokens carrying that domain's `hd` claim.
+     * Registers a trusted third-party IdP issuer that BYO-IdP token exchange (`POST /v1/auth/token/exchange`) may accept a `subject_token` from. Requires a root API key or the CLI bootstrap's provisioning capability — never an ordinary grantable scope. A credential authorized only via the provisioning capability may register only against the app context it is bound to; naming a different one returns 403. A root API key is unaffected and may register against any of its contexts. A registration without `restrictedToDomain` is created `pending_verification` with a one-time challenge (`verificationClaim`, `verificationNonce`, `verificationExpiresAt`) and accepts no token until you prove you control the issuer with `POST /v1/auth/issuers/{issuerId}/verify`; it claims no `(issuer, audience)` pair until then, so registering never reveals whether another tenant holds one. A registration scoped to an already-verified domain with `restrictedToDomain` is `active` at once. Idempotent by `issuerId` within your tenant. If `issuerId` collides with a registration owned by a different app context than the one you're confined to, the request fails with 400 rather than returning that context's configuration. An app context may have at most one active issuer — deregister the existing one first if you need to replace it. One issuer MAY serve several contexts, each via its own registration row with a distinct `audience`. Optionally name `restrictedToDomain` to scope this registration's (issuer, audience) uniqueness to a specific VERIFIED domain rather than the bare pair — see that field's own description. A domain-scoped registration proves control of the DOMAIN, not of the issuer itself: it routes only tokens carrying that domain's `hd` claim.
      *
      * @param {Vectros.IssuerRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2812,6 +2839,7 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -2868,6 +2896,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -2980,6 +3010,7 @@ export class AuthClient {
      * @throws {@link Vectros.UnauthorizedError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ContentTooLargeError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -3033,6 +3064,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 413:
+                    throw new Vectros.ContentTooLargeError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:

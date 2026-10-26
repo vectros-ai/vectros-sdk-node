@@ -25,7 +25,7 @@ export class InferenceClient {
     }
 
     /**
-     * Returns the whole platform model catalog, whatever your plan: `availableOn` names each model's plan tiers. Each entry also carries the context window and the exact credit rates charged per 1K input and output tokens. A model reached through a `providerAlias` is not listed. Use this to populate model pickers and to validate a request before calling `/v1/chat`, `/v1/rag`, or `/v1/documents/{id}/ask`.
+     * Returns the whole platform model catalog, whatever your plan: `availableOn` names each model's plan tiers. Each entry also carries the context window and the credit rates per 1K input and output tokens: `regionPricing.base` for global-region requests, `regionPricing.us` for default requests, and `longContext` for prompts over its threshold. A model reached through a `providerAlias` is not listed. Use this to populate model pickers and to validate a request before calling `/v1/chat`, `/v1/rag`, or `/v1/documents/{id}/ask`.
      *
      * @param {InferenceClient.RequestOptions} requestOptions - Request-specific configuration.
      *
@@ -78,7 +78,7 @@ export class InferenceClient {
     }
 
     /**
-     * Streams a model response as Server-Sent Events (SSE). Send the full conversation history in the `messages` array; a message with role `system` is extracted and used as the system prompt. Token cost is debited from your pre-paid inference balance (in cents), and a small per-call flat fee is debited from your monthly platform credit allowance. Requires the `inference:r` scope.
+     * Streams a model response as Server-Sent Events (SSE). Send the full conversation history in the `messages` array; a message with role `system` is extracted and used as the system prompt. On a pre-paid account, token cost is debited from your inference balance; usage-billed accounts accrue it for post-billing. A request routed through your own `providerAlias` incurs no Vectros token cost. A small per-call flat fee is charged to your monthly credit allowance, except when the call fails on the server side. Requires the `inference:r` scope.
      */
     public chatInference(
         request: Vectros.ChatRequest,
@@ -146,6 +146,8 @@ export class InferenceClient {
                     throw new Vectros.ContentTooLargeError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                case 503:
+                    throw new Vectros.ServiceUnavailableError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -230,6 +232,8 @@ export class InferenceClient {
                     throw new Vectros.ContentTooLargeError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                case 503:
+                    throw new Vectros.ServiceUnavailableError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -313,6 +317,8 @@ export class InferenceClient {
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 case 500:
                     throw new Vectros.InternalServerError(_response.error.body as unknown, _response.rawResponse);
+                case 503:
+                    throw new Vectros.ServiceUnavailableError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,

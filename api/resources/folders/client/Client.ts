@@ -105,6 +105,8 @@ export class FoldersClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -167,6 +169,10 @@ export class FoldersClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -255,6 +261,7 @@ export class FoldersClient {
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -311,6 +318,8 @@ export class FoldersClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -333,6 +342,7 @@ export class FoldersClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -383,6 +393,8 @@ export class FoldersClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -398,7 +410,7 @@ export class FoldersClient {
     }
 
     /**
-     * Partially updates a folder using an RFC 7386 JSON Merge Patch. The `name`, `description`, and ownership fields (`userId`, `scopes`) are applied when present and left unchanged when omitted; sending any of these as null is rejected, because clearing a field is not supported in this release (omit it instead). `slug` and `parentFolderId` are immutable — a folder cannot be re-slugged or moved via the API — and the request is rejected if either is present. Pass `expectedVersion` for optimistic concurrency (you get a 409 if the folder changed since you last read it). Requires the `folders:u` scope.
+     * Partially updates a folder using an RFC 7386 JSON Merge Patch. The `name`, `description`, and ownership fields (`userId`, `scopes`) are applied when present and left unchanged when omitted; sending any of these as null is rejected, because clearing a field is not supported (omit it instead). `slug` and `parentFolderId` are immutable — a folder cannot be re-slugged or moved via the API — and the request is rejected if either is present. Pass `expectedVersion` for optimistic concurrency (you get a 409 if the folder changed since you last read it). Requires the `folders:u` scope.
      *
      * @param {Vectros.PatchFolderRequest} request
      * @param {FoldersClient.RequestOptions} requestOptions - Request-specific configuration.

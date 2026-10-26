@@ -168,7 +168,7 @@ export class ComplianceClient {
     }
 
     /**
-     * Submits an asynchronous job to export your account's data, or a single end-subject's data, across the requested contexts. The request returns 202 with an `exportJobId`; poll `GET /v1/admin/export/{id}` until the job completes to obtain a short-lived presigned download URL and a manifest describing the payload. Requires a root API key — a scoped credential is rejected with 403.
+     * Reserved: with a root API key this operation answers `501` and starts no job. The request and response shapes are published so that integrations can be written against them: a request names the contexts, or a single end-subject, to export, and the response carries an `exportJobId` that `GET /v1/admin/export/{id}` reports on. Requires a root API key — a scoped credential is rejected with 403.
      *
      * @param {Vectros.ExportRequest} request
      * @param {ComplianceClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -240,7 +240,7 @@ export class ComplianceClient {
     }
 
     /**
-     * Polls an export job by id. While the job is still running this returns its status only; once it completes, the response also includes a short-lived presigned download URL and a manifest (format version and per-context counts). Requires a root API key.
+     * Reserved: with a root API key this operation answers `501`. Its response shape is the one the export operation above refers to: the job status, and a short-lived presigned download URL and a manifest (format version and per-context counts) for a completed job. Requires a root API key.
      *
      * @param {Vectros.GetExportRequest} request
      * @param {ComplianceClient.RequestOptions} requestOptions - Request-specific configuration.

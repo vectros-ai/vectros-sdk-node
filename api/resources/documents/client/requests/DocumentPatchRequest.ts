@@ -22,7 +22,7 @@ export interface DocumentPatchRequest {
     userId?: string;
     /** The document's scope ownership, as `namespace:value` entries (at most 2 namespaces; a value is 1-128 characters, a letter or digit first then letters/digits/`_`/`-`) — the COMPLETE new selection when supplied (`[]` clears it to the private tier). Omit to leave ownership unchanged. */
     scopes?: string[];
-    /** Optimistic-concurrency token. Pass the `version` you last read to make this update conditional — rejected with `409 VERSION_CONFLICT` if the document changed since. Omit for last-write-wins. */
+    /** Optimistic-concurrency token. Pass the `version` you last read to make this update conditional — rejected with `409 VERSION_CONFLICT` if the document changed since. Omit it to update whatever version is stored; an update that collides with another write to the same document while it is being applied is still rejected with `409 VERSION_CONFLICT`. */
     expectedVersion?: number;
     /** Caller-controlled lifecycle status. `ARCHIVED` soft-retracts the document (pulled from search, kept and recoverable); `ACTIVE` restores it. Omit to leave unchanged. */
     status?: DocumentPatchRequest.Status;

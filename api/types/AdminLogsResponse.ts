@@ -8,7 +8,7 @@ import type * as Vectros from "../index.js";
 export interface AdminLogsResponse {
     /** Matching log entries, most recent first. Bounded by the request `limit` (default 200, max 500). */
     entries: Vectros.LogEntry[];
-    /** True if more matching rows exist than the requested limit. When true, narrow the time window or add a filter (resource/method/keyId) to see older entries. */
+    /** True when the result filled the requested `limit`, so more matching rows may exist. When true, narrow the time window or add a filter (resource/method/keyId) to see older entries. */
     truncated: boolean;
     /** Wall-clock time spent retrieving these results, in milliseconds. Useful for diagnosing slow queries (large time windows or high-traffic accounts). */
     queryDurationMs: number;

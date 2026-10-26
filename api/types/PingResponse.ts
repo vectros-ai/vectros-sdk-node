@@ -18,7 +18,7 @@ export interface PingResponse {
     principalKeyId: string;
     /** The label you set on the originating `sk_*` or `ssk_*` key. Omitted when no label is set, or when the credential is an `st_*` token. */
     principalLabel?: string | undefined;
-    /** The actions this credential is allowed to perform. Present only when `principalType` is `scoped_key`. */
+    /** The action verbs granted across the credential's scope clauses, in `resource:ops` form. Not narrowed by data scope. Present only when `principalType` is `scoped_key`. */
     allowedActions?: string[] | undefined;
     dataScope?: Vectros.DataScope | undefined;
     /** When the token expires, as seconds since the Unix epoch (mirrors the JWT `exp` claim). Present only when `principalType` is `token`. */

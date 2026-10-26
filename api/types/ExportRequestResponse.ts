@@ -3,7 +3,7 @@
 import type * as Vectros from "../index.js";
 
 /**
- * Job handle and result for an asynchronous data-export request. While the job runs this carries its status; once it completes it also carries a short-lived presigned download URL and a manifest describing the exported payload.
+ * Reserved shape; the operation answers 501. Job handle and result for an asynchronous data-export request. While the job runs this carries its status; once it completes it also carries a short-lived presigned download URL and a manifest describing the exported payload.
  */
 export interface ExportRequestResponse {
     /** Opaque identifier for the export job. Pass this to `GET /v1/admin/export/{id}` to poll for status and, once complete, the download URL. */

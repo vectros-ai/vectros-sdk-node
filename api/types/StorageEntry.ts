@@ -8,6 +8,6 @@ export interface StorageEntry {
     bytes?: number | undefined;
     /** Estimated credits this period for this storage (final billing at cycle end) */
     estimatedCredits?: number | undefined;
-    /** estimatedCredits in milli-credit precision (exact). Storage credits are computed in whole-credit units today (HUNDRED_MB granularity), so this currently equals estimatedCredits * 1000 — the field is exposed for future-proofing when sub-credit storage rates land. */
+    /** estimatedCredits in milli-credit precision (1 credit = 1000 milli-credits). Storage is priced in whole credits per 100 MB, so this equals estimatedCredits * 1000. */
     estimatedCreditsMilli?: number | undefined;
 }

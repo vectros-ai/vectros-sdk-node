@@ -127,6 +127,8 @@ export class IdentityClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -192,6 +194,10 @@ export class IdentityClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -289,6 +295,7 @@ export class IdentityClient {
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -354,6 +361,8 @@ export class IdentityClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -375,6 +384,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -432,6 +442,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -702,6 +714,7 @@ export class IdentityClient {
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -766,6 +779,8 @@ export class IdentityClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -788,6 +803,7 @@ export class IdentityClient {
      *
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -845,6 +861,8 @@ export class IdentityClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -926,7 +944,7 @@ export class IdentityClient {
     }
 
     /**
-     * Registers a new scope namespace and declares whether its values resolve to identity entities (`entityBacked`). Also requires `specificityRank`, an explicit, account-unique position in the specificity order used to break recordType schema-resolution ties. Requires a root API key or one of the CLI bootstrap's two provisioning capabilities — never an ordinary partner-grantable scope. A bootstrap credential's registration is confined to its own app context UNLESS it additionally holds the tenant-wide namespace-provisioning capability and `contextId` is omitted, in which case it may register a TENANT-WIDE namespace (visible to every context). `org` and `client` are reserved names, registered the same way as any other namespace.
+     * Registers a new scope namespace and declares whether its values resolve to identity entities (`entityBacked`). Also requires `specificityRank`, an explicit, account-unique position in the specificity order used to break recordType schema-resolution ties. Requires a root API key or one of the CLI bootstrap's two provisioning capabilities — never an ordinary grantable scope. A bootstrap credential's registration is confined to its own app context UNLESS it additionally holds the tenant-wide namespace-provisioning capability and `contextId` is omitted, in which case it may register a TENANT-WIDE namespace (visible to every context). `org` and `client` are reserved names, registered the same way as any other namespace.
      *
      * @param {Vectros.RegisterNamespaceRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -1244,7 +1262,7 @@ export class IdentityClient {
     }
 
     /**
-     * Updates mutable fields on an existing user (such as email, status, payload, or schema binding). The `type` field is immutable after creation, and `email` cannot be changed while an invitation to that user is still outstanding — revoke the invitation, or invite the new address instead. This endpoint also activates an invited user: a PUT that moves a PENDING user to ACTIVE and carries `inviteToken`, `externalSubject`, and `emailVerifiedAttestation=true` completes the invitation. **`externalSubject` set this way is NOT an authentication binding and does not enable sign-in anywhere** — not the Vectros DevPortal/Admin App/web apps, and not `/v1/auth/token/exchange` either; both are granted only by the invitee authenticating themselves. If the invitee needs dev-portal/web-app access, send them the invitation link and let them accept it directly. If the invitee needs to sign in via token exchange, have them redeem `inviteToken` themselves at `/v1/auth/token/exchange` with their own credential — Vectros verifies it there and computes its own value for this field from the verified credential. The value you send here is stored exactly as-is, with no normalization, and does NOT automatically match or deduplicate against what a later token-exchange sign-in computes for the same real-world identity. Call this endpoint directly only if you run your own backend and want Vectros to record which of your own users a given account corresponds to — treat this field as informational for that purpose, not as a way to pre-authorize sign-in. Requires the `users:u` scope.
+     * Updates mutable fields on an existing user (such as email, status, payload, or schema binding). The `type` field is immutable after creation, and `email` cannot be changed while an invitation to that user is still outstanding — revoke the invitation, or invite the new address instead. This endpoint also activates an invited user: a PUT that moves a PENDING user to ACTIVE and carries `inviteToken`, `externalSubject`, and `emailVerifiedAttestation=true` completes the invitation. **`externalSubject` set this way is NOT an authentication binding and does not enable sign-in anywhere** — not the Vectros DevPortal/Admin App/web apps, and not `/v1/auth/token/exchange` either; both are granted only by the invitee authenticating themselves. A subject stored through `PUT /v1/users/{id}` does not make the person a member of your account: it is ignored for the tenant claims in sign-in tokens, the developer portal's memberships list and tenant switching, and an ownership transfer. To give such a person access, delete the user and invite them again; accepting the invitation binds the subject and counts it. If the invitee needs dev-portal/web-app access, send them the invitation link and let them accept it directly. If the invitee needs to sign in via token exchange, have them redeem `inviteToken` themselves at `/v1/auth/token/exchange` with their own credential — Vectros verifies it there and computes its own value for this field from the verified credential. The value you send here is stored exactly as-is, with no normalization, and does NOT automatically match or deduplicate against what a later token-exchange sign-in computes for the same real-world identity. Call this endpoint directly only if you run your own backend and want Vectros to record which of your own users a given account corresponds to — treat this field as informational for that purpose, not as a way to pre-authorize sign-in. Requires the `users:u` scope.
      *
      * @param {Vectros.UpdateUserRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.

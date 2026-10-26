@@ -93,6 +93,7 @@ export * from "./ReadAccessSection.js";
 export * from "./ReadAccessSubject.js";
 export * from "./ReadCalls.js";
 export * from "./ReadsSection.js";
+export * from "./ReasoningDeltaEvent.js";
 export * from "./RecordLookupPage.js";
 export * from "./RecordPage.js";
 export * from "./RecordRequest.js";

@@ -10,6 +10,6 @@ export interface RegionPricing {
     us: Vectros.RegionRates;
     /** Premium multiplier applied to the US rate (1.0 or greater). A value of 1.0 means the US and base rates are equal — no premium. */
     regionPremiumFactor: number;
-    /** Whether this model can be served from a non-US region when you opt into global data residency. */
+    /** Whether the model is available when you opt into global data residency. A model that is offered only in US regions is still served from there. */
     globalAvailable: boolean;
 }

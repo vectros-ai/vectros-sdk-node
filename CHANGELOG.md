@@ -9,6 +9,143 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.48.0 — 2026-10-25
+
+This release adds no operation to the SDKs. It adds one optional request field (`reasoning`) and one stream event
+(`reasoning_delta`) to the three streaming routes (`POST /v1/chat`, `POST /v1/rag` and `POST /v1/documents/{id}/ask`), and
+a request that does not set `reasoning` gets exactly the stream it got before. The generated SDKs gain `ReasoningDeltaEvent`
+and the `reasoning` field of the three request types, and more operations raise the SDKs' existing typed errors
+(`ConflictError`, `NotFoundError`, `ServiceUnavailableError`) because their responses are now documented. It also changes the
+documented responses of several routes: the `403` of the three streaming routes for a request that names a `providerAlias`
+whose provider waiver is not in force, the `429` and `503` of the three streaming routes for a pre-paid inference balance step
+that did not complete, and the `409` of the update routes and of `DELETE /v1/schemas/{id}`.
+
+It has **two breaking changes**: one for code that handles every member of a stream event union, and one for accounts whose
+users were created with an `externalSubject` through the API. Several further changes make a request that succeeded before
+fail or answer a different status. Read every entry marked **BREAKING** and every entry that says it
+changes an outcome you may be relying on.
+
+### Breaking changes
+
+- **BREAKING for SDK code that handles every member of a stream event union: `ReasoningDeltaEvent` is a new member of the
+  event union of `POST /v1/chat`, `POST /v1/rag` and `POST /v1/documents/{id}/ask`.** The stream does not change on the wire
+  unless you set `reasoning`, but code that is checked for completeness at build time stops compiling until it handles the new
+  event. **To migrate:** handle `reasoning_delta`, or ignore it.
+  - **TypeScript:** a `switch (event.type)` whose `default` branch assigns the event to `never`, or a `Record` keyed by every
+    event `type`, needs a `"reasoning_delta"` case.
+  - **Java:** an implementation of `ChatStreamEvent.Visitor<T>`, `RagStreamEvent.Visitor<T>` or
+    `DocumentAskStreamEvent.Visitor<T>` must implement `visitReasoningDelta(ReasoningDeltaEvent)`.
+  - **Python:** a type checker that requires an exhaustive `match` over `ChatStreamEvent`, `RagStreamEvent` or
+    `DocumentAskStreamEvent` needs a case for `ChatStreamEvent_ReasoningDelta` (respectively
+    `RagStreamEvent_ReasoningDelta`, `DocumentAskStreamEvent_ReasoningDelta`).
+- **BREAKING for accounts whose users were created with an `externalSubject` through the Vectros API: such a person no longer
+  counts as a member of your account.** A subject stored with `PUT /v1/users/{id}` (rather than bound when the person signs in
+  or accepts an invitation) is ignored for the tenant claims in sign-in tokens, the developer portal's memberships list, tenant
+  switching and the check of an active session, and for an ownership transfer. **To migrate:** delete the user and invite them
+  again; accepting the invitation binds the subject and counts it.
+
+### Added
+
+- **Receive a reasoning model's reasoning as its own stream event (opt-in).** `POST /v1/chat`, `POST /v1/rag` and
+  `POST /v1/documents/{id}/ask` take an optional request field `reasoning`: `"omit"` (the default) or `"stream"`. With
+  `"stream"`, a model that reasons sends each chunk of its reasoning as a `reasoning_delta` event (`type`, `event` and
+  `delta`) before the `content_delta` events of the answer (on RAG after `search_results` and any `truncation_warning`, on
+  document-ask after `document_context`); a model that does not reason sends none. The reasoning counts against `maxTokens`
+  and is billed as output whether or not you ask for it, and `done` is unchanged. Vectros does not log or store it. Any other
+  value of `reasoning` is a `400`. A request routed through `providerAlias` ignores a valid value of the field.
+
+### Changed
+
+- **A request that names a `providerAlias` whose stored provider key cannot be opened now answers `503` before the stream
+  starts.** A provider key you enter from this release on is stored encrypted, and only such a key can produce this `503`: a
+  key stored before this release is read as it is, and becomes an encrypted key the next time you enter it. If the platform
+  cannot open an encrypted key (for example its encryption service is unavailable, or the stored value is unreadable), the three
+  streaming routes answer `503` with a JSON body, nothing is sent to the provider and nothing is charged. The call does not
+  fall back to another route, and the response never carries the key. Retry shortly; if it persists, enter the key again in the
+  developer portal. Creating or updating a provider configuration whose key cannot be stored securely also answers `503`, and
+  nothing is saved.
+
+- **A request that names a `providerAlias` and is refused because the account's provider waiver is not in force now says
+  which case it is.** The status is still `403`; the response body now carries an `errorCode`:
+  - `WAIVER_NOT_SIGNED`: the waiver has not been signed for this tenant. An account owner can sign it in the developer
+    portal (Model Providers).
+  - `WAIVER_TEXT_CHANGED`: the waiver was signed, then its text changed, so the earlier signature no longer counts. An
+    account owner must review and sign the current text in the developer portal (Model Providers).
+  - `WAIVER_REVOKED`: the waiver is revoked for this tenant. An account owner can sign it again.
+
+  The message names the action an account owner takes and says nothing about any other tenant. A client that only checks
+  for `403` is unaffected. A client that wants to react (for example, to alert an owner when a text change has paused
+  unattended calls) can now key on `errorCode`. The documented `403` description of the three routes lists the `errorCode` values.
+
+- **Changes an outcome you may be relying on: a call on a pre-paid balance whose balance step did not complete is no longer
+  reported as a shortage.** When that step
+  was rejected by concurrent requests of yours or interrupted by a temporary fault, the response was `402` (as if the balance
+  were short). It is now:
+  - `429` with `errorCode` `BALANCE_BUSY` and a `Retry-After` header: your balance is momentarily busy with other
+    concurrent requests of yours, so the call did not start. It is not a shortage and not a rate-limit breach: do not top up;
+    retry after the seconds in `Retry-After`.
+  - `503` with `errorCode` `BALANCE_UNAVAILABLE` and a `Retry-After` header: a temporary service fault interrupted the
+    pre-paid balance step of the call. It is not a shortage either: do not top up; retry after the seconds in `Retry-After`.
+
+  Within the balance step, `402` (`INSUFFICIENT_BALANCE`) now means only a shortage; the plan-limit, monthly credit-limit and
+  usage-cap `402`s (`SUBSCRIPTION_LIMIT_EXCEEDED`) are unchanged. On `POST /v1/rag` the existing `503` (a retrieval leg was
+  unavailable and `requireComplete` was set) carries no `errorCode`: branch on `errorCode` to tell the two apart. The documented
+  `429` and `503` descriptions of the three routes list these codes.
+
+- **Changes an outcome you may be relying on: an update that meets another change to the same item at the same moment now
+  returns `409` (`VERSION_CONFLICT`) instead of overwriting it, and an update of an item that was deleted a moment earlier
+  returns `404` instead of bringing it back.** This applies to updates and `?upsert=true` requests on records, documents
+  (including the upload that re-uses an existing document), folders, entities, trigger rules, schemas, issuers, app contexts,
+  roles and namespaces, and to resending an invitation. It happens whether or not the request carries `expectedVersion`. Nothing is
+  written and the other change is kept; re-read the item and retry. The update reads the item with a strongly consistent
+  read, so a write that had already finished is always seen, and a `409` means another request changed the item after that
+  read. The documented `409` (and, for `?upsert=true`, `404`) of these routes says so. Writes made from inside a script, a
+  trigger or a transactional batch are not covered by this and keep their earlier behaviour.
+
+- **Changes an outcome you may be relying on: a delete that meets another write to the same item at the same moment now
+  returns a retryable `409` instead of `500`.** Nothing is deleted when it does, except that a delete of a user confined to one app context may already have removed
+  the user's access profile in that app context.
+
+- **Changes an outcome you may be relying on: `DELETE /v1/schemas/{id}` is now also refused with `409` while users or
+  entities bound to the schema still exist, and `PUT /v1/schemas/{id}` is refused with `409` when it removes the `user` or
+  `entity` surface while rows are bound to it.** This applies to a schema that declares the `user` or `entity` surface; the
+  `409` also answers when the tenant holds more rows than can be checked, and then asks you to retry. Delete the users or
+  entities, or bind them to another schema, first.
+
+- **Changes an outcome you may be relying on: an item whose schema no longer exists is no longer served.** Reading such a
+  record, document, entity or user returns `500` instead of its content; updating it, reading its version history, and reading
+  a document's text, download or answers (`/text`, `/download`, `/ask`) are refused; and lists, batch reads and lookups leave it
+  out. Search and RAG results are not covered by this. Delete the item.
+
+- **Changes an outcome you may be relying on: a request body larger than 8 KB to `POST /v1/auth/token/exchange` or to the
+  developer portal's unauthenticated request-access and invitation-redemption routes now returns `413`,** counted in
+  bytes. A `GET` or `DELETE` that carries a body longer than the limit of its router (counted in characters) now returns `413`
+  as the other methods do.
+
+- **The `400` for a request body that is not valid JSON, or does not have the expected shape, no longer repeats the JSON
+  parser's own text.** The message is fixed and names the offending field where there is one.
+
+- **Changes an outcome you may be relying on: a webhook delivery is now sent over HTTP/1.1 with the `User-Agent`
+  `Apache-HttpClient/<version>`; it was `Java-http-client/<version>`.** A receiver, firewall or allow-list that matches on the
+  `User-Agent` of a delivery needs updating. The signature headers and the body are unchanged.
+
+- **API reference: corrected descriptions and documented responses.** The reference states the defaults of `minSimilarity`
+  (0.15), `minTextRelevance` (0.3, HYBRID mode only) and `uniqueDocuments` (true); documents more `409` and `404` responses (the
+  create routes with `?upsert=true`, the delete routes, access profiles, issuers, schema update and delete), the `413` of
+  `POST /v1/auth/token/exchange`, and the `sourceType` and `typeName` of a RAG `search_results` entry; describes `POST /v1/admin/export`,
+  `GET /v1/admin/export/{id}` and `POST /v1/records/lookup/batch` as reserved operations that answer `501`; and corrects the
+  descriptions of the usage report's read-access credits, the billing of `POST /v1/chat`, the credential types, the
+  `expectedVersion` fields and the invitation `fromName` default.
+
+### Fixed
+
+- **The Python SDK sends its own version in its `User-Agent` header.** It sent the version of an earlier release.
+- **A record update whose schema your credential's scope does not reach answers a uniform `400` (`Schema not found`) instead of
+  `500`.**
+- **A plan change, a limit override or a signed global-region waiver now reaches your existing API keys.** It takes effect at
+  your account's next plan, override or residency change; keys are not updated retroactively.
+- **A call's pre-paid balance hold is applied once.** A transient storage fault could debit the hold twice.
+
 ## 0.47.0 — 2026-10-12
 
 This release changes the default model, adds two models, lets streamed answers run for up to five minutes, and
@@ -71,8 +208,7 @@ outcome you may be relying on.
   requests applies to both. `GET /v1/models` lists its context window of 1,000,000 tokens, its standard rates in
   `inputCreditsPer1kTokens`, `outputCreditsPer1kTokens` and `regionPricing`, and the rates for a longer prompt in a new
   optional `longContext` object (`promptTokensOver`, `multiplier`, and `base` and `us` rates); no other model has that
-  object. The length of the prompt is the one the model provider reports when the call completes (if the connection is
-  closed first, the platform's estimate is used). The balance hold taken before the call assumes the higher rate when the
+  object. The length of the prompt is the one the model provider reports when the call completes. The balance hold taken before the call assumes the higher rate when the
   prompt looks near or over the line, and the unused part is refunded, so a balance-mode account whose balance covers the
   real cost but not the held amount can be refused with `402`. As for every model, token cost is rounded to whole cents per call, so a small
   call costs 0 cents in tokens and only the per-call platform fee applies. The model can reason before it answers; the
@@ -135,9 +271,9 @@ outcome you may be relying on.
   `claude-haiku-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5` and `claude-opus-5-5`, whose tokenizer counts more tokens
   for the same text, the estimate is larger (for `claude-sonnet-5` and `claude-opus-5-5`, larger than before). It sizes
   the balance hold taken before a call (still refunded down to the actual cost, but a larger hold can be refused with
-  `402` on a balance that is close to it), the retrieved-context budget of `POST /v1/rag` (less text fits the same token
-  window), and the input and output billed for a call whose client disconnects before the provider reports its usage. A
-  call that completes is billed on the provider's reported usage.
+  `402` on a balance that is close to it), and the retrieved-context budget of `POST /v1/rag` (less text fits the same token
+  window). A call whose client disconnects can still run to completion and is then billed on the provider's reported
+  usage; the platform does not currently stop the model call when the client disconnects on the public API.
 - **`GET /developer/me` accepts `?tenant=test|live` and returns your own principal in that tenant,** so the CLI's
   `--principal me` resolves correctly in the test tenant. A value other than `test` or `live` answers `400`, and a
   tenant where you have no membership answers `404`.
@@ -2451,7 +2587,7 @@ called out individually below with its own migration guidance.
 
 - **The `create_own_scoped_key` literal `allowed_actions` verb has been removed.** It was never wired to
   any enforcement path — no handler ever checked for it — so authoring a scope with this literal granted
-  no actual capability beyond what was otherwise already true of the credential; the 0.33.1 entry
+  no actual capability beyond what was otherwise already true of the credential; the 0.34.0 entry
   describing it as a valid, working option was inaccurate for the entire time it stood. Correcting the
   record here rather than editing that historical entry, which stands as released. An `allowed_actions`
   entry naming `create_own_scoped_key` now fails author-time validation with a 400, same as any other
@@ -3140,6 +3276,20 @@ and search to them, exactly like the built-in org and client scopes.
   those fields explicitly, use `PATCH` (which preserves omitted fields), or pass `?allowClear=true`
   to confirm a full replacement. `PATCH` semantics are unchanged.
 
+- **Scope `allowed_actions` must use the compact `resource:ops` form.** When you author an access
+  profile, role, or scoped token, each `allowed_actions` entry must be `*`, the compact
+  `resource:ops[:type]` form (e.g. `records:cru`, `documents:r`, `search:r`, `keys:crd`,
+  `profiles:cru`), or the literal `create_own_scoped_key`. Bare verbs (`read`, `write`, `delete`)
+  and the older `admin:keys` / `admin:profiles` shorthand are **no longer accepted**: they matched
+  no resource at runtime, so a credential authored with them was silently granted nothing. They are
+  now rejected when you save, so the mistake surfaces immediately. The `s` letter inside the compact
+  form still grants sensitive-field reveal for a record type (e.g. `records:rs:patient`).
+- **Scope `data_scope` honors the public `userId` ownership key.** A `data_scope` may key on
+  `userId`, `orgId`, or `clientId`. Previously a filter keyed on `userId` was silently ignored — a
+  credential confined that way matched no records, including its own; it now scopes correctly to the
+  named user's records. An unrecognized ownership key is rejected when you save, instead of being
+  stored inert.
+
 ### Fixed
 
 - **Re-indexing no longer drops documents whose extracted text was discarded.** A
@@ -3157,27 +3307,6 @@ and search to them, exactly like the built-in org and client scopes.
 - **A corrected re-ingest now actually re-applies its metadata.** Re-ingesting a document or record
   (or editing a filterable field) previously re-indexed against the values captured at first ingest, so
   a fix to a filter field never took effect; it now re-reads the current values on every re-index.
-
-## 0.33.1 — 2026-07-09
-
-Scope-authoring hygiene: mistaken grants now fail loudly instead of quietly
-authorizing nothing.
-
-### Changed
-
-- **Scope `allowed_actions` must use the compact `resource:ops` form.** When you author an access
-  profile, role, or scoped token, each `allowed_actions` entry must be `*`, the compact
-  `resource:ops[:type]` form (e.g. `records:cru`, `documents:r`, `search:r`, `keys:crd`,
-  `profiles:cru`), or the literal `create_own_scoped_key`. Bare verbs (`read`, `write`, `delete`)
-  and the older `admin:keys` / `admin:profiles` shorthand are **no longer accepted**: they matched
-  no resource at runtime, so a credential authored with them was silently granted nothing. They are
-  now rejected when you save, so the mistake surfaces immediately. The `s` letter inside the compact
-  form still grants sensitive-field reveal for a record type (e.g. `records:rs:patient`).
-- **Scope `data_scope` honors the public `userId` ownership key.** A `data_scope` may key on
-  `userId`, `orgId`, or `clientId`. Previously a filter keyed on `userId` was silently ignored — a
-  credential confined that way matched no records, including its own; it now scopes correctly to the
-  named user's records. An unrecognized ownership key is rejected when you save, instead of being
-  stored inert.
 
 ## 0.33.0 — 2026-07-05
 

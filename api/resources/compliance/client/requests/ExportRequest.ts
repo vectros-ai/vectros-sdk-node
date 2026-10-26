@@ -5,7 +5,7 @@
  *     {}
  */
 export interface ExportRequest {
-    /** What to export. `tenant` (the default) exports all of your account's data across the requested contexts; `subject` exports a single end-subject's data (for example, to satisfy a one-person data-portability request). Additional scopes may be added in the future. */
+    /** What to export. `tenant` (the default) exports all of your account's data across the requested contexts; `subject` exports a single end-subject's data (for example, to satisfy a one-person data-portability request). */
     scope?: ExportRequest.Scope;
     /** The kind of subject to export: `user` for a person, or an ownership namespace such as `org` or `client` — including a custom namespace you have defined. Required only when `scope` is `subject`. */
     subjectType?: string;
@@ -15,20 +15,20 @@ export interface ExportRequest {
     externalId?: string;
     /** The contexts to export. Omit or leave empty to export all of your contexts. Each listed context is exported and reported separately in the manifest. */
     contextScope?: string[];
-    /** Serialization format of the export payload. NDJSON (newline-delimited JSON, one row per line) is currently the only supported format; more may be added in the future. The manifest carries a `formatVersion` so you can parse the payload in a forward-compatible way. */
+    /** Serialization format of the export payload. NDJSON (newline-delimited JSON, one row per line) is the only supported format. The manifest carries a `formatVersion` so you can parse the payload in a forward-compatible way. */
     format?: ExportRequest.Format;
     /** Whether to also include the audit and version-history trail of the exported data, not just the current live rows. Defaults to false (live data only). Set true to also export the retained version history. This governs only the audit data — the live records are always included. */
     includeAuditHistory?: boolean;
 }
 
 export namespace ExportRequest {
-    /** What to export. `tenant` (the default) exports all of your account's data across the requested contexts; `subject` exports a single end-subject's data (for example, to satisfy a one-person data-portability request). Additional scopes may be added in the future. */
+    /** What to export. `tenant` (the default) exports all of your account's data across the requested contexts; `subject` exports a single end-subject's data (for example, to satisfy a one-person data-portability request). */
     export const Scope = {
         Tenant: "tenant",
         Subject: "subject",
     } as const;
     export type Scope = (typeof Scope)[keyof typeof Scope];
-    /** Serialization format of the export payload. NDJSON (newline-delimited JSON, one row per line) is currently the only supported format; more may be added in the future. The manifest carries a `formatVersion` so you can parse the payload in a forward-compatible way. */
+    /** Serialization format of the export payload. NDJSON (newline-delimited JSON, one row per line) is the only supported format. The manifest carries a `formatVersion` so you can parse the payload in a forward-compatible way. */
     export const Format = {
         Ndjson: "ndjson",
     } as const;

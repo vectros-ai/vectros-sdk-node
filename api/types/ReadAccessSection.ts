@@ -3,12 +3,12 @@
 import type * as Vectros from "../index.js";
 
 /**
- * PHI read-access logging metering. Two lines, because read-access bills BOTH the retained storage AND the per-read write (unlike audit history's storage-only line — an audited write is already billed; a read is not).
+ * PHI read-access logging metering. `storageBytes` is the retained read-access-log storage, billed at the audit rate. `rows` counts logged reads and is reported for information; logged-read writes are not currently charged.
  */
 export interface ReadAccessSection {
     storageBytes?: Vectros.StorageEntry | undefined;
-    /** Logged-read write/operation count this period (one per emitted access record). Recovers the additional per-read write cost. Credits are 0 until this rate is set. */
+    /** Number of logged reads (one per emitted access record) this period. Not currently charged. */
     rows?: number | undefined;
-    /** Credits for the logged-read writes this period (0 until this rate is set). */
+    /** Currently 0: logged-read writes are not charged. */
     rowCredits?: number | undefined;
 }
