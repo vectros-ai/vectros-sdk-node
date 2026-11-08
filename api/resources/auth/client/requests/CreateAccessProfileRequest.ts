@@ -6,9 +6,7 @@ import type * as Vectros from "../../../../index.js";
  * @example
  *     {
  *         contextId: "contextId",
- *         body: {
- *             principalId: "usr_6ba7b810-9dad-11d1-80b4-00c04fd430c8"
- *         }
+ *         body: {}
  *     }
  */
 export interface CreateAccessProfileRequest {

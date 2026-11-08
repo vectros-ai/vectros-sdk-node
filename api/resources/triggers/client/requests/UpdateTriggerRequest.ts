@@ -6,17 +6,7 @@ import type * as Vectros from "../../../../index.js";
  * @example
  *     {
  *         id: "id",
- *         body: {
- *             name: "on-intake-create",
- *             firingSource: {
- *                 schemaId: "sch_9f8e7d6c",
- *                 event: "CREATE"
- *             },
- *             scriptRef: {
- *                 name: "notify-assignee",
- *                 version: "3"
- *             }
- *         }
+ *         body: {}
  *     }
  */
 export interface UpdateTriggerRequest {

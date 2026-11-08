@@ -111,9 +111,7 @@ export class FoldersClient {
      *
      * @example
      *     await client.folders.createFolder({
-     *         body: {
-     *             name: "Patient Records 2024"
-     *         }
+     *         body: {}
      *     })
      */
     public createFolder(
@@ -267,9 +265,7 @@ export class FoldersClient {
      * @example
      *     await client.folders.updateFolder({
      *         id: "id",
-     *         body: {
-     *             name: "Patient Records 2024"
-     *         }
+     *         body: {}
      *     })
      */
     public updateFolder(
@@ -424,9 +420,7 @@ export class FoldersClient {
      * @example
      *     await client.folders.patchFolder({
      *         id: "id",
-     *         body: {
-     *             name: "Patient Records 2024"
-     *         }
+     *         body: {}
      *     })
      */
     public patchFolder(

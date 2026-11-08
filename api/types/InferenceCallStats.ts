@@ -6,8 +6,12 @@
 export interface InferenceCallStats {
     /** Number of inference calls this period */
     calls?: number | undefined;
-    /** Total input tokens consumed across all calls */
+    /** Input tokens other than prompt-cache tokens, across all calls. Cache tokens are counted separately in `cacheReadTokens` and `cacheCreateTokens`. */
     inputTokens?: number | undefined;
     /** Total output tokens generated across all calls */
     outputTokens?: number | undefined;
+    /** Input tokens served from the prompt cache across all calls. 0 when no call read the cache. */
+    cacheReadTokens?: number | undefined;
+    /** Input tokens written to the prompt cache across all calls, whatever the cache lifetime. 0 when no call wrote to the cache. */
+    cacheCreateTokens?: number | undefined;
 }

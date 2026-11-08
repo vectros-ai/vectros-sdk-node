@@ -172,7 +172,7 @@ export class TriggersClient {
     }
 
     /**
-     * Declares a new trigger rule, or (with `?upsert=true`) reconciles an existing one of the same name to the submitted shape. Once declared, the rule fires: a record write on the named schema dispatches the referenced script, which runs asynchronously under this rule's own grant. Because that grant is executed, a scoped credential may not declare a trigger whose grant exceeds its own — such a request is rejected with a `403`, and a `roleIds` entry that does not resolve in this context with a `400`. Requires the `triggers:c` scope (also `triggers:u` when `?upsert=true` matches an existing row).
+     * Declares a new trigger rule, or (with `?upsert=true`) reconciles an existing one of the same name to the submitted shape. Once declared, the rule fires: a record write on the named schema dispatches the referenced script, which runs asynchronously under this rule's own grant. Because that grant is executed, a scoped credential may not declare a trigger whose grant exceeds its own — such a request is rejected with a `403`, and a `roleIds` entry that does not resolve in this context with a `400`. Requires the `triggers:c` scope (also `triggers:u` when `?upsert=true` matches an existing row). `name`, `firingSource`, `scriptRef`, `fields` and exactly one of `scopes` or `roleIds` are required when declaring a rule.
      *
      * @param {Vectros.CreateTriggerRequest} request
      * @param {TriggersClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -185,17 +185,7 @@ export class TriggersClient {
      *
      * @example
      *     await client.triggers.createTrigger({
-     *         body: {
-     *             name: "on-intake-create",
-     *             firingSource: {
-     *                 schemaId: "sch_9f8e7d6c",
-     *                 event: "CREATE"
-     *             },
-     *             scriptRef: {
-     *                 name: "notify-assignee",
-     *                 version: "3"
-     *             }
-     *         }
+     *         body: {}
      *     })
      */
     public createTrigger(
@@ -350,17 +340,7 @@ export class TriggersClient {
      * @example
      *     await client.triggers.updateTrigger({
      *         id: "id",
-     *         body: {
-     *             name: "on-intake-create",
-     *             firingSource: {
-     *                 schemaId: "sch_9f8e7d6c",
-     *                 event: "CREATE"
-     *             },
-     *             scriptRef: {
-     *                 name: "notify-assignee",
-     *                 version: "3"
-     *             }
-     *         }
+     *         body: {}
      *     })
      */
     public updateTrigger(

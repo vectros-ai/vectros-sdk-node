@@ -659,9 +659,7 @@ export class AuthClient {
      * @example
      *     await client.auth.createAccessProfile({
      *         contextId: "contextId",
-     *         body: {
-     *             principalId: "usr_6ba7b810-9dad-11d1-80b4-00c04fd430c8"
-     *         }
+     *         body: {}
      *     })
      */
     public createAccessProfile(
@@ -827,10 +825,7 @@ export class AuthClient {
      *
      * @example
      *     await client.auth.createAppContext({
-     *         body: {
-     *             contextId: "myapp",
-     *             name: "My Internal App"
-     *         }
+     *         body: {}
      *     })
      */
     public createAppContext(
@@ -1003,13 +998,7 @@ export class AuthClient {
      * @example
      *     await client.auth.createRole({
      *         contextId: "contextId",
-     *         body: {
-     *             roleId: "engineering-member",
-     *             name: "Engineering Team Member",
-     *             scopes: [{
-     *                     allowed_actions: ["records:cru", "search:r"]
-     *                 }]
-     *         }
+     *         body: {}
      *     })
      */
     public createRole(
@@ -1179,9 +1168,7 @@ export class AuthClient {
      *     await client.auth.updateAccessProfile({
      *         contextId: "contextId",
      *         principalId: "principalId",
-     *         body: {
-     *             principalId: "usr_6ba7b810-9dad-11d1-80b4-00c04fd430c8"
-     *         }
+     *         body: {}
      *     })
      */
     public updateAccessProfile(
@@ -1417,10 +1404,7 @@ export class AuthClient {
      * @example
      *     await client.auth.updateAppContext({
      *         contextId: "contextId",
-     *         body: {
-     *             contextId: "myapp",
-     *             name: "My Internal App"
-     *         }
+     *         body: {}
      *     })
      */
     public updateAppContext(
@@ -1662,13 +1646,7 @@ export class AuthClient {
      *     await client.auth.updateRole({
      *         contextId: "contextId",
      *         roleId: "roleId",
-     *         body: {
-     *             roleId: "engineering-member",
-     *             name: "Engineering Team Member",
-     *             scopes: [{
-     *                     allowed_actions: ["records:cru", "search:r"]
-     *                 }]
-     *         }
+     *         body: {}
      *     })
      */
     public updateRole(

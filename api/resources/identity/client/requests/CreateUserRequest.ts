@@ -5,9 +5,7 @@ import type * as Vectros from "../../../../index.js";
 /**
  * @example
  *     {
- *         body: {
- *             externalId: "usr_12345"
- *         }
+ *         body: {}
  *     }
  */
 export interface CreateUserRequest {

@@ -6,9 +6,7 @@ import type * as Vectros from "../../../../index.js";
  * @example
  *     {
  *         id: "id",
- *         body: {
- *             title: "Patient Intake Form \u2014 Jane Doe"
- *         }
+ *         body: {}
  *     }
  */
 export interface UpdateDocumentRequest {

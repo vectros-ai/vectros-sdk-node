@@ -6,9 +6,7 @@ import type * as Vectros from "../../../../index.js";
  * @example
  *     {
  *         id: "550e8400-e29b-41d4-a716-446655440000",
- *         body: {
- *             externalId: "usr_12345"
- *         }
+ *         body: {}
  *     }
  */
 export interface UpdateUserRequest {

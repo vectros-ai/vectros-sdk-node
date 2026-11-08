@@ -93,6 +93,9 @@ browser token-minting pattern.
   this script version under this grant"), and list the trigger executions that
   failed. The rule fires: a matching record write runs the script asynchronously
   under the rule's own grant.
+- **Stored agents & runs** — `client.agents` — store named, versioned agent definitions (a model, a system
+  prompt, a tool whitelist, limits and a spending cap) and run them: start a run, stream what it
+  does, read it back, or cancel it.
 - **Identity & access** — `client.identity`, `client.auth` — manage users and
   namespaced identity entities (`org` and `client` are reserved names,
   registered the same way as any other namespace); mint and revoke scoped

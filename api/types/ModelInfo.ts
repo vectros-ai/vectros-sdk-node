@@ -22,4 +22,5 @@ export interface ModelInfo {
     outputCreditsPer1kTokens: number;
     regionPricing: Vectros.RegionPricing;
     longContext?: Vectros.LongContextPricing | undefined;
+    cachePricing?: Vectros.CachePricing | undefined;
 }

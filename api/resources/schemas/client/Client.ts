@@ -140,8 +140,7 @@ export class SchemasClient {
      *                 }],
      *             capabilities: {
      *                 "auditHistory": true
-     *             },
-     *             allowedSurfaces: ["record"]
+     *             }
      *         }
      *     })
      */
@@ -297,11 +296,7 @@ export class SchemasClient {
      * @example
      *     await client.schemas.updateSchema({
      *         id: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-     *         body: {
-     *             typeName: "intake_form",
-     *             displayName: "Client Intake Form",
-     *             allowedSurfaces: ["record"]
-     *         }
+     *         body: {}
      *     })
      */
     public updateSchema(

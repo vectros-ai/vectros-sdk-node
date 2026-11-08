@@ -5,9 +5,9 @@
  */
 export interface AppContextRequest {
     /** Your identifier for the app context. Must be 3-31 characters, start with a lowercase letter, and contain only lowercase letters, digits, and hyphens (for example `myapp`, `taskflow`, or `engineering-team`). Required when creating a context. Ignored when updating, since the URL path supplies the contextId on update. */
-    contextId: string;
-    /** Human-readable display name for this app context. Required. */
-    name: string;
+    contextId?: string | undefined;
+    /** Human-readable display name for this app context. Required when creating; on update, omit it to keep the current name. */
+    name?: string | undefined;
     /** Optional free-text description of what this app context is for. */
     description?: string | undefined;
     /** Optional display name for the organization deploying this app context — distinct from `name`, which is the app's own identity. Used to personalize platform-sent correspondence (e.g. sub-user invitation emails) with your own branding instead of a generic app name. */

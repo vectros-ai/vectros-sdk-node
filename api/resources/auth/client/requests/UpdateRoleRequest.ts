@@ -7,13 +7,7 @@ import type * as Vectros from "../../../../index.js";
  *     {
  *         contextId: "contextId",
  *         roleId: "roleId",
- *         body: {
- *             roleId: "engineering-member",
- *             name: "Engineering Team Member",
- *             scopes: [{
- *                     allowed_actions: ["records:cru", "search:r"]
- *                 }]
- *         }
+ *         body: {}
  *     }
  */
 export interface UpdateRoleRequest {

@@ -9,6 +9,82 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.49.0 — 2026-11-07
+
+### Breaking changes
+
+- **Java SDK only:** the getters of 18 request fields on `EntityRequest`, `FolderRequest`, `DocumentRequest`, `UserRequest`,
+  `AppContextRequest`, `RoleRequest`, `NamespaceRequest`, `SchemaRequest`, `TriggerRuleRequest` and `AccessProfileRequest` return
+  `Optional`, and their builders are plain, not staged (code that reads one of them, or names a staged-builder interface such as
+  `FolderRequest.NameStage`, needs a change). The REST API is not affected.
+- **Inference amounts are reported in milli-cents (1 cent = 1000) and the whole-cent fields are removed:**
+  `inferenceBalanceCentsCharged` is now `inferenceBalanceCentsChargedMilli` on the `done` event of `POST /v1/chat`, `/v1/rag` and
+  `/v1/documents/{id}/ask`, and `balanceCents` is now `balanceCentsMilli` in the usage report's `inference` section. Amounts you
+  send are unchanged.
+
+### Added
+
+- **Stored agents:** `POST` and `GET /v1/agents`, `GET`, `PUT` and `DELETE /v1/agents/{id}`, `GET /v1/agents/{id}/versions`. An agent
+  is a named, versioned definition (model, system prompt, tool whitelist, limits, spending cap); every change writes a new version,
+  and `PUT` takes `expectedVersion` (`409` `VERSION_CONFLICT`). New scopes: `agents:r`, `agents:c`, `agents:u`, `agents:d`.
+- **Agent runs:** `POST /v1/runs` (answers a `text/event-stream`), `GET /v1/runs/{id}`, `POST /v1/runs/{id}/cancel`. A run's tool
+  calls act with the caller's own permissions. New scopes: `runs:c` (start, cancel) and `runs:r` (read). A run's record is kept at
+  least 30 days after it ends.
+- **Runs are off for a tenant until an account owner turns them on** in the developer portal (Settings); until then `POST /v1/runs`
+  answers `403` `AGENT_RUNS_NOT_ENABLED`. The `web_fetch` tool is also per tenant (and under a BAA needs the owner's acceptance), and
+  `web_search` is off until the platform turns it on: a run of an agent that offers a tool that is off answers `403`
+  `AGENT_TOOL_NOT_ENABLED`.
+- **Run billing:** `budget.maxInferenceCents` caps a run's model calls (`BUDGET_EXCEEDED`); a fixed fee per run, tool calls and run
+  time are billed separately against your plan. A start can be refused with `402` (`INSUFFICIENT_BALANCE`,
+  `SUBSCRIPTION_LIMIT_EXCEEDED`), `429` (`CONCURRENT_RUN_CAP`, `RUN_HOLD_CAP`, `BALANCE_BUSY`) or `503` (`WRITE_FROZEN`). Send an
+  `Idempotency-Key` to make a retried start safe (`409` `IDEMPOTENCY_IN_PROGRESS`, `422` `IDEMPOTENCY_KEY_REUSED`).
+- **Agents can read and search your data**, including the tools `search_content` and `documents_text`, and `documents_query` takes
+  `type`. Scripts and trigger rules can call `vectros.search.content` and `vectros.documents.text`.
+- **`actingVia` on version-history and access-log entries** names the agent run (`kind`, `actorId`, `runId`, `tool`) that made a
+  change or a read; it is absent for direct calls.
+- **`GET /v1/documents/{id}/text`** takes `offset` and `limit` (counted in characters) and returns `offset`, `totalLength` and
+  `nextOffset`. **`GET /v1/documents`** takes `type`.
+- **`extraction` on file-uploaded documents** (`outcome`, `truncated`, `message`) says how text extraction went. Extraction keeps up
+  to 1,000,000 characters (it cut at 100,000) and reports a longer file as `TRUNCATED`.
+- **`cachePricing` on `GET /v1/models`** gives the prompt-cache rates per 1K tokens for each region, and `InferenceCallStats` in the
+  usage report gains `cacheReadTokens` and `cacheCreateTokens`.
+
+### Changed
+
+- **Prompt-cache tokens are charged at the model's cache rates** on `/v1/chat`, `/v1/rag` and `/v1/documents/{id}/ask`; on a prepaid
+  balance the hold at the start of a call covers the 5-minute cache-write rate, so a balance close to the hold can be refused with
+  `402`.
+- **The per-call platform fee on those three endpoints follows the call's duration:** 0.2 credits up to 60 seconds, then 1 credit
+  per 5 minutes (it was a flat 0.2), reported in `platformCreditsCharged`.
+- **Update operations no longer mark as required the fields they keep when you omit them:** `EntityRequest.externalId`,
+  `FolderRequest.name`, `DocumentRequest.title`, `UserRequest.externalId`, `AppContextRequest.contextId` and `name`,
+  `RoleRequest.roleId`, `name` and `scopes`, `NamespaceRequest.namespace` and `specificityRank`, `SchemaRequest.typeName`,
+  `displayName` and `allowedSurfaces`, `TriggerRuleRequest.name`, `firingSource` and `scriptRef`, `AccessProfileRequest.principalId`.
+  They are optional in the TypeScript and Python SDKs; a create without one is still `400`.
+- **Version 2 of the bring-your-own model provider waiver is published;** version 1 stays in force for tenants that signed it.
+  `WAIVER_TEXT_CHANGED` now means the waiver in force for the tenant is no longer current (status and code unchanged).
+
+### Fixed
+
+- A script version you just pushed is the one `latest` resolves to (`POST /v1/scripts/execute`, trigger rules, `POST /v1/triggers`,
+  `DELETE /v1/scripts/{id}`, `GET /v1/scripts?name=&latest=true`); in a rare window `POST /v1/scripts` and `DELETE /v1/scripts/{id}`
+  answer `409` ("Try again in a few seconds").
+- A file with no extractable text (an image, or a scanned, protected, corrupt or empty file) is no longer indexed with placeholder
+  text: `extraction.outcome` says why, `GET /v1/documents/{id}/text` is `404`, `POST /v1/documents/{id}/ask` is `409` without a
+  charge, and `indexStatus` is `SKIPPED`. A file whose extraction cannot finish ends `UNREADABLE` instead of waiting in
+  `PENDING_UPLOAD`.
+- Replacing a document's file no longer occasionally keeps the old file's text.
+- Version history no longer lists internal index keys in `changedFields`.
+- Clarified the API reference wording for run events, token counts and the document-ask limit; no behaviour change.
+
+### Security
+
+- **The account owner's user is protected:** `PUT /v1/users/{id}`, `POST /v1/users?upsert=true`, `DELETE /v1/users/{id}` and the
+  owner's access-profile routes answer `403` to every credential except the root API key and a scoped API key bound to the owner
+  (not one created by delegation; a scoped token never counts). The owner's user can no longer be suspended or given a status other
+  than `ACTIVE` (`400`).
+- **Java SDK:** Jackson is 2.18.12 and the Kotlin standard library is declared at 2.4.21 (OkHttp stays 4.12.0).
+
 ## 0.48.0 — 2026-10-25
 
 This release adds no operation to the SDKs. It adds one optional request field (`reasoning`) and one stream event

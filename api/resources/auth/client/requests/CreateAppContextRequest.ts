@@ -5,10 +5,7 @@ import type * as Vectros from "../../../../index.js";
 /**
  * @example
  *     {
- *         body: {
- *             contextId: "myapp",
- *             name: "My Internal App"
- *         }
+ *         body: {}
  *     }
  */
 export interface CreateAppContextRequest {

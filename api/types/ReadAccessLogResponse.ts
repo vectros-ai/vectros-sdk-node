@@ -32,6 +32,7 @@ export interface ReadAccessLogResponse {
     destinationAlias?: string | undefined;
     /** For a disclosure into a routed model call: the host of the endpoint address the call is sent to, as saved on the provider configuration when the call was made (host only, no path). Null for every other read. */
     destinationHost?: string | undefined;
+    actingVia?: Vectros.ActingViaResponse | undefined;
     /** When the read occurred / the row was recorded (ISO-8601 UTC). */
     createdAt?: string | undefined;
 }

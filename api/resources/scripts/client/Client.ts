@@ -440,7 +440,7 @@ export class ScriptsClient {
     }
 
     /**
-     * Permanently deletes one script version by ID. Deleting one version does not affect any other version of the same name. Requires the `scripts:d` scope. Refused with 409 if a live trigger rule still references this version — either directly (a pinned `scriptRef`), or via `"latest"` when this IS the newest version of its name. Delete or re-point those rules first.
+     * Permanently deletes one script version by ID. Deleting one version does not affect any other version of the same name. Requires the `scripts:d` scope. Refused with 409 if a live trigger rule still references this version — either directly (a pinned `scriptRef`), or via `"latest"` when this IS the newest version of its name. Delete or re-point those rules first. Also refused with a retryable 409, deleting nothing, when it cannot be told yet whether this is the newest version (for example just after several of this name's newest versions were deleted, or while its first version is gone and the listing has not caught up) and a `"latest"` rule depends on the script: try again shortly.
      *
      * @param {Vectros.DeleteScriptRequest} request
      * @param {ScriptsClient.RequestOptions} requestOptions - Request-specific configuration.

@@ -25,8 +25,7 @@ import type * as Vectros from "../../../../index.js";
  *                 }],
  *             capabilities: {
  *                 "auditHistory": true
- *             },
- *             allowedSurfaces: ["record"]
+ *             }
  *         }
  *     }
  */

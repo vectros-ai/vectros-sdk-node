@@ -4,8 +4,8 @@
  * Request body for creating or updating a text-ingested document. Update semantics (PUT): omitted fields are preserved — sending null does not clear a field; `payload` is replaced in full when supplied (not deep-merged); `indexMode` is fixed at creation and ignored on update; `text` is used only on the POST ingest path. Text-ingested documents always retain their body (retrievable via `GET /{id}/text`); the `storeText` retention flag applies only to file uploads (`POST /v1/documents/upload`).
  */
 export interface DocumentRequest {
-    /** Human-readable document title */
-    title: string;
+    /** Human-readable document title. Required when creating; on update, omit it to keep the current title. */
+    title?: string | undefined;
     /** Raw text content to ingest. Required when creating a document via the text-ingest path. On update, supply it to replace the stored text; omit it to leave the existing text unchanged. */
     text?: string | undefined;
     /** Indexing strategy for this document. `HYBRID` runs both BM25 keyword and dense-vector semantic indexing (recommended for most use cases). `SEMANTIC` indexes only as dense vectors — best for conceptual similarity search. `TEXT` indexes only with BM25 — best for exact keyword matching. `NONE` stores the document without search indexing (store-only / archival): it remains retrievable by id and by structured-field lookup but never appears in search results. Optional: omit to inherit the bound schema's default index mode. If neither this field nor the schema specifies one, the request is rejected. When both are set, this per-document value wins. */

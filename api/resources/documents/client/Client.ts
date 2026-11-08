@@ -25,7 +25,7 @@ export class DocumentsClient {
     }
 
     /**
-     * Returns a paginated list of your documents, optionally filtered by folder (`folderId`) and/or owner (`userId` or `scope`). The response is a `{data, nextCursor}` envelope; pass `nextCursor` back as `startFrom` to fetch the next page. Requires the `documents:r` scope.
+     * Returns a paginated list of your documents, optionally filtered by folder (`folderId`), owner (`userId` or `scope`) and/or type (`type`). The response is a `{data, nextCursor}` envelope; pass `nextCursor` back as `startFrom` to fetch the next page. A page can hold fewer documents than `limit`, or none, while `nextCursor` is still set: keep paging until `nextCursor` is null. Requires the `documents:r` scope.
      *
      * @param {Vectros.ListDocumentsRequest} request
      * @param {DocumentsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -35,6 +35,7 @@ export class DocumentsClient {
      *         userId: "550e8400-e29b-41d4-a716-446655440000",
      *         scope: "group:eng-team",
      *         folderId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+     *         type: "investigation_report",
      *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl"
      *     })
      */
@@ -49,11 +50,12 @@ export class DocumentsClient {
         request: Vectros.ListDocumentsRequest = {},
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.DocumentPage>> {
-        const { userId, scope, folderId, startFrom, limit } = request;
+        const { userId, scope, folderId, type: type_, startFrom, limit } = request;
         const _queryParams: Record<string, unknown> = {
             userId,
             scope,
             folderId,
+            type: type_,
             startFrom,
             limit,
         };
@@ -111,9 +113,7 @@ export class DocumentsClient {
      *
      * @example
      *     await client.documents.ingestDocument({
-     *         body: {
-     *             title: "Patient Intake Form \u2014 Jane Doe"
-     *         }
+     *         body: {}
      *     })
      */
     public ingestDocument(
@@ -269,9 +269,7 @@ export class DocumentsClient {
      * @example
      *     await client.documents.updateDocument({
      *         id: "id",
-     *         body: {
-     *             title: "Patient Intake Form \u2014 Jane Doe"
-     *         }
+     *         body: {}
      *     })
      */
     public updateDocument(
@@ -743,11 +741,12 @@ export class DocumentsClient {
     }
 
     /**
-     * Returns the document's full text body when it is retained: retained for text-ingested documents, and for file-uploaded documents unless they were uploaded with `storeText=false` (which discards the extracted text once indexing completes — the original file remains available via `GET /v1/documents/{id}/download`). Returns 404 when the document does not exist, its text was not retained, or extraction has not yet completed. Requires the `documents:r` scope.
+     * Returns the document's full text body when it is retained: always for text-ingested documents, and for file-uploaded documents unless they were uploaded with `storeText=false` (which discards the extracted text once indexing completes — the original file remains available via `GET /v1/documents/{id}/download`). Returns 404 when the document does not exist, its text was not retained, extraction has not yet completed, or no text could be extracted from its file (see the document's `extraction`). To read a long text in parts, pass `limit` (and `offset` from the second part on): offsets and lengths count Unicode characters (code points), `totalLength` is the length of the whole text, and `nextOffset` is where the next part starts, absent once the end is reached. Requires the `documents:r` scope.
      *
      * @param {Vectros.GetDocumentTextRequest} request
      * @param {DocumentsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.NotFoundError}
      *
      * @example
@@ -766,7 +765,11 @@ export class DocumentsClient {
         request: Vectros.GetDocumentTextRequest,
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.DocumentTextResponse>> {
-        const { id } = request;
+        const { id, offset, limit } = request;
+        const _queryParams: Record<string, unknown> = {
+            offset,
+            limit,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -781,7 +784,11 @@ export class DocumentsClient {
             ),
             method: "GET",
             headers: _headers,
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -794,6 +801,8 @@ export class DocumentsClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 default:

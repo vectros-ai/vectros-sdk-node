@@ -4,8 +4,8 @@
  * Request body for creating or updating a folder. On update (PUT or PATCH), omitted fields are preserved — a null does not clear a field. `parentFolderId` is honored only at creation and ignored on update, because a folder cannot be moved via the API.
  */
 export interface FolderRequest {
-    /** Human-readable display name of the folder. Required. */
-    name: string;
+    /** Human-readable display name of the folder. Required when creating; on update, omit it to keep the current name. */
+    name?: string | undefined;
     /** Optional description of the folder's contents or purpose. */
     description?: string | undefined;
     /** ID of the parent folder to create this folder under, applied at creation only. Omit to create the folder under your context's default root folder. Ignored on update: a folder cannot be moved via the API. */

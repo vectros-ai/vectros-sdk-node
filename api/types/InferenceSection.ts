@@ -6,8 +6,8 @@ import type * as Vectros from "../index.js";
  * Inference activity at the account level (includes pre-paid balance)
  */
 export interface InferenceSection {
-    /** Pre-paid inference balance in cents (used to settle model token costs) */
-    balanceCents?: number | undefined;
+    /** Pre-paid inference balance in milli-cents (thousandths of a cent; 1 cent = 1000), used to settle model token costs. Token costs are charged to the nearest milli-cent, never rounded to whole cents. */
+    balanceCentsMilli?: number | undefined;
     endpoints?: Vectros.InferenceEndpoints | undefined;
     totals?: Vectros.InferenceCallStats | undefined;
 }

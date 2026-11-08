@@ -5,9 +5,7 @@ import type * as Vectros from "../../../../index.js";
 /**
  * @example
  *     {
- *         body: {
- *             name: "Patient Records 2024"
- *         }
+ *         body: {}
  *     }
  */
 export interface CreateFolderRequest {

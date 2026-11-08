@@ -6,9 +6,7 @@ import type * as Vectros from "../../../../index.js";
  * @example
  *     {
  *         id: "id",
- *         body: {
- *             name: "Patient Records 2024"
- *         }
+ *         body: {}
  *     }
  */
 export interface PatchFolderRequest {

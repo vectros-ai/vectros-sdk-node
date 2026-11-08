@@ -5,10 +5,7 @@ import type * as Vectros from "../../../../index.js";
 /**
  * @example
  *     {
- *         body: {
- *             namespace: "team",
- *             specificityRank: 1500
- *         }
+ *         body: {}
  *     }
  */
 export interface RegisterNamespaceRequest {

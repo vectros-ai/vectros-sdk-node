@@ -6,10 +6,7 @@ import type * as Vectros from "../../../../index.js";
  * @example
  *     {
  *         namespace: "team",
- *         body: {
- *             namespace: "team",
- *             specificityRank: 1500
- *         }
+ *         body: {}
  *     }
  */
 export interface UpdateNamespaceRequest {

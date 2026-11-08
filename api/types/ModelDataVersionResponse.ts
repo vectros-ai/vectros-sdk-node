@@ -3,21 +3,22 @@
 import type * as Vectros from "../index.js";
 
 /**
- * A single entry in a record's audit-trail version history. Returned by GET /v1/records/{id}/versions.
+ * A single entry in the audit-trail version history of a record, document, entity, user, folder, schema, role or access profile. Returned by the `.../versions` routes of those resources.
  */
 export interface ModelDataVersionResponse {
     /** Unique identifier for this version-history entry. */
     id?: string | undefined;
     /** The kind of change this entry records: CREATE for the initial creation, UPDATE for a mutation, DELETE for a deletion. */
     changeType?: ModelDataVersionResponse.ChangeType | undefined;
-    /** A JSON-encoded snapshot of the record's full state immediately before this change. Deserialize it to inspect the previous payload, ownership, and other fields. Present on UPDATE and DELETE entries; null on CREATE. */
+    /** A JSON-encoded snapshot of the item's full state immediately before this change. Deserialize it to inspect the previous payload, ownership, and other fields. Present on UPDATE and DELETE entries; null on CREATE. */
     previousContent?: string | undefined;
-    /** The record's version number immediately before this change. Null on CREATE. */
+    /** The item's version number immediately before this change. Null on CREATE. */
     previousVersion?: number | undefined;
     /** A short, system-generated description of what changed. */
     changeReason?: string | undefined;
     /** Identifier of the user or API key that made the change. */
     changedBy?: string | undefined;
+    actingVia?: Vectros.ActingViaResponse | undefined;
     /** Time this version-history entry was recorded, as an ISO-8601 UTC timestamp. */
     createdAt?: string | undefined;
     changedFields?: Vectros.ModelChanges | undefined;

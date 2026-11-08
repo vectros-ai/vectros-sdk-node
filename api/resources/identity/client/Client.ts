@@ -135,9 +135,7 @@ export class IdentityClient {
      *     await client.identity.createEntity({
      *         namespace: "team",
      *         contextId: "myapp",
-     *         body: {
-     *             externalId: "team_eng_platform"
-     *         }
+     *         body: {}
      *     })
      */
     public createEntity(
@@ -303,9 +301,7 @@ export class IdentityClient {
      *         namespace: "team",
      *         id: "id",
      *         contextId: "myapp",
-     *         body: {
-     *             externalId: "team_eng_platform"
-     *         }
+     *         body: {}
      *     })
      */
     public updateEntity(
@@ -720,10 +716,7 @@ export class IdentityClient {
      * @example
      *     await client.identity.updateNamespace({
      *         namespace: "team",
-     *         body: {
-     *             namespace: "team",
-     *             specificityRank: 1500
-     *         }
+     *         body: {}
      *     })
      */
     public updateNamespace(
@@ -955,10 +948,7 @@ export class IdentityClient {
      *
      * @example
      *     await client.identity.registerNamespace({
-     *         body: {
-     *             namespace: "team",
-     *             specificityRank: 1500
-     *         }
+     *         body: {}
      *     })
      */
     public registerNamespace(
@@ -1121,9 +1111,7 @@ export class IdentityClient {
      *
      * @example
      *     await client.identity.createUser({
-     *         body: {
-     *             externalId: "usr_12345"
-     *         }
+     *         body: {}
      *     })
      */
     public createUser(
@@ -1268,6 +1256,7 @@ export class IdentityClient {
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
@@ -1275,9 +1264,7 @@ export class IdentityClient {
      * @example
      *     await client.identity.updateUser({
      *         id: "550e8400-e29b-41d4-a716-446655440000",
-     *         body: {
-     *             externalId: "usr_12345"
-     *         }
+     *         body: {}
      *     })
      */
     public updateUser(
@@ -1324,6 +1311,8 @@ export class IdentityClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
@@ -1348,6 +1337,7 @@ export class IdentityClient {
      * @param {Vectros.DeleteUserRequest} request
      * @param {IdentityClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
@@ -1396,6 +1386,8 @@ export class IdentityClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:

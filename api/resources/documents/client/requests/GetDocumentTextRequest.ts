@@ -8,4 +8,8 @@
  */
 export interface GetDocumentTextRequest {
     id: string;
+    /** Where the returned text starts, in Unicode characters (code points) from the start of the text. Defaults to 0. Pass the previous part's `nextOffset` to read on. */
+    offset?: number;
+    /** The most characters (code points) to return. Omit it to return the text from `offset` to the end. */
+    limit?: number;
 }

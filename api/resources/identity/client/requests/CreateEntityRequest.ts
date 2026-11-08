@@ -7,9 +7,7 @@ import type * as Vectros from "../../../../index.js";
  *     {
  *         namespace: "team",
  *         contextId: "myapp",
- *         body: {
- *             externalId: "team_eng_platform"
- *         }
+ *         body: {}
  *     }
  */
 export interface CreateEntityRequest {

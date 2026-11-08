@@ -6,6 +6,7 @@
  *         userId: "550e8400-e29b-41d4-a716-446655440000",
  *         scope: "group:eng-team",
  *         folderId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+ *         type: "investigation_report",
  *         startFrom: "b3BhcXVlLWN1cnNvci1mcm9tLXRoZS1wcmV2aW91cy1wYWdl"
  *     }
  */
@@ -16,7 +17,9 @@ export interface ListDocumentsRequest {
     scope?: string;
     /** List only documents in this folder (the Vectros folder ID). Can be combined with the owner filters. */
     folderId?: string;
-    /** Pagination cursor. Pass the `nextCursor` returned by the previous page to fetch the next page; omit it for the first page. The cursor is **opaque** — echo it back unchanged, and do not parse it or construct one. Keep every other query parameter identical while paging: a cursor is valid only for the exact query that returned it, and reusing one against a different query is rejected with a 400. */
+    /** List only documents of this type: the record type of the schema the document is bound to (the `typeName` that `GET /v1/schemas` shows). Documents with no schema never match. Can be combined with the other filters. 1 to 64 letters, digits, `_` or `-`: anything else is a `400`, and an empty value means no filter. The filter applies to each page as it is read, so pages can be short or empty until the listing is exhausted; to find documents of a type across a large collection, `POST /v1/search` with `typeName` is indexed. */
+    type?: string;
+    /** Pagination cursor. Pass the `nextCursor` returned by the previous page to fetch the next page; omit it for the first page. The cursor is **opaque** — echo it back unchanged, and do not parse it or construct one. Keep every other query parameter identical while paging. A cursor is checked against the part of the query that decides where the listing reads, so reusing it with, for example, a different folder or owner is refused with a 400; not every change to the other parameters is detected, though, and a cursor reused after one returns pages that match neither query. */
     startFrom?: string;
     /** Maximum number of documents to return per page (1-100; defaults to 20). */
     limit?: number;

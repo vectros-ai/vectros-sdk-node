@@ -6,6 +6,12 @@
 export interface DocumentTextResponse {
     /** Document ID. */
     id?: string | undefined;
-    /** Full extracted or ingested text content of the document. */
+    /** The document's extracted or ingested text: all of it, or the part that `offset` and `limit` selected. */
     text?: string | undefined;
+    /** Where `text` starts in the whole text, in Unicode characters (code points). 0 unless you passed `offset`. */
+    offset?: number | undefined;
+    /** The length of the whole text, in Unicode characters (code points). */
+    totalLength?: number | undefined;
+    /** Where the next part starts, in Unicode characters (code points): pass it as `offset` to read on. Absent when `text` reaches the end of the document's text. */
+    nextOffset?: number | undefined;
 }

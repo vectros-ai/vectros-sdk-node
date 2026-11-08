@@ -5,13 +5,13 @@
  */
 export interface NamespaceRequest {
     /** The namespace to register: 2-32 characters, a lowercase letter first, then lowercase letters, digits, `_` or `-`. `org` and `client` are reserved names, registered the same way as any other namespace. Deleting any namespace — these two included — is refused while entities still reference it. Required on registration; on update it must match the path and is otherwise ignored (the namespace is immutable). */
-    namespace: string;
+    namespace?: string | undefined;
     /** When `true`, every `scope:<namespace>` value in this namespace must resolve to an existing identity entity of the same account and namespace (create entities via `POST /v1/entities/{namespace}`), and the namespace gains the full identity-entity surface — list its entities, look them up by schema field, and filter other resources by them as a parent. When `false` (the default), values in this namespace are free-form strings validated by grammar only. */
     entityBacked?: boolean | undefined;
     /** Optional ID of a record schema (created via `POST /v1/schemas`) bound as the default governing schema for entities created in this namespace. Must belong to your account. */
     defaultSchemaId?: string | undefined;
     /** This namespace's position in your account's specificity order, used to break a tie when a caller holds two scope dimensions at once during recordType schema resolution — the higher-ranked (more specific) dimension's schema wins. Required on registration (no default); must be an integer between 0 and 1000000, and unique across every namespace in your account — including `org` and `client`, once registered (`org`=1000, `client`=2000). Optional on update — omit to leave it unchanged. */
-    specificityRank: number;
+    specificityRank?: number | undefined;
     /** Optional. The record type holding this namespace's MEMBERSHIP grants — the records that say which values of this namespace a given user belongs to. Supply it together with `membershipTargetField` and `membershipContextId`, or omit all three. Declaring it grants nobody anything on its own: a credential receives membership-derived access only if its own role or access profile asks for it by naming `${{ member.scope.<namespace> }}` in `data_scope`. */
     membershipRecordType?: string | undefined;
     /** Optional. The field on `membershipRecordType` naming the user a grant is FOR. It is an ordinary reference field, not an ownership field — the grant is owned by whoever created it, and the namespace value it applies to is the grant's own scope stamp, which is what your placement authority is checked against when you write it. */
