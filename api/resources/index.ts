@@ -14,6 +14,8 @@ export * as identity from "./identity/index.js";
 export * from "./identity/types/index.js";
 export * from "./inference/client/requests/index.js";
 export * as inference from "./inference/index.js";
+export * from "./public/client/requests/index.js";
+export * as public_ from "./public/index.js";
 export * from "./records/client/requests/index.js";
 export * as records from "./records/index.js";
 export * from "./records/types/index.js";

@@ -30,6 +30,10 @@ export interface AppContextResponse {
     principalUsageCap?: number | undefined;
     /** Whether read-access logging is on by default for this context. A schema that sets `capabilities.readAccessLog` overrides it; a schema that does not inherits it. Null means no context default is set, so the platform default applies and logging is OFF. Use it to tell an empty `GET /v1/admin/access-log` result that genuinely means "no one accessed this subject" from one that means "nothing was being recorded". */
     readAccessLogDefault?: (boolean | null) | undefined;
+    /** Whether end users can delete their own account from this context's app (`/v1/me/erasure`). Absent means off. */
+    allowSelfErasure?: (boolean | null) | undefined;
+    /** The days a self-requested account deletion waits before it runs (0 to 30). Absent means the default, 7. */
+    selfErasureGraceDays?: (number | null) | undefined;
     /** The golden IdP-asserted identity claim names projected, read-only, onto access profiles in this context. Filled in once per profile, the first time a sign-in for that principal can supply a value — usually at profile-creation, but for an invited member not until they actually accept and sign in, since there is nothing to project before that. Once filled, a profile's projection does not update again even if this declaration or the underlying identity data changes later. Absent when no projection is declared. */
     identityProjectionClaims?: string[] | undefined;
 }

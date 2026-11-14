@@ -35,19 +35,17 @@ export class SearchClient {
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
-     *     await client.search.content({
-     *         query: "patient intake form diabetes"
-     *     })
+     *     await client.search.content()
      */
     public content(
-        request: Vectros.SearchRequest,
+        request: Vectros.SearchRequest = {},
         requestOptions?: SearchClient.RequestOptions,
     ): core.HttpResponsePromise<Vectros.SearchResponse> {
         return core.HttpResponsePromise.fromPromise(this.__content(request, requestOptions));
     }
 
     private async __content(
-        request: Vectros.SearchRequest,
+        request: Vectros.SearchRequest = {},
         requestOptions?: SearchClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.SearchResponse>> {
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();

@@ -4,13 +4,11 @@ import type * as Vectros from "../../../../index.js";
 
 /**
  * @example
- *     {
- *         query: "patient intake form diabetes"
- *     }
+ *     {}
  */
 export interface SearchRequest {
-    /** The search query, expressed in natural language or as keywords. Required. */
-    query: string;
+    /** The search query, expressed in natural language or as keywords. Required, unless `filters` contains a `$near` filter: a `$near` with no query returns the matches within the radius, nearest first, and is billed as a `TEXT` search whatever `mode` says. */
+    query?: string;
     /** How results are ranked. HYBRID combines semantic and keyword ranking (recommended). SEMANTIC ranks by vector similarity only. TEXT ranks by keyword matching only. Defaults to HYBRID. */
     mode?: SearchRequest.Mode;
     /** The maximum number of results to return. Must be between 1 and 100. Defaults to 20. */
@@ -23,7 +21,7 @@ export interface SearchRequest {
     scope?: string;
     /** Restrict results to content matching ALL of these scope values (one per namespace), for a credential whose access spans more than one ownership dimension — for example `["org:<id>", "client:<id>"]` to narrow to one specific client within one specific org. Each entry uses the same `namespace:value` form as `scope`. Naming the same namespace twice is rejected. Mutually exclusive with `scope` — use `scope` for a single dimension. */
     scopeFilters?: string[];
-    /** Field-level filters applied to your document and record metadata. Each key is a field name, and top-level keys are AND-combined. Each value is one of: a scalar (string, number, or boolean) for an exact match; an array of scalars to match any one of them; or an operator map for ranges, negation, and membership. The supported operators are a closed set: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte` (each takes a scalar) and `$in`, `$nin` (each takes an array of scalars). Operators within one map are AND-combined, so `{"price":{"$gte":100,"$lte":500}}` expresses a closed range; `$in` and `$nin` may not be combined with other operators. Numbers and booleans are matched by type, so the field must have been ingested under a typed schema; dates may be sent as ISO 8601 strings or epoch milliseconds. Unknown operators, non-scalar operands, and malformed field names are rejected with a 400. */
+    /** Field-level filters applied to your document and record metadata. Each key is a field name, and top-level keys are AND-combined. Each value is one of: a scalar (string, number, or boolean) for an exact match; an array of scalars to match any one of them; or an operator map for ranges, negation, and membership. The supported operators are a closed set: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte` (each takes a scalar) and `$in`, `$nin` (each takes an array of scalars). Operators within one map are AND-combined, so `{"price":{"$gte":100,"$lte":500}}` expresses a closed range; `$in` and `$nin` may not be combined with other operators. Numbers and booleans are matched by type, so the field must have been ingested under a typed schema; dates may be sent as ISO 8601 strings or epoch milliseconds. Unknown operators, non-scalar operands, and malformed field names are rejected with a 400. A field of type `geo` takes the `$near` operator: `{"location":{"$near":{"lat":47.6062,"lon":-122.3321,"radiusMeters":5000}}}` keeps only content whose location is within `radiusMeters` (1 to 2,000,000) of the point, measured as great-circle distance on a sphere, inclusive. `$near` must be the only operator in its map, and at most one `$near` is allowed per request. Each result then carries `distanceMeters`. With a query and no `sortBy`, results keep their relevance order. Without `typeName`, a `$near` on a field that is not of type `geo` matches nothing: the result is empty, not an error. With `typeName`, a `$near` on a field that no schema of that type declares as `geo` is a `400`. This check does not apply to a key that reaches every app context: that key gets an empty result. */
     filters?: Record<string, Vectros.FilterValue>;
     /** How query terms are matched by the keyword engine when the mode is TEXT or HYBRID. OR matches content containing any query term (broadest recall). AND requires every term to be present (higher precision). PHRASE requires the terms to appear as a contiguous sequence. COMPLEX enables the full query syntax, including boolean operators, field-scoped queries, and range filters. When omitted, defaults to PHRASE (with a slop of 3) in HYBRID mode and OR in TEXT mode. */
     textMode?: SearchRequest.TextMode;
@@ -47,8 +45,10 @@ export interface SearchRequest {
     createdAfter?: string;
     /** Restrict results to content created at or before this ISO-8601 UTC timestamp. Pair it with `createdAfter` to define a window, or use it alone to find content older than a cutoff (for example, in archival or cleanup workflows). */
     createdBefore?: string;
-    /** A fail-closed override. When true, the request returns HTTP 503 instead of partial results if one of the search engines is unavailable. Defaults to false, in which case an outage degrades to the surviving engine and the response carries `degraded: true` along with the failed engines in `degradedLegs`. Set this to true only when complete results are required and a degraded answer is unacceptable. */
+    /** A fail-closed override. When true, the request returns HTTP 503 instead of partial results if one of the search engines is unavailable. Defaults to false, in which case an outage degrades to the surviving engine and the response carries `degraded: true` along with the failed engines in `degradedLegs`. Set this to true only when complete results are required and a degraded answer is unacceptable. It also returns a 503 instead of a search ordered by distance that would carry `incompleteResults: true`. */
     requireComplete?: boolean;
+    /** The result order. Omit it for relevance order. `distance` orders results nearest first; it requires a `$near` filter, and either no `query` or `mode` TEXT (it is rejected with a 400 for HYBRID and SEMANTIC). A `TEXT` search with a `$near` (ordered by distance or not) returns no keyword-highlighted snippet: `snippet` falls back to an excerpt of the item. A search with no `query` runs as a keyword-index search whatever `mode` says, so content indexed for semantic search only is not found by it, nor by a `TEXT` search ordered by distance. A search ordered by distance returns at most one result per item (`uniqueDocuments` does not apply). */
+    sortBy?: SearchRequest.SortBy;
 }
 
 export namespace SearchRequest {
@@ -77,4 +77,10 @@ export namespace SearchRequest {
         } as const;
         export type Item = (typeof Item)[keyof typeof Item];
     }
+
+    /** The result order. Omit it for relevance order. `distance` orders results nearest first; it requires a `$near` filter, and either no `query` or `mode` TEXT (it is rejected with a 400 for HYBRID and SEMANTIC). A `TEXT` search with a `$near` (ordered by distance or not) returns no keyword-highlighted snippet: `snippet` falls back to an excerpt of the item. A search with no `query` runs as a keyword-index search whatever `mode` says, so content indexed for semantic search only is not found by it, nor by a `TEXT` search ordered by distance. A search ordered by distance returns at most one result per item (`uniqueDocuments` does not apply). */
+    export const SortBy = {
+        Distance: "distance",
+    } as const;
+    export type SortBy = (typeof SortBy)[keyof typeof SortBy];
 }

@@ -83,7 +83,7 @@ export class AuthClient {
     }
 
     /**
-     * Returns a page of per-subject PHI read-access rows: who read which subject's PHI, when, against which record, and whether any sensitive value was actually revealed in plaintext. Metadata only — never the PHI itself. Rows exist only where read-access logging is enabled. Provide at least one query axis: a subject (`subjectType` + `subjectId`) within a `contextId` for the primary accounting query; `resourceId` within a `contextId` for 'who read this record'; `callerKeyId` for 'what did this credential read' (account-wide forensic); or `contextId` alone to enumerate a whole context. `from`/`to` bound the time window. Results are scoped to your account, derived from your token — never from input. Requires the `access-log:r` scope.
+     * Returns a page of per-subject PHI read-access rows: who read which subject's PHI, when, against which resource, and whether any sensitive value was actually revealed in plaintext. Metadata only — never the PHI itself. Rows exist only where read-access logging is enabled. Provide at least one query axis: a subject (`subjectType` + `subjectId`) within a `contextId` for the primary accounting query; `resourceType` + `resourceId` within a `contextId` for 'who read this resource' (both are required for that axis: rows are keyed by the pair, so `resourceId` alone matches nothing); `callerKeyId` for 'what did this credential read' (account-wide forensic); or `contextId` alone to enumerate a whole context. `from`/`to` bound the time window. Results are scoped to your account, derived from your token — never from input. Requires the `access-log:r` scope.
      *
      * @param {Vectros.GetAccessLogRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -811,7 +811,7 @@ export class AuthClient {
     }
 
     /**
-     * Creates a new app context. This call is idempotent by `contextId`: if an app context with the same `contextId` already exists, the existing app context is returned (with status 200) instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing context was returned) tells the two apart. To overwrite an existing context's `name`/`description`/`companyName` instead of returning it unchanged, set `?upsert=true` (this also requires the `app-contexts:u` scope). The reserved `contextId` value `vectros-admin` cannot be created through this endpoint; it is provisioned automatically for your account. Requires the `app-contexts:c` scope.
+     * Creates a new app context. This call is idempotent by `contextId`: if an app context with the same `contextId` already exists, the existing app context is returned (with status 200) instead of creating a duplicate. The response's `created` field (and the HTTP status — 201 when created, 200 when an existing context was returned) tells the two apart. Fields applied when the context is created: `name` (required), `description`, `companyName`; `readAccessLogDefault` (the PHI read-access-logging context default); the per-principal metering trio (`meteringAxis`, `principalBurstLimit`, `principalUsageCap`, which only take effect for an account with the corresponding feature enabled); `identityProjectionClaims` (requires the platform provisioning capability; see its own field description); and `allowSelfErasure` and `selfErasureGraceDays` (end-user account deletion; they also require the provisioning capability). An omitted (or null) field is left unset (for `readAccessLogDefault`, no context default: read-access logging is then off unless a schema turns it on). When an existing context is returned, none of the submitted fields are applied and a value that differs from the stored one is not an error: the response shows the stored values. (Sending `identityProjectionClaims`, `allowSelfErasure` or `selfErasureGraceDays` without the provisioning capability is refused either way.) To apply the submitted fields to an existing context instead, set `?upsert=true`, which then also requires the `app-contexts:u` scope. The reserved `contextId` value `vectros-admin` cannot be created through this endpoint; it is provisioned automatically for your account. Requires the `app-contexts:c` scope.
      *
      * @param {Vectros.CreateAppContextRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -1391,11 +1391,12 @@ export class AuthClient {
     }
 
     /**
-     * Updates an app context. This is a partial update: any field you omit (or send as null) keeps its existing value. The `contextId` is immutable and is taken from the URL path, so any `contextId` in the request body is ignored. Patchable fields: `name`, `description`, `companyName`; the per-principal metering trio (`meteringAxis`, `principalBurstLimit`, `principalUsageCap` — only takes effect for an account with the corresponding feature enabled); `readAccessLogDefault` (the PHI read-access-logging context default); and `identityProjectionClaims` (requires the platform provisioning capability on top of the ordinary scope below — see its own field description). Requires the `app-contexts:u` scope.
+     * Updates an app context. This is a partial update: any field you omit (or send as null) keeps its existing value. The `contextId` is immutable and is taken from the URL path, so any `contextId` in the request body is ignored. Patchable fields: `name`, `description`, `companyName`; the per-principal metering trio (`meteringAxis`, `principalBurstLimit`, `principalUsageCap` — only takes effect for an account with the corresponding feature enabled); `readAccessLogDefault` (the PHI read-access-logging context default); `identityProjectionClaims` (requires the platform provisioning capability on top of the ordinary scope below — see its own field description); and `allowSelfErasure` and `selfErasureGraceDays` (end-user account deletion; the same provisioning requirement). Requires the `app-contexts:u` scope.
      *
      * @param {Vectros.UpdateAppContextRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
@@ -1449,6 +1450,8 @@ export class AuthClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 403:
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
@@ -1478,7 +1481,9 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
+     * @throws {@link Vectros.ServiceUnavailableError}
      *
      * @example
      *     await client.auth.deleteAppContext({
@@ -1537,8 +1542,12 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                case 503:
+                    throw new Vectros.ServiceUnavailableError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -1962,7 +1971,7 @@ export class AuthClient {
     }
 
     /**
-     * Returns full usage detail for the requested calendar month, broken down by category (search, documents, records, and trigger-script execution time) with per-category credit estimates and a split between your live and test environments. Defaults to the current month when `year` and `month` are omitted. Requires the `billing:r` scope on scoped tokens; API keys always have access. **A token confined to a single app context sees only that context's usage**: totals, the environment split, and the `contexts` breakdown narrow to it, and the environment your context is not bound to is omitted (`null`), not zeroed. Only a token with cross-context reach sees your full account-wide totals. Two exceptions to the narrowing, since they have no per-context breakdown to narrow to: `reads.calls.used`/`reads.dataOut.bytes` (metered per account, not per context) read as `0` for a confined token rather than a narrowed figure — the corresponding overage-credit charge fields narrow correctly; and `credits.limit` stays your whole plan's ceiling, so `credits.remaining` may overstate the account's true remaining room. The `execution` section narrows correctly for a confined token, like the other per-context charge fields — but note its credits carry sub-credit remainders forward across your whole account for the period, so compare `execution.creditsMilli` against your account-wide figure rather than recomputing it from one context's `billableMillis`.
+     * Returns full usage detail for the requested calendar month, broken down by category (search, documents, records, and trigger-script execution time) with per-category credit estimates and a split between your live and test environments. Defaults to the current month when `year` and `month` are omitted. Requires the `billing:r` scope on scoped tokens; API keys always have access. **A token confined to a single app context sees only that context's usage**: totals, the environment split, and the `contexts` breakdown narrow to it, and the environment your context is not bound to is omitted (`null`), not zeroed. Only a token with cross-context reach sees your full account-wide totals. Two exceptions to the narrowing, since they have no per-context breakdown to narrow to: `reads.calls.used`/`reads.dataOut.bytes` (metered per account, not per context) read as `0` for a confined token rather than a narrowed figure — the corresponding overage-credit charge fields narrow correctly; and `credits.limit` stays your whole plan's ceiling, so `credits.remaining` may overstate the account's true remaining room (`credits.admissionLimit`, `credits.includedCredits` and `credits.overage` are not reported to a confined token). The `execution` section narrows correctly for a confined token, like the other per-context charge fields — but note its credits carry sub-credit remainders forward across your whole account for the period, so compare `execution.creditsMilli` against your account-wide figure rather than recomputing it from one context's `billableMillis`.
      *
      * @param {Vectros.GetUsageRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2109,7 +2118,7 @@ export class AuthClient {
     }
 
     /**
-     * Updates the mutable fields of a registered issuer: `subClaim`, `emailClaim`, `userinfoUri`, `capturedClaims`, `restrictedToDomain` (a new non-blank value must already be a VERIFIED domain for your account; an empty string clears it where permitted; see `IssuerUpdateRequest.restrictedToDomain` for the full semantics), `status` (`active`/`suspended` — a registration awaiting verification (`pending_verification`) accepts no status change until it is verified; a suspended issuer's tokens are rejected identically to an unregistered issuer at exchange time), and `selfSignupPolicies`. Fields omitted from the body are left unchanged (partial update). `issuer`, `jwksUri`, `audience`, and `contextId` are trust-anchor / routing-pin fields and are immutable via this route — supplying a value that differs from the current registration is rejected with 400; supplying the current value back is a no-op. Rotating a trust anchor requires deleting and re-registering the issuer, which is itself refused while any user is bound through it. **`subClaim` is identity-determining, not merely cosmetic**: it names which verified JWT claim is read as the federated user's identifier, so changing it on an issuer that already has bound users would silently re-identify (or, under self-signup, orphan) every one of them — changing it is therefore refused once any user has bound through this issuer, the same guard `DELETE` already applies, and is only free before the first real login. Requires a root API key or the bootstrap's provisioning capability, gated identically to every other operation on this surface. A credential confined to one app context may only update an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId. A root API key may update any issuer.
+     * Updates the mutable fields of a registered issuer: `subClaim`, `emailClaim`, `userinfoUri`, `capturedClaims`, `acceptedIdTokenClientIds`, `restrictedToDomain` (a new non-blank value must already be a VERIFIED domain for your account; an empty string clears it where permitted; see `IssuerUpdateRequest.restrictedToDomain` for the full semantics), `status` (`active`/`suspended` — a registration awaiting verification (`pending_verification`) accepts no status change until it is verified; a suspended issuer's tokens are rejected identically to an unregistered issuer at exchange time), and `selfSignupPolicies`. Fields omitted from the body are left unchanged (partial update). `issuer`, `jwksUri`, `audience`, and `contextId` are trust-anchor / routing-pin fields and are immutable via this route — supplying a value that differs from the current registration is rejected with 400; supplying the current value back is a no-op. Rotating a trust anchor requires deleting and re-registering the issuer, which is itself refused while any user is bound through it. **`subClaim` is identity-determining, not merely cosmetic**: it names which verified JWT claim is read as the federated user's identifier, so changing it on an issuer that already has bound users would silently re-identify (or, under self-signup, orphan) every one of them — changing it is therefore refused once any user has bound through this issuer, the same guard `DELETE` already applies, and is only free before the first real login. Requires a root API key or the bootstrap's provisioning capability, gated identically to every other operation on this surface. A credential confined to one app context may only update an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId. A root API key may update any issuer.
      *
      * @param {Vectros.IssuerUpdateRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2640,6 +2649,239 @@ export class AuthClient {
     }
 
     /**
+     * Lists the publishable app keys of your credential's environment, active and revoked, a page at a time. A credential confined to one app context lists only that context's keys, so its page can be shorter than `limit` while `nextCursor` is not null: keep paging, passing `nextCursor` as `startFrom`, until it is null. A server key's secret is never listed. Requires the `public-keys:r` scope.
+     *
+     * @param {Vectros.ListPublicAppKeysRequest} request
+     * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
+     *
+     * @example
+     *     await client.auth.listPublicAppKeys()
+     */
+    public listPublicAppKeys(
+        request: Vectros.ListPublicAppKeysRequest = {},
+        requestOptions?: AuthClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.PublicAppKeyPage> {
+        return core.HttpResponsePromise.fromPromise(this.__listPublicAppKeys(request, requestOptions));
+    }
+
+    private async __listPublicAppKeys(
+        request: Vectros.ListPublicAppKeysRequest = {},
+        requestOptions?: AuthClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.PublicAppKeyPage>> {
+        const { limit, startFrom } = request;
+        const _queryParams: Record<string, unknown> = {
+            limit,
+            startFrom,
+        };
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                "v1/admin/public-keys",
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.PublicAppKeyPage, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/admin/public-keys");
+    }
+
+    /**
+     * Issues a publishable app key for one app context. Anonymous visitors send it as the `k` query parameter to read that context's public views; it grants nothing else. A browser key (`pub`) is meant to ship in web pages. A server key (`pubs`) also gets a server secret, returned once in this response, which your server sends in the `X-Vectros-Public-Server-Secret` header for higher rate limits. An app context has at most two active keys: issue the new one, move your clients to it, then revoke the old one. Requires the `public-keys:c` scope.
+     *
+     * @param {Vectros.CreatePublicAppKeyRequest} request
+     * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     *
+     * @example
+     *     await client.auth.createPublicAppKey()
+     */
+    public createPublicAppKey(
+        request: Vectros.CreatePublicAppKeyRequest = {},
+        requestOptions?: AuthClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.PublicAppKeyResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__createPublicAppKey(request, requestOptions));
+    }
+
+    private async __createPublicAppKey(
+        request: Vectros.CreatePublicAppKeyRequest = {},
+        requestOptions?: AuthClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.PublicAppKeyResponse>> {
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                "v1/admin/public-keys",
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: request,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.PublicAppKeyResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/admin/public-keys");
+    }
+
+    /**
+     * Revokes a publishable app key. Revoking a key also revokes every older key of the same app context, because a revocation applies to every key version below a minimum: the response lists every key it covers. Revoked keys stop being accepted by the API within about 30 seconds, and at the edge within the edge's propagation time. Revocation is permanent; issue a new key to replace it. Revoking an already revoked key repeats the revocation and returns the same list. Requires the `public-keys:d` scope.
+     *
+     * @param {Vectros.RevokePublicAppKeyRequest} request
+     * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     * @throws {@link Vectros.ServiceUnavailableError}
+     *
+     * @example
+     *     await client.auth.revokePublicAppKey({
+     *         keyId: "keyId"
+     *     })
+     */
+    public revokePublicAppKey(
+        request: Vectros.RevokePublicAppKeyRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.RevokedPublicAppKeys> {
+        return core.HttpResponsePromise.fromPromise(this.__revokePublicAppKey(request, requestOptions));
+    }
+
+    private async __revokePublicAppKey(
+        request: Vectros.RevokePublicAppKeyRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.RevokedPublicAppKeys>> {
+        const { keyId } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/admin/public-keys/${core.url.encodePathParam(keyId)}`,
+            ),
+            method: "DELETE",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.RevokedPublicAppKeys, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                case 503:
+                    throw new Vectros.ServiceUnavailableError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "DELETE",
+            "/v1/admin/public-keys/{keyId}",
+        );
+    }
+
+    /**
      * Creates a short-lived JWT bearer token restricted to specific actions and, optionally, to a particular user or identity entity (in any namespace). Use this to hand a narrowly-scoped credential to a browser or downstream service so it never sees your root API key. Only callable with a root API key (`sk_*`).
      *
      * @param {Vectros.TokenRequest} request
@@ -2979,7 +3221,7 @@ export class AuthClient {
     }
 
     /**
-     * RFC 8693 OAuth 2.0 Token Exchange. Trades a JWT issued by a third-party identity provider you've registered (`POST /v1/auth/issuers`) for a Vectros `st_*` scoped bearer token — no Vectros credential required to call this endpoint. The exchanged token's scope is resolved entirely server-side from the matched user's access profile; this endpoint accepts no caller-supplied scope, resource, or audience parameter (RFC 8693 §2.1's `resource`/`audience`/`scope` are not used in v1 — the registered `(issuer, audience)` pair alone pins the target tenant and app context). On a first-time login (no existing Vectros identity for this subject), two opt-in binding paths exist: `invite_token` (a `PENDING` sub-user invitation), and — if the registration declares one or more self-signup policies — `signup_type` (a brand-new user is created and bound to the policy's configured role). If `invite_token` is present at all, it is the ONLY path tried — a failed invite never falls through to self-signup. Neither field is required for a subject with an existing identity. If your issuer is registered against more than one app context (each via its own audience), `context_id` selects which one to target; omit it when your token's `aud` claim matches only one registered context — the common case, unaffected by this field. Uses the OAuth-standard error envelope (`{"error":..., "error_description":...}`, RFC 6749 §5.2), NOT this API's usual `{"message":...}` shape — its client is generic OAuth tooling, not the Vectros SDK.
+     * RFC 8693 OAuth 2.0 Token Exchange. Trades a JWT issued by a third-party identity provider you've registered (`POST /v1/auth/issuers`) for a Vectros `st_*` scoped bearer token — no Vectros credential required to call this endpoint. The exchanged token's scope is resolved entirely server-side from the matched user's access profile; this endpoint accepts no caller-supplied scope, resource, or audience parameter (RFC 8693 §2.1's `resource`/`audience`/`scope` are not used in v1 — the registered `(issuer, audience)` pair alone pins the target tenant and app context). On a first-time login (no existing Vectros identity for this subject), two opt-in binding paths exist: `invite_token` (a `PENDING` sub-user invitation), and — if the registration declares one or more self-signup policies — `signup_type` (a brand-new user is created and bound to the policy's configured role). If `invite_token` is present at all, it is the ONLY path tried — a failed invite never falls through to self-signup. Neither field is required for a subject with an existing identity. If your issuer is registered against more than one app context (each via its own audience), `context_id` selects which one to target; omit it when your token's `aud` claim matches only one registered context — the common case, unaffected by this field. Uses the OAuth-standard error envelope (`{"error":..., "error_description":...}`, RFC 6749 §5.2), NOT this API's usual `{"message":...}` shape — its client is generic OAuth tooling, not the Vectros SDK. The one exception is the per-IP `429`, which the edge returns before the request reaches this endpoint, in this API's rate-limit shape (`{"errorCode":"RATE_LIMITED",...}`).
      *
      * @param {Vectros.TokenExchangeRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.

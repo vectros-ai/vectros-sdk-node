@@ -8,7 +8,7 @@ import type * as Vectros from "../../../../index.js";
  *         id: "id",
  *         body: {
  *             name: "notify-assignee",
- *             source: "export default function(input) { return { ok: true }; }"
+ *             source: "({ ok: true });"
  *         }
  *     }
  */

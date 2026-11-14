@@ -10,6 +10,6 @@ export interface DocumentDownloadResponse {
     downloadUrl?: string | undefined;
     /** Epoch-millis (Unix milliseconds) timestamp at which the presigned URL expires. */
     expires?: number | undefined;
-    /** MIME type of the file, as captured at upload time. */
+    /** The media type the file was uploaded with (the document's `fileType`): the uploader's declaration, not checked against the file's content. */
     fileType?: string | undefined;
 }

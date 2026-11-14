@@ -6,4 +6,5 @@ export type { GetAgentRequest } from "./GetAgentRequest.js";
 export type { GetRunRequest } from "./GetRunRequest.js";
 export type { ListAgentsRequest } from "./ListAgentsRequest.js";
 export type { ListAgentVersionsRequest } from "./ListAgentVersionsRequest.js";
+export type { ListRunsRequest } from "./ListRunsRequest.js";
 export type { UpdateAgentRequest } from "./UpdateAgentRequest.js";

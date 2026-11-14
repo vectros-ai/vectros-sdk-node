@@ -3,7 +3,7 @@
 import type * as Vectros from "../index.js";
 
 /**
- * A stored agent. A caller holding `runs:c` but not `agents:r` sees only `id`, `name`, `description`, `latestVersion` and `status`. A purged version carries no content.
+ * A stored agent. A caller holding `runs:c` for it but not `agents:r` sees only `id`, `name`, `description`, `latestVersion` and `status`. A purged version carries no content.
  */
 export interface AgentResponse {
     /** The agent's id: stable across its versions and derived from its app context and name (opaque; do not assume a format). */
@@ -28,6 +28,8 @@ export interface AgentResponse {
     tools?: Vectros.AgentToolEntry[] | undefined;
     limits?: Vectros.AgentLimits | undefined;
     budget?: Vectros.AgentBudget | undefined;
+    /** What the agent's runs have spent and hold in each period it counts: every capped period, and always the current month. Returned only when one agent is read (`GET /v1/agents/{id}`). */
+    periodUsage?: Vectros.AgentPeriodUsage[] | undefined;
     /** When this version was written (ISO-8601). */
     createdAt?: string | undefined;
     /** The principal that wrote this version. */

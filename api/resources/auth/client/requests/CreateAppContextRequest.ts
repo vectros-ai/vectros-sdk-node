@@ -9,7 +9,7 @@ import type * as Vectros from "../../../../index.js";
  *     }
  */
 export interface CreateAppContextRequest {
-    /** When `true`, if an app context with the same `contextId` already exists its `name`, `description`, and `companyName` are updated to the submitted values instead of being returned unchanged. Defaults to `false`. Requires the `app-contexts:u` scope in addition to `app-contexts:c`. */
+    /** When `true`, if an app context with the same `contextId` already exists, each submitted field (`name`, `description`, `companyName`, `readAccessLogDefault`, `meteringAxis`, `principalBurstLimit`, `principalUsageCap`, `identityProjectionClaims`, `allowSelfErasure`, and `selfErasureGraceDays`) is applied to it instead of the context being returned unchanged; an omitted (or null) field keeps its existing value. When no such context exists the context is created as without this parameter. Defaults to `false`. When the context already exists, requires the `app-contexts:u` scope in addition to `app-contexts:c`. */
     upsert?: boolean;
     body: Vectros.AppContextRequest;
 }

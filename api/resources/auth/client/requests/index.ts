@@ -1,5 +1,6 @@
 export type { CreateAccessProfileRequest } from "./CreateAccessProfileRequest.js";
 export type { CreateAppContextRequest } from "./CreateAppContextRequest.js";
+export { CreatePublicAppKeyRequest } from "./CreatePublicAppKeyRequest.js";
 export type { CreateRoleRequest } from "./CreateRoleRequest.js";
 export type { CreateScopedKeyRequest } from "./CreateScopedKeyRequest.js";
 export type { DeleteAccessProfileRequest } from "./DeleteAccessProfileRequest.js";
@@ -23,7 +24,9 @@ export type { ListAccessProfilesRequest } from "./ListAccessProfilesRequest.js";
 export type { ListAppContextsRequest } from "./ListAppContextsRequest.js";
 export type { ListIssuersRequest } from "./ListIssuersRequest.js";
 export type { ListProfilesForPrincipalRequest } from "./ListProfilesForPrincipalRequest.js";
+export type { ListPublicAppKeysRequest } from "./ListPublicAppKeysRequest.js";
 export type { ListRolesRequest } from "./ListRolesRequest.js";
+export type { RevokePublicAppKeyRequest } from "./RevokePublicAppKeyRequest.js";
 export type { RevokeScopedKeyRequest } from "./RevokeScopedKeyRequest.js";
 export type { TokenExchangeRequest } from "./TokenExchangeRequest.js";
 export type { TokenRequest } from "./TokenRequest.js";

@@ -27,9 +27,9 @@ export interface GetAccessLogRequest {
     action?: string;
     /** Forensic axis — restrict to reads performed by a single credential (the API key / scoped token key id that made the call). */
     callerKeyId?: string;
-    /** Restrict to a single accessed resource type: a record schema type name, or one of `document`, `search`, or `rag`. */
+    /** The accessed resource's type: a record schema type name, or one of `document`, `folder`, `entities` or `users`. Required together with `resourceId` for the per-resource axis; with another axis it filters the page. */
     resourceType?: string;
-    /** Forensic axis — restrict to reads of a single accessed record/document id. */
+    /** Forensic axis — restrict to reads of a single accessed resource (a record, document, entity, user or folder id). Pass the matching `resourceType` with it: the per-resource axis is keyed by the pair. */
     resourceId?: string;
     /** If true, return only reads that actually revealed a sensitive value in plaintext. */
     revealedSensitive?: boolean;

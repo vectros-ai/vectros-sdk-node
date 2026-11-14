@@ -3,6 +3,7 @@ export type { BatchLookupRequest } from "./BatchLookupRequest.js";
 export { BatchWriteRequest } from "./BatchWriteRequest.js";
 export type { CreateRecordRequest } from "./CreateRecordRequest.js";
 export type { DeleteRecordRequest } from "./DeleteRecordRequest.js";
+export type { GetRecordPublicViewRequest } from "./GetRecordPublicViewRequest.js";
 export type { GetRecordRequest } from "./GetRecordRequest.js";
 export type { GetRecordTombstoneRequest } from "./GetRecordTombstoneRequest.js";
 export type { GetRecordVersionsRequest } from "./GetRecordVersionsRequest.js";

@@ -26,6 +26,8 @@ export interface SearchResult {
     metadata?: Record<string, unknown> | undefined;
     /** When this item was added to the search index, as an ISO-8601 UTC timestamp. Usually the same moment the source item was created, but not always: if the item was re-indexed onto a new index entry at some later point, this reports that later time. Use the item's own `createdAt` from documents.get / records.get when you need the source creation time. */
     createdAt?: string | undefined;
+    /** The great-circle distance in meters, rounded to 0.1 m, from the `$near` point to this item's location. Present only when the request has a `$near` filter. */
+    distanceMeters?: number | undefined;
 }
 
 export namespace SearchResult {

@@ -8,7 +8,7 @@ export interface FileUploadResponse {
     created?: boolean | undefined;
     /** Document ID assigned to this upload. Poll `GET /v1/documents/{id}` to track indexing status after the upload completes. */
     id?: string | undefined;
-    /** Presigned upload URL. Upload the raw file bytes directly to this URL with an HTTP PUT request, setting the Content-Type header to the `fileType` you provided. No Authorization header is needed — the URL is self-authenticating. Your PUT MUST also include the header named in `requiredHeaderName`, set to `requiredHeaderValue` exactly — the URL is single-use and this header is part of what makes it so; omitting it fails the request. */
+    /** Presigned upload URL. Upload the raw file bytes directly to this URL with an HTTP PUT request. The Content-Type header of your PUT is stored with the file and served back on download. When the request sent `size`, it must be the `Content-Type` in `requiredHeaders` and the body must be exactly `size` bytes, or the PUT is refused; without `size`, setting it to the `fileType` you provided is recommended, but it is not checked. No Authorization header is needed — the URL is self-authenticating. Your PUT MUST also send every header in `requiredHeaders` (which includes the header named in `requiredHeaderName`, set to `requiredHeaderValue`) exactly — the URL is single-use and this header is part of what makes it so; omitting it fails the request. */
     uploadUrl?: string | undefined;
     /** ISO-8601 UTC timestamp at which the presigned URL expires. The upload must complete before this time. Default expiry is 15 minutes. */
     expiresAt?: string | undefined;
@@ -18,4 +18,6 @@ export interface FileUploadResponse {
     requiredHeaderName?: string | undefined;
     /** The exact value to send for `requiredHeaderName`, verbatim. */
     requiredHeaderValue?: string | undefined;
+    /** Every header your PUT to `uploadUrl` MUST send, with the exact value to send, as a map of header name to value. It always holds `If-None-Match`. When the request sent `size` it also holds `Content-Type`, set to the media type the URL was signed for, which may be written differently from the `fileType` you sent: send this value, not your own. Do not set `Content-Length` yourself; your HTTP client sets it from the body, which must be exactly `size` bytes. A missing header or a different value fails the PUT with `403 SignatureDoesNotMatch`. */
+    requiredHeaders?: Record<string, string> | undefined;
 }

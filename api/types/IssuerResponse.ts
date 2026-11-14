@@ -32,6 +32,8 @@ export interface IssuerResponse {
     selfSignupPolicies?: Vectros.SelfSignupPolicy[] | undefined;
     /** Additional OIDC claim names captured from this issuer's tokens on every successful exchange, beyond `emailClaim`. Absent (not an empty list) when none are configured. */
     capturedClaims?: string[] | undefined;
+    /** Extra `aud` values accepted on an ID token presented to confirm a recent sign-in before an end user deletes their own account, beyond `audience`. Absent when none are configured. */
+    acceptedIdTokenClientIds?: string[] | undefined;
     /** The verified domain this issuer's (issuer, audience) uniqueness is scoped to, if opted into. Absent when this registration is domain-less (unrestricted). */
     restrictedToDomain?: string | undefined;
     /** Present only while `status` is `pending_verification`. The name of the token claim your IdP must stamp `verificationNonce` into. Fixed by the platform; configure an admin-controlled rule at your IdP (an Auth0 Action, an Okta inline hook, an Entra claims-mapping policy, a Keycloak protocol mapper) that adds it — never map it from an attribute your end users can edit. */

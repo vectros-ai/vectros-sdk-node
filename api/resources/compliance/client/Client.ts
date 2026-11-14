@@ -310,4 +310,303 @@ export class ComplianceClient {
 
         return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/admin/export/{id}");
     }
+
+    /**
+     * Cancels the signed-in user's own scheduled account deletion in this app while its waiting period runs; nothing is deleted. Once the deletion has started it can no longer be cancelled. Like requesting it, cancelling needs a fresh ID token proving the user just signed in (not the one that requested the deletion), so a deletion the user asked for cannot be cancelled with an API key alone. Refused with 403 (`errorCode` says why) unless the request uses the signed-in user's own scoped token.
+     *
+     * @param {Vectros.CancelSelfErasureRequest} request
+     * @param {ComplianceClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     * @throws {@link Vectros.ServiceUnavailableError}
+     *
+     * @example
+     *     await client.compliance.cancelSelfErasure({
+     *         id: "er_550e8400e29b41d4a716446655440000",
+     *         body: {
+     *             idToken: "eyJhbGciOiJSUzI1NiIsImtpZCI6IjEifQ.eyJzdWIiOiJ1c2VyIn0.c2ln"
+     *         }
+     *     })
+     */
+    public cancelSelfErasure(
+        request: Vectros.CancelSelfErasureRequest,
+        requestOptions?: ComplianceClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.SelfErasureResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__cancelSelfErasure(request, requestOptions));
+    }
+
+    private async __cancelSelfErasure(
+        request: Vectros.CancelSelfErasureRequest,
+        requestOptions?: ComplianceClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.SelfErasureResponse>> {
+        const { id, body: _body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/me/erasure/${core.url.encodePathParam(id)}/cancel`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: _body,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.SelfErasureResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                case 503:
+                    throw new Vectros.ServiceUnavailableError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/me/erasure/{id}/cancel");
+    }
+
+    /**
+     * Returns the signed-in user's account deletion in this app that is still scheduled or running, so the app can show when it will happen and offer to cancel it. Refused with 403 (`errorCode` says why) unless the request uses the signed-in user's own scoped token.
+     *
+     * @param {ComplianceClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     *
+     * @example
+     *     await client.compliance.getPendingSelfErasure()
+     */
+    public getPendingSelfErasure(
+        requestOptions?: ComplianceClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.SelfErasureResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__getPendingSelfErasure(requestOptions));
+    }
+
+    private async __getPendingSelfErasure(
+        requestOptions?: ComplianceClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.SelfErasureResponse>> {
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                "v1/me/erasure",
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.SelfErasureResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/me/erasure");
+    }
+
+    /**
+     * Schedules the deletion of the signed-in user's own account in this app: their data in this app context and their access to it. Only this app is affected; other app contexts are other apps. The user's identity is removed too when this is the account's only app context. The deletion starts after the app's waiting period (`selfErasureGraceDays`, default 7 days), during which the user can cancel it, and the user is emailed when it is scheduled and when it completes (to the verified email in the ID token). Requires the user's own scoped token, a fresh ID token proving they just signed in, and account deletion turned on for this app (`allowSelfErasure` on the app context). Refused with 403 (`errorCode` says why) unless the request uses the signed-in user's own scoped token. The account owner cannot use it.
+     *
+     * @param {Vectros.SelfErasureRequest} request
+     * @param {ComplianceClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     * @throws {@link Vectros.ServiceUnavailableError}
+     *
+     * @example
+     *     await client.compliance.requestSelfErasure({
+     *         idToken: "eyJhbGciOiJSUzI1NiIsImtpZCI6IjEifQ.eyJzdWIiOiJ1c2VyIn0.c2ln"
+     *     })
+     */
+    public requestSelfErasure(
+        request: Vectros.SelfErasureRequest,
+        requestOptions?: ComplianceClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.SelfErasureResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__requestSelfErasure(request, requestOptions));
+    }
+
+    private async __requestSelfErasure(
+        request: Vectros.SelfErasureRequest,
+        requestOptions?: ComplianceClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.SelfErasureResponse>> {
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                "v1/me/erasure",
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: request,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.SelfErasureResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                case 503:
+                    throw new Vectros.ServiceUnavailableError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/me/erasure");
+    }
+
+    /**
+     * Returns one of the signed-in user's own account deletions in this app, in any status; once it has completed, with the certificate of what was removed. Refused with 403 (`errorCode` says why) unless the request uses the signed-in user's own scoped token.
+     *
+     * @param {Vectros.GetSelfErasureRequest} request
+     * @param {ComplianceClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     *
+     * @example
+     *     await client.compliance.getSelfErasure({
+     *         id: "er_550e8400e29b41d4a716446655440000"
+     *     })
+     */
+    public getSelfErasure(
+        request: Vectros.GetSelfErasureRequest,
+        requestOptions?: ComplianceClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.SelfErasureResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__getSelfErasure(request, requestOptions));
+    }
+
+    private async __getSelfErasure(
+        request: Vectros.GetSelfErasureRequest,
+        requestOptions?: ComplianceClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.SelfErasureResponse>> {
+        const { id } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/me/erasure/${core.url.encodePathParam(id)}`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.SelfErasureResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/me/erasure/{id}");
+    }
 }

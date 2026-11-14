@@ -16,7 +16,7 @@ export interface AgentDefinitionRequest {
     model: string;
     /** The agent's system prompt. At most 32,000 characters. */
     system?: string | undefined;
-    /** The tools a run of this agent may call, by name from the tool catalog. At most 50, each named once. A tool that creates, changes or deletes data needs `allowWrites: true`. */
+    /** The tools a run of this agent may call: catalog tools by name, and stored scripts offered as tools (an entry with `script`). At most 50, each named once. A tool that creates, changes or deletes data needs `allowWrites: true`. */
     tools?: Vectros.AgentToolEntry[] | undefined;
     limits?: Vectros.AgentLimits | undefined;
     budget?: Vectros.AgentBudget | undefined;

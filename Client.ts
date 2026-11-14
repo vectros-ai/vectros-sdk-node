@@ -7,6 +7,7 @@ import { DocumentsClient } from "./api/resources/documents/client/Client.js";
 import { FoldersClient } from "./api/resources/folders/client/Client.js";
 import { IdentityClient } from "./api/resources/identity/client/Client.js";
 import { InferenceClient } from "./api/resources/inference/client/Client.js";
+import { PublicClient } from "./api/resources/public/client/Client.js";
 import { RecordsClient } from "./api/resources/records/client/Client.js";
 import { SchemasClient } from "./api/resources/schemas/client/Client.js";
 import { ScriptsClient } from "./api/resources/scripts/client/Client.js";
@@ -35,6 +36,7 @@ export class VectrosClient {
     protected _schemas: SchemasClient | undefined;
     protected _scripts: ScriptsClient | undefined;
     protected _search: SearchClient | undefined;
+    protected _public: PublicClient | undefined;
     protected _triggers: TriggersClient | undefined;
 
     constructor(options: VectrosClient.Options) {
@@ -83,6 +85,10 @@ export class VectrosClient {
 
     public get search(): SearchClient {
         return (this._search ??= new SearchClient(this._options));
+    }
+
+    public get public(): PublicClient {
+        return (this._public ??= new PublicClient(this._options));
     }
 
     public get triggers(): TriggersClient {

@@ -26,6 +26,14 @@ export interface SchemaResponse {
     capabilities?: Record<string, boolean> | undefined;
     /** Payload storage profile: STANDARD (externalize large payloads to S3), LOW_LATENCY (always store inline), or LARGE_PAYLOAD (always externalize). Defaults to STANDARD. */
     storageProfile?: SchemaResponse.StorageProfile | undefined;
+    /** `PUBLIC_MEDIA` when this is a public-media type (a document type for images); absent otherwise. */
+    fileProfile?: SchemaResponse.FileProfile | undefined;
+    /** For a public-media type: the media kinds it accepts, as declared (absent means `["image"]`). */
+    mediaKinds?: string[] | undefined;
+    /** For a public-media type: the largest file, in bytes, as declared (absent means 10485760, 10 MiB). */
+    maxBytes?: number | undefined;
+    /** For a public-media type: the file types it accepts, as declared (absent means `image/jpeg`, `image/png`, `image/webp` and `image/gif`). */
+    contentTypes?: string[] | undefined;
     /** Default search-index mode for this type's records: HYBRID, SEMANTIC, TEXT, or NONE (store-only, not searchable). */
     indexMode?: SchemaResponse.IndexMode | undefined;
     /** Which typed surfaces may bind this schema: `record`, `document`, `user`, or `entity` — identity entities in ANY namespace (`org`, `client`, or one you registered) bind under the single `entity` surface. Always present (it is required at write time). */
@@ -34,6 +42,7 @@ export interface SchemaResponse {
     active?: boolean | undefined;
     /** The id of the schema this one is a customization of, or null if this schema IS the shared base for `typeName` in this context. */
     basedOn?: string | undefined;
+    publicView?: Vectros.PublicViewDef | undefined;
     /** Schema version number, incremented each time the schema definition changes. */
     schemaVersion?: number | undefined;
     /** When the schema was created, as an ISO-8601 UTC timestamp. */
@@ -50,6 +59,11 @@ export namespace SchemaResponse {
         LargePayload: "LARGE_PAYLOAD",
     } as const;
     export type StorageProfile = (typeof StorageProfile)[keyof typeof StorageProfile];
+    /** `PUBLIC_MEDIA` when this is a public-media type (a document type for images); absent otherwise. */
+    export const FileProfile = {
+        PublicMedia: "PUBLIC_MEDIA",
+    } as const;
+    export type FileProfile = (typeof FileProfile)[keyof typeof FileProfile];
     /** Default search-index mode for this type's records: HYBRID, SEMANTIC, TEXT, or NONE (store-only, not searchable). */
     export const IndexMode = {
         Hybrid: "HYBRID",

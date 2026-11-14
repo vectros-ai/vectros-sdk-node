@@ -36,7 +36,7 @@ export interface CreditBreakdown {
     dataOut?: number | undefined;
     /** dataOut in milli-credit precision (exact) */
     dataOutMilli?: number | undefined;
-    /** Credits consumed by script execution time (trigger rules and synchronous `POST /v1/scripts/execute` calls) beyond the allowance your billable operations earned. See the `execution` section for the millisecond figures behind this charge. */
+    /** Credits consumed by script execution time (trigger rules, synchronous `POST /v1/scripts/execute` calls and agent script tools) beyond the allowance your billable operations earned. See the `execution` section for the millisecond figures behind this charge. */
     scriptExecution?: number | undefined;
     /** scriptExecution in milli-credit precision (exact) */
     scriptExecutionMilli?: number | undefined;

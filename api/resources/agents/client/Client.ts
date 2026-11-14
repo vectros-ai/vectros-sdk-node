@@ -25,7 +25,7 @@ export class AgentsClient {
     }
 
     /**
-     * Returns a page of the agents in the app context, newest first, each at its latest version. A caller holding `runs:c` but not `agents:r` gets only each agent's `id`, `name`, `description`, `latestVersion` and `status`. Retired and purged agents are left out unless `includeRetired=true`. Requires `agents:r` or `runs:c`.
+     * Returns a page of the agents in the app context, newest first, each at its latest version. A caller holding `runs:c` but not `agents:r` gets only each agent's `id`, `name`, `description`, `latestVersion` and `status`, and only for the agents its `runs:c` grant covers: a grant naming agents (`runs:c:<agent>`) lists those agents alone, in one page with no `nextCursor`. Retired and purged agents are left out unless `includeRetired=true`. Requires `agents:r` or `runs:c`.
      *
      * @param {Vectros.ListAgentsRequest} request
      * @param {AgentsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -187,7 +187,7 @@ export class AgentsClient {
     }
 
     /**
-     * Returns the agent at its latest version, or at `version`. Requires the `agents:r` scope.
+     * Returns the agent at its latest version, or at `version`, with `periodUsage`: what its runs have spent and hold in the current instance of each period it counts. Requires the `agents:r` scope.
      *
      * @param {Vectros.GetAgentRequest} request
      * @param {AgentsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -522,7 +522,7 @@ export class AgentsClient {
     }
 
     /**
-     * Stops a run. The answer is `202` with the run still `RUNNING`: read it with `GET /v1/runs/{id}` to see it end. A model call in progress is cut within a few seconds; a tool call in progress is first allowed to finish, for up to about 30 seconds, so its change is recorded and billed, and the run stops as soon as it has. The run then ends `CANCELLED` with `errorCode` `CANCELLED_BY_CALLER`, unless it had already completed, in which case it stays `COMPLETED`. Its reservation is settled once, like any run's: a model call in progress when it stopped is charged up to its maximum. A run that has ended (or that had not started, which this cancel ends) answers `200` with its final state, so a cancel can always be retried. A run can be cancelled by the credential that started it (for a token bound to a user, by that user) and by your root key. Requires the `runs:c` scope; with `runs:r` as well the answer is the whole run, otherwise only its `id`, `status`, `terminal`, `reason` and `errorCode`. Takes no body.
+     * Stops a run. The answer is `202` with the run still `RUNNING`: read it with `GET /v1/runs/{id}` to see it end. A model call in progress is cut within a few seconds; a tool call in progress is first allowed to finish, for up to about 45 seconds, so its change is recorded and billed, and the run stops as soon as it has. The run then ends `CANCELLED` with `errorCode` `CANCELLED_BY_CALLER`, unless it had already completed, in which case it stays `COMPLETED`. Its reservation is settled once, like any run's: a model call in progress when it stopped is charged up to its maximum. A run that has ended (or that had not started, which this cancel ends) answers `200` with its final state, so a cancel can always be retried. A run can be cancelled by the credential that started it (for a token bound to a user, by that user) and by your root key. Requires the `runs:c` scope; with `runs:r` as well the answer is the whole run, otherwise only its `id`, `status`, `terminal`, `reason` and `errorCode`. A grant naming an agent (`runs:c:<agent>`, `runs:r:<agent>`) reaches only runs of that agent: any other run answers `404` to the cancel, and the whole run is returned only when `runs:r` names its agent too. Takes no body.
      *
      * @param {Vectros.CancelRunRequest} request
      * @param {AgentsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -607,7 +607,7 @@ export class AgentsClient {
     }
 
     /**
-     * Returns the status and metadata of one run: the agent version that ran, how it ended, its tool calls (never their arguments or results) and what it was charged. It never returns text: the answer is delivered only in the run's stream. A run is visible to the credential that started it (for a token bound to a user, to that user) and to your root key, and is kept for 30 days after it ends. Requires the `runs:r` scope.
+     * Returns the status and metadata of one run: the agent version that ran, how it ended, its tool calls (never their arguments or results) and what it was charged. It never returns text: the answer is delivered only in the run's stream. A run is visible to the credential that started it (for a token bound to a user, to that user) and to your root key, and is kept for at least 30 days after it ends. Requires the `runs:r` scope. A grant naming an agent (`runs:r:<agent>`) reads only runs of that agent; any other run answers `404`.
      *
      * @param {Vectros.GetRunRequest} request
      * @param {AgentsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -689,7 +689,92 @@ export class AgentsClient {
     }
 
     /**
-     * Starts a run of a stored agent and streams what it does as Server-Sent Events. The response is always `text/event-stream` once the run has started, whatever `Accept` you send (a request refused before the run starts is answered with JSON); its `X-Vectros-Run-Id` header names the run. The run's tool calls act as you, with your own permissions, and only through the tools the agent lists. On a prepaid account the run reserves its budget from your inference balance when it starts and returns what its model calls did not use when it ends; a fixed fee per run, tool calls and run time are billed separately, against your plan. Read each event's `type`; ignore types and fields you do not know; stop at the event with `terminal: true`. A stream that ends without one: read the run with `GET /v1/runs/{id}`. Closing the stream stops the run only on a best-effort basis. Requires the `runs:c` scope, and agent runs switched on for your tenant by an account owner.
+     * Returns a page of runs, newest first. Each run is what `GET /v1/runs/{id}` returns without `usage` (read a run by its id for its charge). A credential lists the runs it started (for a token bound to a user, that user's runs) in its app context. Your root key lists every run, so it must name `contextId` (that context's runs), `userId` (the runs started by tokens bound to that user; across your app contexts, grouped by context and newest first within each, unless `contextId` is named too), or both. Requires the `runs:r` scope. A grant naming agents (`runs:r:<agent>`) lists only runs of those agents. Runs are kept for at least 30 days after they end. A run started before this list existed appears only in your root key's list of its context until it expires; it can always be read by its id. A page may hold fewer runs than `limit`, or none, while `nextCursor` is present: a request reads a bounded part of the runs it could list, so a filter that matches few of them returns a short page to go on from. Keep reading until `nextCursor` is absent.
+     *
+     * @param {Vectros.ListRunsRequest} request
+     * @param {AgentsClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.UnauthorizedError}
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     *
+     * @example
+     *     await client.agents.listRuns()
+     */
+    public listRuns(
+        request: Vectros.ListRunsRequest = {},
+        requestOptions?: AgentsClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.RunPage> {
+        return core.HttpResponsePromise.fromPromise(this.__listRuns(request, requestOptions));
+    }
+
+    private async __listRuns(
+        request: Vectros.ListRunsRequest = {},
+        requestOptions?: AgentsClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.RunPage>> {
+        const { contextId, userId, status, agentId, startFrom, limit } = request;
+        const _queryParams: Record<string, unknown> = {
+            contextId,
+            userId,
+            status,
+            agentId,
+            startFrom,
+            limit,
+        };
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                "v1/runs",
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.RunPage, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 401:
+                    throw new Vectros.UnauthorizedError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/runs");
+    }
+
+    /**
+     * Starts a run of a stored agent and streams what it does as Server-Sent Events. The response is always `text/event-stream` once the run has started, whatever `Accept` you send (a request refused before the run starts is answered with JSON); its `X-Vectros-Run-Id` header names the run. The run's tool calls act as you, with your own permissions, and only through the tools the agent lists. On a prepaid account the run reserves its budget from your inference balance when it starts and returns what its model calls did not use when it ends; a fixed fee per run, tool calls and run time are billed separately, against your plan. Read each event's `type`; ignore types and fields you do not know; stop at the event with `terminal: true`. A stream that ends without one: read the run with `GET /v1/runs/{id}`. Closing the stream stops the run only on a best-effort basis. Requires the `runs:c` scope (a grant naming an agent, `runs:c:<agent>`, starts only that agent), and agent runs switched on for your tenant by an account owner.
      */
     public createRun(
         request: Vectros.CreateRunRequest,

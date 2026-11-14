@@ -18,4 +18,6 @@ export interface SearchResponse {
     degradedLegs?: string[] | undefined;
     /** True when more matching results are available past this page. Raise `limit` or advance `offset` (up to its max of 200) to fetch them; false also once `offset` is at its max, since no further page is reachable regardless of how many results exist. */
     hasMore?: boolean | undefined;
+    /** Present and true only on a search ordered by distance (`sortBy` `distance`, or a `$near` with no query) that reached its fixed per-request limits before it could confirm the page. The results are still in exact distance order, but nearer matches may exist that were not returned: narrow the radius or add filters. For such a search, `totalResults` is a lower bound. */
+    incompleteResults?: boolean | undefined;
 }

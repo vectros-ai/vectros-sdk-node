@@ -14,9 +14,9 @@ export interface ReadAccessLogResponse {
     subjects?: Vectros.ReadAccessSubject[] | undefined;
     /** The credential (API key / scoped token key id) that performed the read — the actor. */
     callerKeyId?: string | undefined;
-    /** What the caller did: `read` (single fetch), `list`, `lookup`, `search`, or `rag`. */
+    /** What the caller did: `read` (a single fetch, including a read of the version history of a record, document, entity, user or folder, and a create that returned one that already existed), `list`, `lookup`, `search`, or `rag`. */
     action?: ReadAccessLogResponse.Action | undefined;
-    /** The accessed resource's type: a record schema type name, or one of `document`, `search`, or `rag`. */
+    /** The accessed resource's type: a record schema type name, or one of `document`, `folder`, `entities` or `users`. A `search` or `rag` disclosure carries the type of the document or record it disclosed, and may be absent when that type is not known. */
     resourceType?: string | undefined;
     /** The accessed record/document id (opaque). Never the payload or looked-up value. */
     resourceId?: string | undefined;
@@ -38,7 +38,7 @@ export interface ReadAccessLogResponse {
 }
 
 export namespace ReadAccessLogResponse {
-    /** What the caller did: `read` (single fetch), `list`, `lookup`, `search`, or `rag`. */
+    /** What the caller did: `read` (a single fetch, including a read of the version history of a record, document, entity, user or folder, and a create that returned one that already existed), `list`, `lookup`, `search`, or `rag`. */
     export const Action = {
         Read: "read",
         List: "list",

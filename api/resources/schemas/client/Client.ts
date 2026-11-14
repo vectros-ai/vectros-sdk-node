@@ -117,6 +117,7 @@ export class SchemasClient {
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
+     * @throws {@link Vectros.ServiceUnavailableError}
      *
      * @example
      *     await client.schemas.createSchema({
@@ -203,6 +204,8 @@ export class SchemasClient {
                     throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                case 503:
+                    throw new Vectros.ServiceUnavailableError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -292,6 +295,7 @@ export class SchemasClient {
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
+     * @throws {@link Vectros.ServiceUnavailableError}
      *
      * @example
      *     await client.schemas.updateSchema({
@@ -351,6 +355,8 @@ export class SchemasClient {
                     throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                case 503:
+                    throw new Vectros.ServiceUnavailableError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -436,6 +442,147 @@ export class SchemasClient {
         }
 
         return handleNonStatusCodeError(_response.error, _response.rawResponse, "DELETE", "/v1/schemas/{id}");
+    }
+
+    /**
+     * The progress of the latest republish of a `projection` schema's public copies. Requires the `schemas:r` scope.
+     *
+     * @param {Vectros.GetSchemaRepublishRequest} request
+     * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.NotFoundError}
+     *
+     * @example
+     *     await client.schemas.getSchemaRepublish({
+     *         id: "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+     *     })
+     */
+    public getSchemaRepublish(
+        request: Vectros.GetSchemaRepublishRequest,
+        requestOptions?: SchemasClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.PublicViewRepublishResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__getSchemaRepublish(request, requestOptions));
+    }
+
+    private async __getSchemaRepublish(
+        request: Vectros.GetSchemaRepublishRequest,
+        requestOptions?: SchemasClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.PublicViewRepublishResponse>> {
+        const { id } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/schemas/${core.url.encodePathParam(id)}/republish`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.PublicViewRepublishResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/schemas/{id}/republish");
+    }
+
+    /**
+     * For a schema whose `publicView` is in `projection` mode: rewrites every record's public copy from the record as it is now, in the background. A republish also starts on its own whenever the public view changes, so you need this only to repair copies. Each copy written is billed as a record write. If one is already running for the current public view and making progress, that one is returned. Requires the `schemas:u` scope.
+     *
+     * @param {Vectros.RepublishSchemaPublicViewRequest} request
+     * @param {SchemasClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     *
+     * @example
+     *     await client.schemas.republishSchemaPublicView({
+     *         id: "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+     *     })
+     */
+    public republishSchemaPublicView(
+        request: Vectros.RepublishSchemaPublicViewRequest,
+        requestOptions?: SchemasClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.PublicViewRepublishResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__republishSchemaPublicView(request, requestOptions));
+    }
+
+    private async __republishSchemaPublicView(
+        request: Vectros.RepublishSchemaPublicViewRequest,
+        requestOptions?: SchemasClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.PublicViewRepublishResponse>> {
+        const { id } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/schemas/${core.url.encodePathParam(id)}/republish`,
+            ),
+            method: "POST",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.PublicViewRepublishResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/schemas/{id}/republish");
     }
 
     /**

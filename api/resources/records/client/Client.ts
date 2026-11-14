@@ -926,6 +926,75 @@ export class RecordsClient {
     }
 
     /**
+     * For a record whose type has a `publicView` in `projection` mode: what the public sees of it, which is the fields the type lists, as last copied from the record. `published` is false when the record is not public now. Requires the `records:r:<type>` scope, with ownership checked as for reading the record.
+     *
+     * @param {Vectros.GetRecordPublicViewRequest} request
+     * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.NotFoundError}
+     *
+     * @example
+     *     await client.records.getRecordPublicView({
+     *         id: "id"
+     *     })
+     */
+    public getRecordPublicView(
+        request: Vectros.GetRecordPublicViewRequest,
+        requestOptions?: RecordsClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.PublicViewCopyResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__getRecordPublicView(request, requestOptions));
+    }
+
+    private async __getRecordPublicView(
+        request: Vectros.GetRecordPublicViewRequest,
+        requestOptions?: RecordsClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.PublicViewCopyResponse>> {
+        const { id } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/records/${core.url.encodePathParam(id)}/public-view`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.PublicViewCopyResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/records/{id}/public-view");
+    }
+
+    /**
      * Returns the tombstone left behind when a record was hard-deleted, confirming the deletion and recording when it happened. Look it up using the deleted record's original ID. Requires the `records:r:<type>` scope, granted without a `data_scope` restriction: the owner of a deleted record cannot be checked, so a credential confined to an ownership compartment (e.g. `data_scope: {scope:org: [org_A]}`) cannot read tombstones, including for records it owned.
      *
      * @param {Vectros.GetRecordTombstoneRequest} request

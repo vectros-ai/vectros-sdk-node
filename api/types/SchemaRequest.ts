@@ -24,6 +24,14 @@ export interface SchemaRequest {
     indexMode?: SchemaRequest.IndexMode | undefined;
     /** Where this type's payload is stored. STANDARD (default): payloads of 4 KB or larger are externalized to S3, smaller ones are stored inline. LOW_LATENCY: always store inline for the lowest read latency. LARGE_PAYLOAD: always externalize to S3, which lifts the 400 KB item-size ceiling. For externalized types, list and lookup responses return only the indexed projection unless you pass `includePayload=true`. */
     storageProfile?: SchemaRequest.StorageProfile | undefined;
+    /** Makes this a public-media type: a document type for images. The only value is `PUBLIC_MEDIA`. A public-media type must have `allowedSurfaces` exactly `["document"]` and is never indexed (`indexMode` is `NONE`, the default for this type). Its documents are created only by `POST /v1/documents/upload`, cannot be created from text or retyped, and their file cannot be replaced once uploaded. Once set, the profile cannot be removed; it cannot be added to a schema that already has documents or variants. */
+    fileProfile?: SchemaRequest.FileProfile | undefined;
+    /** With `fileProfile: PUBLIC_MEDIA`: the kinds of media this type accepts. Only `image` is available; `video` is refused with errorCode `MEDIA_KIND_NOT_AVAILABLE`. Defaults to `["image"]`. */
+    mediaKinds?: string[] | undefined;
+    /** With `fileProfile: PUBLIC_MEDIA`: the largest file, in bytes, this type declares. At most 10485760 (10 MiB), which is also the default. An upload of this type whose `size` is above it is refused at upload start (`MEDIA_TOO_LARGE`). */
+    maxBytes?: number | undefined;
+    /** With `fileProfile: PUBLIC_MEDIA`: the file types this type declares. A subset of `image/jpeg`, `image/png`, `image/webp` and `image/gif`, which is also the default. An upload of this type whose `fileType` is not one of them is refused at upload start (`MEDIA_FORMAT_NOT_ACCEPTED`). */
+    contentTypes?: string[] | undefined;
     /** Which typed surfaces may bind this schema by its id: `record`, `document`, `user`, or `entity`. Required when creating, and must be non-empty; on update, omit it to keep the current surfaces. Identity entities in ANY namespace — `org`, `client`, or one you registered, such as `team` — bind under the single `entity` surface; use the schema's `typeName` to distinguish them, not the surface. A schema may list several surfaces (for a shared type usable on both records and documents). This drives surface-scoped schema listing (`GET /v1/schemas?surface=`) and is enforced at bind time — for example, a document cannot bind a record-only schema. A `user`-surfaced schema is control-plane managed and can only be created, updated, or deleted with a root API key — a user is tenant-global, so its schema has one tenant-wide home. An `entity`-surfaced schema, by contrast, is writable by an ordinary scoped credential holding `schemas:c`/`u`/`d`, and is homed in that credential's own app context. `record`/`document` schemas are unaffected either way — any credential holding the matching scope may write them, as before. */
     allowedSurfaces?: SchemaRequest.AllowedSurfaces.Item[] | undefined;
     /** Whether this schema is active. An inactive schema rejects creation of new records of its type. */
@@ -34,6 +42,7 @@ export interface SchemaRequest {
     scopes?: string[] | undefined;
     /** The id of an existing schema this one is a CUSTOMIZATION of, when a schema named `typeName` already exists in this context — required in that case (a same-named schema without it is rejected: "specify basedOn"), and must be omitted when this create is the FIRST schema under that name (it becomes that name's shared base, and must be created with no `userId`/`scopes` — a root/unscoped credential). Must point directly at the base (one hop); a schema that itself declares `basedOn` is rejected. Immutable once set. */
     basedOn?: string | undefined;
+    publicView?: Vectros.PublicViewDef | undefined;
 }
 
 export namespace SchemaRequest {
@@ -52,6 +61,11 @@ export namespace SchemaRequest {
         LargePayload: "LARGE_PAYLOAD",
     } as const;
     export type StorageProfile = (typeof StorageProfile)[keyof typeof StorageProfile];
+    /** Makes this a public-media type: a document type for images. The only value is `PUBLIC_MEDIA`. A public-media type must have `allowedSurfaces` exactly `["document"]` and is never indexed (`indexMode` is `NONE`, the default for this type). Its documents are created only by `POST /v1/documents/upload`, cannot be created from text or retyped, and their file cannot be replaced once uploaded. Once set, the profile cannot be removed; it cannot be added to a schema that already has documents or variants. */
+    export const FileProfile = {
+        PublicMedia: "PUBLIC_MEDIA",
+    } as const;
+    export type FileProfile = (typeof FileProfile)[keyof typeof FileProfile];
     export type AllowedSurfaces = AllowedSurfaces.Item[];
 
     export namespace AllowedSurfaces {

@@ -9,6 +9,147 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.50.0 — 2026-11-14
+
+### Breaking changes
+
+- **Reserved names:** a `filterable` schema field whose id starts with `_geo_`, or is named `publicCopy` or `public_copy_owner`
+  (any case), is a `400` on schema create and update, and an existing schema that declares one is refused on its next update until
+  the field is renamed or made non-filterable. A search filter on `publicCopy` or `public_copy_owner` is a `400`, and payload keys
+  with these names are not indexed. A record already indexed with such a key is left out of search until it is next written
+  with a change: after renaming the field, re-save those records or ask for a reindex.
+- **`fileType` on `POST /v1/documents/upload` is optional, and when sent must be a media type (`type/subtype`)**; any other string
+  is a `400`. When omitted it is inferred from `fileName`; it is stored lower case, without parameters.
+- **Java SDK only:** `SearchRequest.getQuery()` and `FileUploadRequest.getFileType()` return `Optional<String>`, because both fields
+  are optional. Builder chains compile unchanged. The REST API is not affected.
+
+### Added
+
+- **`GET /v1/runs`** lists runs, newest first, filtered by `status` and `agentId` and paged with `startFrom`/`nextCursor`; the root
+  key must name `contextId`, `userId` or both. A page may hold fewer runs than `limit`, or none, while `nextCursor` is present.
+- **`runs:c:<agent>` and `runs:r:<agent>`** limit a role to the stored agents it names; a bare `runs:c` or `runs:r` still covers all.
+- **Per-agent spending caps:** `budget.periods` sets a `maxInferenceCents` per `HOUR`, `DAY`, `WEEK` or `MONTH` (`402`
+  `AGENT_BUDGET_EXHAUSTED`; `BUDGET_EXCEEDS_PERIOD_CAP` for a run that can never fit). `GET /v1/agents/{id}` returns `periodUsage`.
+- **The `rag_ask` run tool** answers from the content the run's caller can read, billed from the run's budget;
+  `budget.ragMaxInferenceCents` caps what one run's `rag_ask` answers may cost.
+- **Stored scripts as agent tools:** a tool entry may name a `script` (`{ name, version }`) that declares an `inputSchema`, run with
+  the caller's permissions (read-only unless `allowWrites`). `POST /v1/scripts/execute` also enforces a declared `inputSchema`.
+  Each call may run up to 10 seconds and a run may make up to 12; a call refused before it ran (a rate, credit or concurrency
+  limit) is listed with `toolCalls[].outcome` `NOT_STARTED` and does not count against the 12.
+- **`optInOperations` on `POST /v1/scripts`** and in script responses (omit it or send an empty list), and two capability names for
+  `granted_capabilities`: `public-publish` and `script-egress-declare`.
+- **End-user account deletion, `/v1/me/erasure`:** `POST` schedules the deletion of the signed-in user's data and access in the app
+  context after its waiting period, given an ID token from a sign-in in the last 5 minutes; `GET` and `POST .../{id}/cancel` show and
+  cancel it. Turn it on per app context with `allowSelfErasure` (otherwise `403` `SELF_ERASURE_NOT_ENABLED`) and set
+  `selfErasureGraceDays` (0 to 30, default 7). Issuers gain `acceptedIdTokenClientIds`. `/v1/erasure-requests` shows a waiting
+  self-requested deletion as `accepted`, and one cancelled before it started as `failed` with `failureCode: cancelled` (do not resubmit it).
+- **A self-signup policy can bind more than one role:** `additional_role_ids` (up to 9), composed after `role_id`.
+- **The `geo` field type and location search.** `geo` is in a limited pilot and is refused unless it is enabled for your account. On
+  `POST /v1/search`, a `$near` filter (`lat`, `lon`, `radiusMeters`) keeps content within the radius, results carry
+  `distanceMeters`, `query` becomes optional, `sortBy: "distance"` orders a `TEXT` search nearest first, and `incompleteResults`
+  marks a distance-ordered result that hit its limits. An item whose location is not a valid point is `INDEXED` with `indexFailure`
+  `LOCATION_NOT_INDEXED` (so `indexFailure` can now be present on an `INDEXED` item: if your code treats its presence as a failure,
+  check `indexStatus` instead); one with a location and no searchable text ends `INDEXED`, not `SKIPPED` (unless its `indexMode` is
+  `SEMANTIC`). `$near` (on `POST /v1/search` and MCP `hybrid_search`) is a `400` unless location search is enabled for the account.
+- **Geocoding for `geo` fields (limited pilot):** a `geo` field of a record schema can declare `geocode: { "from": [...] }`, up to
+  10 distinct fields of the same schema that hold its address (`string`, `enum` or `number`, never `sensitive`; a `400` otherwise, and
+  on a schema whose `allowedSurfaces` include `document`). When a write changes the address and sends no value for the geo field, the
+  write succeeds, the field is cleared, and its location is looked up afterwards; a geo value you send is kept for its address.
+  Records gain a read-only `geocodeStatus` per field: `status` (`SUPPLIED`, `OK`, `NOT_FOUND`, `FAILED`, or the in-progress value the API reference lists), an optional
+  `reason`, an open string to which values may be added (now `DAILY_LIMIT`, `TEMPORARILY_UNAVAILABLE`, `ADDRESS_TOO_LONG` for an
+  address longer than 200 characters, `METADATA_LIMIT`, `NOT_ENABLED` or `ADDRESS_REJECTED`), and once found `provider`,
+  `attribution` and `geocodedAt`. Lookups are limited per account per day (a record over the limit waits with `DAILY_LIMIT` and is retried on a later day);
+  a `TEMPORARILY_UNAVAILABLE` lookup is retried a limited number of times, then stays `FAILED` until the address changes, as every other failure
+  reason does (editing other fields does not retry it). The lookup cache holds
+  only a keyed one-way value of the address and the location, removed with the record, its app context or the account, and after
+  180 days without use. Existing records are geocoded when next written. Geocoding a record sends only its address to Amazon
+  Location Service; nothing else about the record is sent. Address geocoding runs on Amazon Location Service under our AWS BAA;
+  the location provider may process the address outside the US. Addresses in Japan are not geocoded.
+- **Public record types:** `publicView` on a base record schema (`mode` `projection`, the default, publishes the listed `fields`
+  through a public copy billed as record writes; `record` publishes the whole record), with `publishWhen` and `ownedBy`; records carry
+  `publicId` and `publicState`. New: `GET /v1/records/{id}/public-view`, `POST`/`GET /v1/schemas/{id}/republish`. A `publicView`
+  needs the `public-publish` capability and the tenant's public access turned on by the account owner. `pv_` type names are reserved. A published
+  projection record takes two rows of an `all_or_nothing` batch (about 40 fit in one).
+- **A `geo` field on a public `projection` copy, at a declared precision (`publicView.geoPrecision`):** each listed `geo` field maps
+  to `"exact"` or a whole number of metres from 100 to 100000, the minimum edge of a grid cell; the public copy holds only the
+  centre of the cell that contains the location (cells are somewhat larger away from the equator). The record, and searches with
+  your own credentials, keep the exact location. A listed `geo` field with no entry is `400 PUBLIC_VIEW_GEO_PRECISION_REQUIRED`; a
+  value outside the range, an entry for a field that is not a listed `geo` field, `geoPrecision` in `record` mode, or a variant
+  whose listed field is `geo` when its base's is not (or the reverse) is `400 PUBLIC_VIEW_GEO_PRECISION_INVALID`. Changing a
+  published precision, in either direction, needs the `public-publish` capability and public access, as listing another field
+  does, and rewrites the public copies: the grids of two cell sizes do not line up, so a location seen before and after a change
+  narrows to where the two cells overlap. A coarsened location still shows roughly when a moving record crossed a cell boundary,
+  because a copy is rewritten only when its cell changes, or when a geocoded field's address changes (the copy then has no location
+  until the new one is found). `GET /v1/records/{id}/public-view` and the public record and list responses carry a `geoPrecision`
+  map beside `fields`. Geo fields are enabled per account on request.
+- **Publishable app keys:** `POST`, `GET /v1/admin/public-keys` and `DELETE /v1/admin/public-keys/{keyId}`, under the new
+  `public-keys` scope resource. `DELETE /v1/app-contexts/{contextId}` can answer `503` `PUBLIC_KEY_EDGE_PENDING` or `409`, with
+  nothing deleted; retry it.
+- **Anonymous public reads:** `GET /v1/public/records/{type}/{publicId}`, `GET /v1/public/records/{type}` and
+  `GET /v1/public/search` (`text`, `semantic` or `hybrid`, as the type's `publicView.search` offers) read published records with
+  a publishable key in `k`. Where public serving is not open, all three answer `503` `PUBLIC_ACCESS_NOT_LAUNCHED` for an account whose public access is otherwise ready; an account that is not ready gets the `503` code for what is missing first (for example
+  `PUBLIC_ACCESS_NOT_ENABLED` or `PUBLIC_BUDGET_MODE_UNSET`).
+- **Public search near a place:** `GET /v1/public/search` takes `near.lat`, `near.lon` and `near.radius`, all three together (one or
+  two alone is `400 PUBLIC_REQUEST_INVALID`). `near.lat` (-90 to 90) and `near.lon` (-180 to 180) are plain decimals with at most 6
+  decimal places, sent as strings; `near.radius` is whole metres, 1 to 200,000 (the public limit; authenticated search allows 2,000,000). With no `q`, the type's published records within
+  the radius come back nearest first: the type must offer `text` and the account must allow it (another `mode` with no `q` is a
+  `400`), it is charged as a `text` search, and it counts as more than one request toward the visitor's and the account's public
+  rate limits. With a `q`, the radius filters the results, which keep their usual order. Each result carries `distanceMeters`, and
+  a nearest-first page that stopped at a search limit carries `incompleteResults: true` (nearer records may be missing). The centre
+  is rounded to 3 decimal places (about 110 m) and the radius up to the next of 1, 2, 5, 10, 25, 50, 100 or 200 km, so nearby
+  searches share one cached answer; `distanceMeters` is measured from the rounded centre, and on a type with a `geoPrecision` the
+  distance and the radius apply to the public cell centre, never the real location. The type must publish exactly one location field and location search must be enabled for the account
+  (enabled per account on request); otherwise the answer is `400 PUBLIC_SEARCH_NEAR_NOT_AVAILABLE`. A location field cannot be used
+  in `filter.<field>`. A record whose location is filled from an address is not found while that location is unknown (being looked
+  up, `NOT_FOUND` or `FAILED`): until a later day under `DAILY_LIMIT`, and until its address changes otherwise.
+- **Public-media document types:** `fileProfile: "PUBLIC_MEDIA"` on a document schema (`mediaKinds`, `maxBytes`, `contentTypes`); an upload of another format is
+  `400` `MEDIA_FORMAT_NOT_ACCEPTED` (with `acceptedTypes`) and one above `maxBytes` is `400` `MEDIA_TOO_LARGE`. A self-signed-up user's upload of one is refused (`403`
+  `SELF_SIGNUP_UPLOAD_NOT_ALLOWED`) unless the account owner allows it. `GET /v1/documents/{id}/text` on one answers `409`
+  `NO_TEXT_FOR_MEDIA`.
+- **The `asset` and `assets` field types** hold the `id` of one, or up to 20, public-media documents of the `documentTypes` listed.
+  An asset field needs a schema with a `publicView`; public record and search responses do not include it. In this version
+  no uploaded image completes processing, so a record write that names one is a `400` `ASSET_NOT_ATTACHABLE`.
+- **Bounded uploads:** `size` on `POST /v1/documents/upload` (1 to 104857600 bytes) signs the file's type and length into
+  `uploadUrl`, and the response's `requiredHeaders` lists every header the PUT must send. `size` is required for a public-media
+  type (`400` `SIZE_REQUIRED`) and optional for every other upload.
+- **`GET /v1/usage`:** `credits` gains `admissionLimit`, `includedCredits` and `overage`.
+- **`detectedType` on documents**, and the `extraction.outcome` value `NOT_EXTRACTED`.
+
+### Changed
+
+- **Text is extracted only from document formats, detected from the file's bytes.** Any other file is stored but not read
+  (`NOT_EXTRACTED`): archives are not unpacked and audio tags are not read. An Office file that expands more than 500
+  times, or whose zip structure is damaged, ends `UNREADABLE`. Images end `NOT_EXTRACTED` (they ended `NO_TEXT`);
+  documents uploaded before this release keep their extracted text.
+- **`POST /v1/auth/token/exchange` can answer `429`:** self-service sign-ups are limited per issuer registration by your plan
+  (`temporarily_unavailable`, with `Retry-After`; existing users and invitations are not limited), and the endpoint has a per-IP
+  limit (`RATE_LIMITED`).
+- **Overage on paid self-service plans continues past the monthly credit limit, up to your monthly budget** (at most $100 on Starter,
+  $500 on Pro, $1,000 on Scale). The credit `402` (`SUBSCRIPTION_LIMIT_EXCEEDED`) says "Monthly credit limit reached; contact
+  support or review your plan", or "Monthly overage cap reached; ..." at the cap, and its `limit` is the cap the request was held to.
+- **`credits.limit` in `GET /v1/usage` is the limit that applied in the month.** A negotiated credit limit, and negotiated free read
+  and data-out allowances, apply to scoped tokens as to API keys.
+- **More reads are in the read-access log:** version-history reads, reading and listing folders, and a create that returns an
+  existing resource (`created: false`). Entity and user reads follow the schema's `readAccessLog` setting, and an entity's entries go
+  to its own app context.
+- **Cancelling a run lets a running tool call finish for up to about 45 seconds** (was 30).
+- **A script run that frees an entity's `externalId` and reuses it in the same run fails** (`400`); reuse it in the next run.
+
+### Fixed
+
+- A create that races an identical create (a schema, a user or entity with an `externalId`, an owned schema variant, a trigger rule)
+  returns the existing resource instead of an error or a duplicate. `PUT /v1/schemas/{id}` that moves a variant to an owner who
+  already has that `typeName` is a `400` (it was a `409`).
+- `POST /v1/app-contexts` stores `readAccessLogDefault` and the per-principal metering fields sent at creation, and `?upsert=true`
+  applies them to an existing context; an invalid value, or an invalid `identityProjectionClaims` list, is a `400` that creates nothing.
+- Scoped tokens from `POST /v1/auth/token/exchange` carry your plan's limits, as tokens from `POST /v1/auth/token` do; an exchange for
+  an account whose record cannot be found is a `500` (`server_error`), not a token.
+- The token exchange refuses an `invite_token` issued by another account with `403` `invalid_grant`.
+- An `externalId` longer than 1,536 bytes once encoded is a `400`, not a `500`.
+- Downloaded files keep their exact names.
+- Documentation: a self-signup role cannot invite members with `member-lifecycle`, and the script examples use the supported
+  form (no `export default`).
+
 ## 0.49.0 — 2026-11-07
 
 ### Breaking changes
@@ -2234,10 +2375,11 @@ called out individually below with its own migration guidance.
   `forensic-read`, `context-directory-read`, or `delegate-mint` is refused when a self-signup policy
   creates a profile, so no *new* self-signup can be created against such a role. `member-lifecycle` is
   the deliberate exception — it is bounded by app context rather than the tenant, so a self-signup role
-  may carry it; granting it to your default self-signup role is the intended way to let a founder sign
-  up and then invite their own team. For the three refused names, the check runs at profile-creation
-  time rather than continuously — so adding one of them to a role your users can **already** sign up to
-  grants it to those existing members at their next token. Treat re-scoping such a role as the
+  may carry it. *(Corrected in 0.50.0: this entry originally said that granting it to your default
+  self-signup role lets a founder sign up and invite their own team. It does not: inviting also needs
+  an unqualified `profiles:c`, which no self-signup role may hold.)* For the three refused names, the
+  check runs at profile-creation time rather than continuously — so adding one of them to a role your
+  users can **already** sign up to grants it to those existing members at their next token. Treat re-scoping such a role as the
   authoring decision it is.
 
 - **`GET /v1/admin/logs` now returns a `delegationChain` field on each entry.** Present only for a

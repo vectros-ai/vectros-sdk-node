@@ -14,4 +14,8 @@ export interface RunErrorBody {
     runId?: string | undefined;
     /** With `IDEMPOTENCY_IN_PROGRESS`: that run's status. */
     status?: string | undefined;
+    /** With `AGENT_BUDGET_EXHAUSTED`: the capped period with no room (when several are full, the one that resets last). With `BUDGET_EXCEEDS_PERIOD_CAP`: the period whose cap the budget exceeds. Today `HOUR`, `DAY`, `WEEK` or `MONTH`; other values may be added. */
+    period?: string | undefined;
+    /** With `AGENT_BUDGET_EXHAUSTED`: when that period resets (ISO-8601, at UTC-05:00). */
+    resetsAt?: string | undefined;
 }

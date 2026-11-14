@@ -20,6 +20,8 @@ export interface ErasureRequestResponse {
     completedAt?: string | undefined;
     /** Free text describing why the erasure failed. Its wording is not stable, so do not branch on it. Present only when `status` is `failed`; null otherwise. */
     failureReason?: string | undefined;
+    /** A stable code for the kind of failure, when there is one. `cancelled`: an account deletion the user requested from an app ended before it started, and nothing was erased; do not resubmit it automatically. Absent otherwise. */
+    failureCode?: ErasureRequestResponse.FailureCode | undefined;
     certificate?: Vectros.ErasureCertificate | undefined;
 }
 
@@ -32,4 +34,9 @@ export namespace ErasureRequestResponse {
         Failed: "failed",
     } as const;
     export type Status = (typeof Status)[keyof typeof Status];
+    /** A stable code for the kind of failure, when there is one. `cancelled`: an account deletion the user requested from an app ended before it started, and nothing was erased; do not resubmit it automatically. Absent otherwise. */
+    export const FailureCode = {
+        Cancelled: "cancelled",
+    } as const;
+    export type FailureCode = (typeof FailureCode)[keyof typeof FailureCode];
 }

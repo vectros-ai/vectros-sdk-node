@@ -25,11 +25,11 @@ export class ScriptsClient {
     }
 
     /**
-     * Runs a script you previously pushed to `POST /v1/scripts`, under your own credential, and returns what it returned. Every write the script makes is buffered and committed as ONE transaction after the script finishes: either all of them land or none do, and the response is sent only after they have committed — so everything in `result` is committed state or the script's own computation over it. On any failure the body is the standard error envelope and nothing the script staged is committed: its rows are written only when the transaction commits, and a document body or a large payload is DECIDED at that point and WRITTEN to storage only after the commit, so an aborted execution leaves nothing behind. The one residual sits after a successful commit, outside this response: if storing a body fails then, the row exists and the body may not — so a `200` guarantees the rows, and a document's text should be read before it is relied on.
+     * Runs a script you previously pushed to `POST /v1/scripts`, under your own credential, and returns what it returned. Every write the script makes is buffered and committed as ONE transaction after the script finishes: either all of them land or none do, and the response is sent only after they have committed — so everything in `result` is committed state or the script's own computation over it. On any failure the body is the standard error envelope and nothing the script staged is committed: its rows are written only when the transaction commits, and a document body or a large payload is DECIDED at that point and WRITTEN to storage only after the commit, so an aborted execution leaves nothing behind. The one residual sits after a successful commit, outside this response: if storing a body fails then, the row exists and the body may not — so a `200` guarantees the rows, and a document's text should be read before it is relied on. Because the writes are one transaction, an entity's `externalId` cannot be freed (by a delete or by changing it) and given to another entity in the same run; the run fails with a `400` saying so. Free it in one run and reuse it in the next.
      *
      * **Permission.** Requires the `scripts:x` scope — the permission to *execute* — separate from the `scripts:c` permission to push scripts. Bare `scripts:x` grants every script in the context; `scripts:x:<name>` grants exactly that script name, every version of it. Execution discloses no source, so `scripts:r` is not needed. Inside the script, every read and write is enforced by your credential's data scopes exactly as the equivalent REST call would be — `scripts:x` alone can read and write nothing.
      *
-     * **Input.** Your script sees `input.event` (the literal `"execute"`), `input.userId` (your credential's user id, or null), and `input.params` (the `input` object you sent, verbatim). That is the same `input` grammar a trigger rule uses, so one script can serve both by branching on `input.event`. `params` is not validated — a script that needs a shape checks for it and throws; the script's `declaredInputContract` is documentation for readers and is not enforced.
+     * **Input.** Your script sees `input.event` (the literal `"execute"`), `input.userId` (your credential's user id, or null), and `input.params` (the `input` object you sent, verbatim). That is the same `input` grammar a trigger rule uses, so one script can serve both by branching on `input.event`. When the script version declares an `inputSchema`, your `input` is checked against it before anything runs (a `400` naming every problem, the same words a script tool's call gets) and an optional member sent as null is removed; a version without one gets `params` unvalidated, and a script that needs a shape checks for it and throws. The script's `declaredInputContract` is documentation for readers and is not enforced.
      *
      * **Budget.** Seconds of useful work: the script has 15 s of wall clock (never more than 16) and a bounded number of statements and host calls; a runaway script is stopped early with `RESOURCE_LIMIT_EXCEEDED`. The transaction is bounded by the number of underlying storage rows it writes — 100 rows after merging — rather than by the number of entities: creating a folder costs 3 rows; creating a plain text document or a record costs 1 row plus one per range-indexed lookup field plus one per `reference` field. So "create a folder and file N documents" holds up to 97 plain documents, 48 with one range field or one reference, 32 with both; if a script exceeds the limit the error says so (`WRITE_BUFFER_CAP_EXCEEDED`, with `total` and `limit`) and nothing is committed. This request takes the write-path limits (burst, credit ceiling, principal quota) once, before the script runs — there is no free-read allowance here, so an account over its credit ceiling is refused even for a read-only script. Reads the script performs are metered as reads, writes as writes, and execution time beyond what those operations include is charged as script execution time (see `GET /v1/usage`).
      *
@@ -233,7 +233,7 @@ export class ScriptsClient {
      * @example
      *     await client.scripts.createScript({
      *         name: "notify-assignee",
-     *         source: "export default function(input) { return { ok: true }; }"
+     *         source: "({ ok: true });"
      *     })
      */
     public createScript(
@@ -377,7 +377,7 @@ export class ScriptsClient {
      *         id: "id",
      *         body: {
      *             name: "notify-assignee",
-     *             source: "export default function(input) { return { ok: true }; }"
+     *             source: "({ ok: true });"
      *         }
      *     })
      */
