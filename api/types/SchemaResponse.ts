@@ -43,6 +43,7 @@ export interface SchemaResponse {
     /** The id of the schema this one is a customization of, or null if this schema IS the shared base for `typeName` in this context. */
     basedOn?: string | undefined;
     publicView?: Vectros.PublicViewDef | undefined;
+    writePolicy?: Vectros.WritePolicy | undefined;
     /** Schema version number, incremented each time the schema definition changes. */
     schemaVersion?: number | undefined;
     /** When the schema was created, as an ISO-8601 UTC timestamp. */

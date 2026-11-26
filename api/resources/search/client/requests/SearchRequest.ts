@@ -7,7 +7,7 @@ import type * as Vectros from "../../../../index.js";
  *     {}
  */
 export interface SearchRequest {
-    /** The search query, expressed in natural language or as keywords. Required, unless `filters` contains a `$near` filter: a `$near` with no query returns the matches within the radius, nearest first, and is billed as a `TEXT` search whatever `mode` says. */
+    /** The search query, expressed in natural language or as keywords. Required, unless `filters` holds at least one filter or `sortBy` names a field. With no query: a `$near` filter returns the matches within the radius, nearest first; a `sortBy` field returns the matches of the filters in that field's order; any other filter returns its matches in a fixed order, the same on every page. A filter has to narrow the results to count: an empty value (`""`, a blank string or `[]`) narrows nothing, and a filter on `context_id` or `tenant_id` does not count either, because every search already applies those. If no filter counts, the request fails with `400`. A search with no query is billed as a `TEXT` search whatever `mode` says. When more than 2,000 index entries match, the response carries `incompleteResults: true`. */
     query?: string;
     /** How results are ranked. HYBRID combines semantic and keyword ranking (recommended). SEMANTIC ranks by vector similarity only. TEXT ranks by keyword matching only. Defaults to HYBRID. */
     mode?: SearchRequest.Mode;
@@ -45,10 +45,12 @@ export interface SearchRequest {
     createdAfter?: string;
     /** Restrict results to content created at or before this ISO-8601 UTC timestamp. Pair it with `createdAfter` to define a window, or use it alone to find content older than a cutoff (for example, in archival or cleanup workflows). */
     createdBefore?: string;
-    /** A fail-closed override. When true, the request returns HTTP 503 instead of partial results if one of the search engines is unavailable. Defaults to false, in which case an outage degrades to the surviving engine and the response carries `degraded: true` along with the failed engines in `degradedLegs`. Set this to true only when complete results are required and a degraded answer is unacceptable. It also returns a 503 instead of a search ordered by distance that would carry `incompleteResults: true`. */
+    /** A fail-closed override. When true, the request returns HTTP 503 instead of partial results if one of the search engines is unavailable. Defaults to false, in which case an outage degrades to the surviving engine and the response carries `degraded: true` along with the failed engines in `degradedLegs`. Set this to true only when complete results are required and a degraded answer is unacceptable. It also returns a 503 instead of a search ordered by distance or by a field, or a search with filters and no query, that would carry `incompleteResults: true`. */
     requireComplete?: boolean;
-    /** The result order. Omit it for relevance order. `distance` orders results nearest first; it requires a `$near` filter, and either no `query` or `mode` TEXT (it is rejected with a 400 for HYBRID and SEMANTIC). A `TEXT` search with a `$near` (ordered by distance or not) returns no keyword-highlighted snippet: `snippet` falls back to an excerpt of the item. A search with no `query` runs as a keyword-index search whatever `mode` says, so content indexed for semantic search only is not found by it, nor by a `TEXT` search ordered by distance. A search ordered by distance returns at most one result per item (`uniqueDocuments` does not apply). */
-    sortBy?: SearchRequest.SortBy;
+    /** The result order. Omit it for relevance order. `distance` orders results nearest first; it requires a `$near` filter, and either no `query` or `mode` TEXT (it is rejected with a 400 for HYBRID and SEMANTIC). Any other value is the id of a field to order by: a `number` or `date` field that a schema of `typeName` declares `filterable` and not `sensitive`. It requires `typeName`, and a field no schema of that type declares so is a 400 (not checked when no schema of that type exists in the caller's app context, or for a key that reaches every app context: a field that is not sortable then orders nothing, and ties decide the order). With a `query`, a field order needs `mode` TEXT (a 400 for HYBRID and SEMANTIC); with no `query` it runs as a keyword-index search whatever `mode` says. Items without a value in that field come last, in either direction; ties are ordered by distance when a `$near` filter is present, then by relevance. A record is ordered by a field only once it has been indexed with that field filterable. A `TEXT` search with a `$near` (ordered by distance or not) returns no keyword-highlighted snippet: `snippet` falls back to an excerpt of the item. A search with no `query` runs as a keyword-index search whatever `mode` says, so content indexed for semantic search only is not found by it, nor by a `TEXT` search ordered by distance or by a field. A search ordered by distance or by a field returns at most one result per item (`uniqueDocuments` does not apply) and runs within fixed per-request limits. A field order considers at most 2,000 matches (with a `query`, the 2,000 most relevant; with none, 2,000 in no particular order): when more match, or a limit is reached, the response carries `incompleteResults: true`, and items that belong earlier may be missing. */
+    sortBy?: string;
+    /** The direction of a `sortBy` field order: `asc` (the default) or `desc`. `distance` is ascending only. */
+    order?: SearchRequest.Order;
 }
 
 export namespace SearchRequest {
@@ -78,9 +80,10 @@ export namespace SearchRequest {
         export type Item = (typeof Item)[keyof typeof Item];
     }
 
-    /** The result order. Omit it for relevance order. `distance` orders results nearest first; it requires a `$near` filter, and either no `query` or `mode` TEXT (it is rejected with a 400 for HYBRID and SEMANTIC). A `TEXT` search with a `$near` (ordered by distance or not) returns no keyword-highlighted snippet: `snippet` falls back to an excerpt of the item. A search with no `query` runs as a keyword-index search whatever `mode` says, so content indexed for semantic search only is not found by it, nor by a `TEXT` search ordered by distance. A search ordered by distance returns at most one result per item (`uniqueDocuments` does not apply). */
-    export const SortBy = {
-        Distance: "distance",
+    /** The direction of a `sortBy` field order: `asc` (the default) or `desc`. `distance` is ascending only. */
+    export const Order = {
+        Asc: "asc",
+        Desc: "desc",
     } as const;
-    export type SortBy = (typeof SortBy)[keyof typeof SortBy];
+    export type Order = (typeof Order)[keyof typeof Order];
 }

@@ -22,7 +22,7 @@ export interface IssuerResponse {
     emailClaim?: string | undefined;
     /** The IdP's OIDC userinfo endpoint, used as a fallback email-resolution source. Absent when not configured. */
     userinfoUri?: string | undefined;
-    /** `active`, `suspended` or `pending_verification`. A suspended issuer is registered but its tokens are no longer accepted for exchange. A registration created WITHOUT `restrictedToDomain` starts as `pending_verification`: it accepts no tokens until you prove you control the issuer with `POST /v1/auth/issuers/{issuerId}/verify` (see the `verification*` fields). A registration scoped to a verified domain is `active` at once. */
+    /** `active`, `suspended` or `pending_verification`. A suspended issuer is registered but its tokens are no longer accepted for exchange. A registration created WITHOUT `restrictedToDomain` starts as `pending_verification`: it accepts no tokens until you prove you control the issuer with `POST /v1/auth/issuers/{issuerId}/verify`, or an operator approves it (see the `verification*` fields). A registration scoped to a verified domain is `active` at once. */
     status?: string | undefined;
     /** Timestamp when the issuer was registered, as an ISO-8601 UTC timestamp. */
     createdAt?: string | undefined;
@@ -42,4 +42,10 @@ export interface IssuerResponse {
     verificationNonce?: string | undefined;
     /** Present only while `status` is `pending_verification`. When the challenge expires, as an ISO-8601 UTC timestamp. An expired registration can no longer be verified; delete it and register again. */
     verificationExpiresAt?: string | undefined;
+    /** Set once approval was requested: `requested`, `approved` or `denied`. */
+    approvalStatus?: string | undefined;
+    /** When approval was requested, as an ISO-8601 UTC timestamp. Set once requested. */
+    approvalRequestedAt?: string | undefined;
+    /** Why the operator denied the request. Set only when `approvalStatus` is `denied`. */
+    approvalDenyReason?: string | undefined;
 }

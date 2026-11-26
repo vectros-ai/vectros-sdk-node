@@ -20,6 +20,8 @@ export interface ScriptResponse {
     inputSchema?: Record<string, unknown> | undefined;
     /** The operation names this version declares, sorted; empty when it declares none. */
     optInOperations?: string[] | undefined;
+    /** The seal of this script version: a SHA-256 over its source, its declared operations and its input schema. A record schema's `writePolicy` admits a script version by this value. Null when the version cannot be sealed, and a null seal is admitted by no write policy. */
+    seal?: string | undefined;
     /** The name of the blueprint that provisions this script, or null if it is unmanaged (hand-authored, or pushed before this field existed and never re-pushed). A later push of this name inherits it forward automatically when the push omits the field — see `ScriptRequest.provisionedBy` for the full mechanism, including why this is a live comparison against the current latest version rather than a value fixed for the name's whole history. */
     provisionedBy?: string | undefined;
     /** When this script version was created, as an ISO-8601 UTC timestamp. */

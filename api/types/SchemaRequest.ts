@@ -43,6 +43,7 @@ export interface SchemaRequest {
     /** The id of an existing schema this one is a CUSTOMIZATION of, when a schema named `typeName` already exists in this context — required in that case (a same-named schema without it is rejected: "specify basedOn"), and must be omitted when this create is the FIRST schema under that name (it becomes that name's shared base, and must be created with no `userId`/`scopes` — a root/unscoped credential). Must point directly at the base (one hop); a schema that itself declares `basedOn` is rejected. Immutable once set. */
     basedOn?: string | undefined;
     publicView?: Vectros.PublicViewDef | undefined;
+    writePolicy?: Vectros.WritePolicy | undefined;
 }
 
 export namespace SchemaRequest {

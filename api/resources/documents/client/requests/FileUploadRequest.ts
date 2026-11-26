@@ -3,7 +3,8 @@
 /**
  * @example
  *     {
- *         fileName: "patient_intake_2024_01_15.pdf"
+ *         fileName: "patient_intake_2024_01_15.pdf",
+ *         size: 48213
  *     }
  */
 export interface FileUploadRequest {
@@ -13,10 +14,10 @@ export interface FileUploadRequest {
     confirmUntyped?: boolean;
     /** Original file name, including its extension. Used as the document title when no separate title is provided. */
     fileName: string;
-    /** Media type of the file being uploaded, as `type/subtype`. Any valid media type is accepted. It is stored lower case and without parameters (`text/plain; charset=utf-8` is stored as `text/plain`), and when it is omitted or `application/octet-stream` it is inferred from the extension of `fileName`. Without `size` it is a label only: it does not set the Content-Type of the stored file (your PUT to `uploadUrl` does). With `size`, `uploadUrl` is signed for this type in its stored form, and your PUT must send it as given in the response's `requiredHeaders`. For a document of a public-media type it must be a type that document type accepts. Whether text is extracted is decided from the file's content (see `detectedType` on the document). */
+    /** Media type of the file being uploaded, as `type/subtype`. Any valid media type is accepted. It is stored lower case and without parameters (`text/plain; charset=utf-8` is stored as `text/plain`), and when it is omitted or `application/octet-stream` it is inferred from the extension of `fileName`. `uploadUrl` is signed for this type in its stored form, and your PUT must send it as given in the response's `requiredHeaders`. For a document of a public-media type it must be a type that document type accepts. Whether text is extracted is decided from the file's content (see `detectedType` on the document). */
     fileType?: string;
-    /** The exact length of the file in bytes, at least 1. When you send it, the upload is bound: the file's media type and this length become part of `uploadUrl`'s signature, so the storage service refuses a PUT whose `Content-Type` differs from the one in the response's `requiredHeaders` or whose length differs from `size` (`403 SignatureDoesNotMatch`), before anything is stored. Send the exact number of bytes you will upload (in a browser, `File.size`); your HTTP client sets `Content-Length` from the body. A file can be at most 104857600 bytes (100 MiB). Required for a document of a public-media type. Optional for every other upload. */
-    size?: number;
+    /** The exact length of the file in bytes, at least 1. Required: without it the request is refused (`400`, errorCode `SIZE_REQUIRED`), so an empty file cannot be uploaded. The upload is bound: the file's media type and this length become part of `uploadUrl`'s signature, so the storage service refuses a PUT whose `Content-Type` differs from the one in the response's `requiredHeaders` or whose length differs from `size` (`403 SignatureDoesNotMatch`), before anything is stored. Send the exact number of bytes you will upload (in a browser, `File.size`); your HTTP client sets `Content-Length` from the body. A file can be at most 104857600 bytes (100 MiB); for a document of a public-media type, at most 10485760 bytes (10 MiB), or less if the type sets a lower `maxBytes` (`400` `MEDIA_TOO_LARGE`). */
+    size: number;
     /** Indexing strategy applied after the file is processed and its text is extracted. `HYBRID` runs both BM25 keyword and dense-vector semantic indexing (recommended). `SEMANTIC` indexes only as dense vectors. `TEXT` indexes only with BM25. `NONE` is store-only (archival): the file is still uploaded and its text extracted, but it is not search-indexed — retrievable by id/download and structured-field lookup only. Optional: omit to inherit the bound schema's default index mode. If neither this field nor the schema specifies one, the request is rejected. When both are set, this per-file value wins. */
     indexMode?: FileUploadRequest.IndexMode;
     /** Whether the text extracted from this file is retained after indexing. Defaults to true: the extracted text stays retrievable via `GET /v1/documents/{id}/text` and usable by `POST /v1/documents/{id}/ask`. Set false to discard the extracted text once indexing completes — search results and the original file download are unaffected, but `/text` returns 404 and `/ask` returns 409 for the document. Fixed at ingest time: it cannot be changed later, and a re-upload to the same document keeps the original choice. */

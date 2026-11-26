@@ -9,4 +9,6 @@
 export interface GetRecordRequest {
     /** The Vectros-assigned UUID of the record to retrieve. */
     id: string;
+    /** When `true`, the record is read with strong consistency: the response reflects every write to this record that completed before this request started. Use it when a decision depends on the record's latest state. It is metered as one ordinary read, but it is slower and uses more database capacity than the default, so use it only where you need it. `false` (the default) is the ordinary read; any other value is rejected with 400, as is the parameter on the other data endpoints. It does not replace `expectedVersion` on an update: a write that lands between this read and your update is still caught only by the version check. */
+    consistent?: boolean;
 }

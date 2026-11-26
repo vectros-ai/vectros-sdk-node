@@ -5,14 +5,16 @@
  *     {}
  */
 export interface CreatePublicAppKeyRequest {
+    /** A value you generate per issue: 1 to 128 of `A-Za-z0-9._:-`. For at least 30 days, a retry with it returns the original key (and, for a server key, the same server secret). */
+    "Idempotency-Key"?: string;
     /** The app context the key serves. Defaults to your credential's own context. A credential confined to one context can issue keys only for that context. */
     contextId?: string;
-    /** `pub` (the default) for a browser key that ships in web pages, or `pubs` for a server key whose server secret is returned once, in this response. */
+    /** `pub` (the default) for a browser key that ships in web pages, or `pubs` for a server key whose server secret is returned in this response. */
     keyClass?: CreatePublicAppKeyRequest.KeyClass;
 }
 
 export namespace CreatePublicAppKeyRequest {
-    /** `pub` (the default) for a browser key that ships in web pages, or `pubs` for a server key whose server secret is returned once, in this response. */
+    /** `pub` (the default) for a browser key that ships in web pages, or `pubs` for a server key whose server secret is returned in this response. */
     export const KeyClass = {
         Pub: "pub",
         Pubs: "pubs",

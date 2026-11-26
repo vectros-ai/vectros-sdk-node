@@ -11,7 +11,7 @@
  *     }
  */
 export interface ListRecordsRequest {
-    /** The record type to list, e.g. `intake_form`. Required unless `folderId` or `recent=true` is given. */
+    /** The record type to list, e.g. `intake_form`: only records of that type are returned. Required unless `folderId` or `recent=true` is given. */
     type?: string;
     /** List all records in this folder, regardless of type. The value is a Vectros-assigned folder UUID. Required unless `type` or `recent=true` is given; may be combined with `type` to list a single type within the folder. */
     folderId?: string;

@@ -4,12 +4,12 @@
  * The automated execution through which a call was made on behalf of the credential that authorized it, such as a tool call made by an agent run. Present only for calls made by such an execution; absent for calls made directly with a credential. It does not replace the credential: the caller named on the same entry remains the party whose authority the call used.
  */
 export interface ActingViaResponse {
-    /** The kind of execution. Currently `agent-run`, a run of a stored agent. This is an open set: new kinds may be added without notice, so treat an unrecognized value as a valid kind you do not interpret. */
+    /** The kind of execution: `agent-run`, a run of a stored agent; or `script`, a script version a record type's `writePolicy` admitted for this write. This is an open set: new kinds may be added without notice, so treat an unrecognized value as a valid kind you do not interpret. */
     kind?: string | undefined;
-    /** Identifier of the definition that acted. For `agent-run`, the ID of the stored agent. */
+    /** Identifier of the definition that acted. For `agent-run`, the ID of the stored agent; for `script`, the script's name and version (`name@version`). */
     actorId?: string | undefined;
-    /** Identifier of the execution that made the call. For `agent-run`, the ID of the run. Treat it as opaque: for other kinds it may be a composite reference. */
+    /** Identifier of the execution that made the call. For `agent-run`, the ID of the run; for `script`, the ID of the script execution. Treat it as opaque: for other kinds it may be a composite reference. */
     runId?: string | undefined;
-    /** The tool the execution called to make this call, when it made it through a tool. For `agent-run`, the name of the tool the run called. */
+    /** The tool the execution called to make this call, when it made it through a tool. For `agent-run`, the name of the tool the run called. For `script`, the script version's `seal`. */
     tool?: string | undefined;
 }

@@ -262,6 +262,7 @@ export class DocumentsClient {
      * @param {DocumentsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
@@ -323,6 +324,8 @@ export class DocumentsClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
@@ -672,13 +675,14 @@ export class DocumentsClient {
     }
 
     /**
-     * Returns a short-lived presigned S3 GET URL for the original uploaded file. Only available for file-backed documents (created via POST /v1/documents/upload); text-only documents return 400. Requires the `documents:r` scope.
+     * Returns a short-lived presigned S3 GET URL for the original uploaded file. Only available for file-backed documents (created via POST /v1/documents/upload); text-only documents return 400. For a document of a type with `fileProfile: PUBLIC_MEDIA`, the link is to a private copy of the processed image, whether or not the image is public. For an image, the uploaded file is deleted once the image is processed, and the processed image carries no location data. A private copy of the processed image is kept with the document and deleted with it. A rejected image has no download. An image still being processed has no download yet. A taken-down image has no download. Each of these answers `409` with `errorCode` `NO_DOWNLOAD_FOR_MEDIA`. Requires the `documents:r` scope.
      *
      * @param {Vectros.GetDocumentDownloadUrlRequest} request
      * @param {DocumentsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
      *
      * @example
      *     await client.documents.getDocumentDownloadUrl({
@@ -728,6 +732,8 @@ export class DocumentsClient {
                     throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,
@@ -894,7 +900,7 @@ export class DocumentsClient {
     }
 
     /**
-     * Starts a file-based document by returning a short-lived presigned S3 PUT URL. Upload the file bytes directly to `uploadUrl`; the document is then automatically queued for text extraction and asynchronous indexing. Any type of file can be uploaded. Text is extracted only from document formats (plain text, CSV, TSV, Markdown, JSON, YAML, HTML, XML, PDF, RTF, Word, Excel, PowerPoint, Outlook messages, OpenDocument, EPUB, e-mail messages and mbox exports, WordPerfect, Visio, Publisher, OneNote and Apple iWork), and which format a file is in is decided from its content, not from `fileType`. Any other file (audio, video, images, archives such as zip) is stored and can be downloaded, but is not read: its `extraction.outcome` is `NOT_EXTRACTED`. Supplying an `externalId` makes this idempotent — re-initiating an upload with the same `externalId` re-issues a fresh presigned URL for the SAME existing document, targeting a newly-staged object rather than the document's current one — your PUT lands there first, and the document only adopts it once the upload is validated (so a re-upload inherently replaces the file body) rather than creating a duplicate. For a document of a public-media type the file is never replaced: while its upload is still pending, the same request issues a URL for the SAME object instead, and once the upload has arrived it is refused (`409`, errorCode `PUBLIC_MEDIA_IMMUTABLE`). The response's `created` field (and the HTTP status — 201 when a new document was minted, 200 when an existing one was matched) tells the two apart. With `?upsert=true`, the submitted `payload`/`title` are also applied to the matched document (file-body divergence cannot be diffed at upload-init — the bytes have not arrived yet — so the re-upload itself replaces the body). Creating a NEW document requires the `documents:c` scope. Re-uploading over an EXISTING document overwrites (and re-indexes) its body, so it is an update: it requires the `documents:u` scope (as does `?upsert=true` for the metadata). **Your PUT to `uploadUrl` MUST include the header named in the response's `requiredHeaderName`, set to `requiredHeaderValue` exactly.** It is a signed part of the presigned request — the PUT never reaches this service either way, so neither failure uses this API's JSON error shape. Omitting it, or sending a different value, invalidates the request's signature and S3 rejects it with a 403 `SignatureDoesNotMatch`. Sending it correctly makes the URL single-use: `requiredHeaderName` is always `If-None-Match` and `requiredHeaderValue` is always `*` — a create, a recovery upload for a document whose earlier file is missing, and a re-upload ALL target a freshly-minted, never-written key (for a pending public-media document, its not-yet-written object), so the same S3 conditional-write precondition applies uniformly (S3's own documented conditional-write behavior): a replay after the object already exists (from your own completed PUT, or anyone else's) fails with `412 Precondition Failed`; a replay after the object was deleted and never re-created finds an absent key again and can succeed — single-use is a property of the object's existence, not a one-time token. **Either precondition can also fail with `409 Conflict` if your PUT genuinely races a concurrent delete on the same object.** Whichever of `412` or `409` you receive, the remedy is the same: call this endpoint again for a fresh URL rather than retrying the same PUT — a fresh call targets a new key (for a public-media document, see above), so it is never subject to whatever raced the previous one. Supplying `externalId` WITHOUT `schemaId` is refused (`400`) unless you also pass `confirmUntyped=true` — externalId uniqueness is scoped per schema, so omitting `schemaId` by mistake would otherwise silently create a separate untyped document instead of targeting the typed one you likely meant. **Send `size`, the exact length of the file in bytes.** The upload is then bound: the file's media type and its length are part of `uploadUrl`'s signature, so a PUT with another `Content-Type` or another length is refused with `403 SignatureDoesNotMatch` before anything is stored. Send every header in the response's `requiredHeaders`, with its value unchanged. `size` is required for a document of a public-media type and optional for every other upload.
+     * Starts a file-based document by returning a short-lived presigned S3 PUT URL. Upload the file bytes directly to `uploadUrl`; the document is then automatically queued for text extraction and asynchronous indexing. Any type of file can be uploaded. Text is extracted only from document formats (plain text, CSV, TSV, Markdown, JSON, YAML, HTML, XML, PDF, RTF, Word, Excel, PowerPoint, Outlook messages, OpenDocument, EPUB, e-mail messages and mbox exports, WordPerfect, Visio, Publisher, OneNote and Apple iWork), and which format a file is in is decided from its content, not from `fileType`. Any other file (audio, video, images, archives such as zip) is stored and can be downloaded, but is not read: its `extraction.outcome` is `NOT_EXTRACTED`. Supplying an `externalId` makes this idempotent — re-initiating an upload with the same `externalId` re-issues a fresh presigned URL for the SAME existing document, targeting a newly-staged object rather than the document's current one — your PUT lands there first, and the document only adopts it once the upload is validated (so a re-upload inherently replaces the file body) rather than creating a duplicate. For a document of a public-media type the file is never replaced: while its upload is still pending, the same request issues a URL for the SAME object instead, and once the upload has arrived it is refused (`409`, errorCode `PUBLIC_MEDIA_IMMUTABLE`). An image uploaded as a document of a public-media type is re-encoded: to PNG when it has transparency, otherwise to JPEG, with its longest edge at most 2048 pixels; an animated GIF or WebP keeps only its first frame. The response's `created` field (and the HTTP status — 201 when a new document was minted, 200 when an existing one was matched) tells the two apart. With `?upsert=true`, the submitted `payload`/`title` are also applied to the matched document (file-body divergence cannot be diffed at upload-init — the bytes have not arrived yet — so the re-upload itself replaces the body). Creating a NEW document requires the `documents:c` scope. Re-uploading over an EXISTING document overwrites (and re-indexes) its body, so it is an update: it requires the `documents:u` scope (as does `?upsert=true` for the metadata). **Your PUT to `uploadUrl` MUST send every header in the response's `requiredHeaders`, with its value unchanged** (`Content-Type` and `If-None-Match`; older clients read the latter from `requiredHeaderName` and `requiredHeaderValue`). Each is a signed part of the presigned request — the PUT never reaches this service either way, so neither failure uses this API's JSON error shape. Omitting one, or sending a different value, invalidates the request's signature and S3 rejects it with a 403 `SignatureDoesNotMatch`. Sending `If-None-Match: *` makes the URL single-use: `requiredHeaderName` is always `If-None-Match` and `requiredHeaderValue` is always `*` — a create, a recovery upload for a document whose earlier file is missing, and a re-upload ALL target a freshly-minted, never-written key (for a pending public-media document, its not-yet-written object), so the same S3 conditional-write precondition applies uniformly (S3's own documented conditional-write behavior): a replay after the object already exists (from your own completed PUT, or anyone else's) fails with `412 Precondition Failed`; a replay after the object was deleted and never re-created finds an absent key again and can succeed — single-use is a property of the object's existence, not a one-time token. **Either precondition can also fail with `409 Conflict` if your PUT genuinely races a concurrent delete on the same object.** Whichever of `412` or `409` you receive, the remedy is the same: call this endpoint again for a fresh URL rather than retrying the same PUT — a fresh call targets a new key (for a public-media document, see above), so it is never subject to whatever raced the previous one. Supplying `externalId` WITHOUT `schemaId` is refused (`400`) unless you also pass `confirmUntyped=true` — externalId uniqueness is scoped per schema, so omitting `schemaId` by mistake would otherwise silently create a separate untyped document instead of targeting the typed one you likely meant. **`size`, the exact length of the file in bytes, is required** (without it, `400` with errorCode `SIZE_REQUIRED`). The upload is bound: the file's media type and its length are part of `uploadUrl`'s signature, so a PUT with another `Content-Type` or another length is refused with `403 SignatureDoesNotMatch` before anything is stored. An empty file cannot be uploaded. For a public-media type, a `429` with errorCode `PUBLIC_MEDIA_BACKLOG_FULL` means too many images in this app context are waiting to be set on a record: set or delete some, then try again (no `Retry-After`).
      *
      * @param {Vectros.FileUploadRequest} request
      * @param {DocumentsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -904,10 +910,12 @@ export class DocumentsClient {
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
+     * @throws {@link Vectros.ServiceUnavailableError}
      *
      * @example
      *     await client.documents.uploadDocument({
-     *         fileName: "patient_intake_2024_01_15.pdf"
+     *         fileName: "patient_intake_2024_01_15.pdf",
+     *         size: 48213
      *     })
      */
     public uploadDocument(
@@ -970,6 +978,8 @@ export class DocumentsClient {
                     throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                case 503:
+                    throw new Vectros.ServiceUnavailableError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.VectrosError({
                         statusCode: _response.error.statusCode,

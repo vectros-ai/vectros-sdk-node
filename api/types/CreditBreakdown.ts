@@ -40,4 +40,12 @@ export interface CreditBreakdown {
     scriptExecution?: number | undefined;
     /** scriptExecution in milli-credit precision (exact) */
     scriptExecutionMilli?: number | undefined;
+    /** Credits consumed by anonymous public access: public reads beyond the shared read allowance, public searches, public cache hits beyond the allowance, and edge cache purges (0.5 credit for each purged path). Public response bytes are charged on `dataOut`. */
+    publicAccess?: number | undefined;
+    /** publicAccess in milli-credit precision (exact) */
+    publicAccessMilli?: number | undefined;
+    /** Credits consumed by address geocoding: 1 credit for each address the geocoding provider looked up (see the `geocoding` section). */
+    geocodeStored?: number | undefined;
+    /** geocodeStored in milli-credit precision (exact) */
+    geocodeStoredMilli?: number | undefined;
 }

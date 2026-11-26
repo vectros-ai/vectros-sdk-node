@@ -9,6 +9,201 @@ into each SDK package + mirror **and the `vectros-api-spec` repo**.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## 0.51.0 — 2026-11-25
+
+### Breaking changes
+
+- **`size` is required on `POST /v1/documents/upload`**: the file's exact length in bytes, 1 to 104857600 (for a document of a
+  public-media type, up to 10485760, or the type's lower `maxBytes`). Without it the request is a `400` `SIZE_REQUIRED`, and an empty
+  file cannot be uploaded. PUT to `uploadUrl` with every header in `requiredHeaders`, which now always includes the `Content-Type` the
+  URL was signed for, and a body of exactly `size` bytes; any other type or length is refused (`403 SignatureDoesNotMatch`).
+- **Java SDK only:** `size` is the `FileUploadRequest` builder step right after `fileName`
+  (`FileUploadRequest.builder().fileName("a.pdf").size(48213L)`), so a chain that sets another field between them no longer compiles;
+  `getSize()` returns `long` instead of `Optional<Long>`.
+- **Moving or retyping needs create access at the destination.** An update that changes an item's ownership (`scopes`, `userId`) or a document's type (`schemaId`) now also needs the matching create grant (`records:c`, `documents:c`, `entities:c`, `folders:c` or `schemas:c`, typed where the resource is) covering the whole result, unchanged labels included. With no create grant on the type it is a `403`; with one that doesn't cover the result, a `400`. These updates previously returned `200`. Root API keys and edits that change neither are unaffected.
+- **`sortBy` on `POST /v1/search` is now a string, not a one-value enum.** It takes `distance` or a field id, so the
+  generated `SearchRequestSortBy` type is gone from the SDKs: pass the string `"distance"` instead. The values `distance`
+  accepts and returns are unchanged.
+- **A `consistent` query parameter on any data endpoint other than `GET /v1/records/{id}` is now a `400`** (record lists, lookups and
+  versions, documents, folders, entities, schemas, users and search, writes included). It was previously ignored. It is refused rather
+  than ignored because it promises a strongly consistent read that only that endpoint gives (see Added).
+
+- **A version conflict inside a script is now retried, and answers `409`, not `400`.** An update a script does not catch that
+  finds the item changed since the script read it (`VERSION_CONFLICT`, sent with `expectedVersion`) is reported as
+  `CONCURRENT_MODIFICATION`: a trigger rule runs the script again from fresh reads, and `POST /v1/scripts/execute` or an agent's
+  script tool answers `409` instead of `400` `SCRIPT_ERROR`; a caught conflict's message carries `"errorCode":"VERSION_CONFLICT"`.
+  An `expectedVersion` that can never match (an item created or updated earlier in the same run, with no stored version, above its
+  current version, or below 1) is now a `400` inside a script or an `atomicity: all_or_nothing` record batch, where the item reads
+  `invalid` instead of `conflict`.
+- **An `externalId` or `unique` field value too long to be kept unique is refused with a `400` naming the field.** Each one is
+  now kept unique by a key that also carries its type and field, and that key has a size limit. So a create or
+  update that SETS a value longer than about 900 bytes once URL-encoded is refused. For example, about 100 CJK characters in an
+  `externalId`, or a long `unique` value, which records and documents accepted before. An item that already holds such a value
+  keeps working while that value is unchanged. For entities and users, the same request already failed with a `500`; it is now
+  the same `400`.
+- **Fewer records fit in one `all_or_nothing` batch or one script run when they carry an `externalId` or `unique` values.**
+  Each `externalId` and each value of a `unique` lookup field now adds one row to the transaction (100 rows at most). An
+  `all_or_nothing` request to `POST /v1/records/batch` holds up to 49 records that each carry an `externalId` (50 before), about 32
+  when each also carries one `unique` value; over that it is refused with `batch_refused` and nothing is written. In a script run,
+  creating a folder costs 4 rows (3 before), and a record or document 1 more per `externalId` and per `unique` value. Send larger
+  imports as several requests, or with `atomicity: best_effort`, which has no such limit.
+- **An update inside a script, a trigger or an `atomicity: all_or_nothing` record batch now commits only if the item is
+  unchanged since that update read it.** If a record, document, folder or entity changes between the update call and the end of
+  the run or batch (another request, a delete, or a platform write-back such as an index status), nothing staged is written:
+  `POST /v1/scripts/execute` answers `409` `CONCURRENT_MODIFICATION`, a trigger rule runs the script again (each run is billed) and
+  the batch is retried, even if the script caught the update's error. Previously only a write landing in the last moments before the commit was caught: an earlier one was overwritten,
+  fields the update did not send included, and an update could re-create an item deleted meanwhile. A slow script that updates a
+  frequently written or searchable item may now be re-run more often.
+
+### Added
+
+- **Atomic increment: `POST /v1/records/{id}/increment` (`incrementRecord`) and `vectros.records.increment` in scripts.** Adds
+  `by` to one `number` field in a single operation, optionally only while the new value stays within limits (`where`), with an
+  optional `Idempotency-Key`. Requires `records:u` on the type and is charged as a record update; agents get it as the
+  `records_increment` tool.
+- **Script-only writes: `writePolicy` on a record schema.** A record type can fence `create`, `update` and `delete` so that only
+  the script versions it admits, named by their `seal` (now returned on every script version) and by how they run (`execute`,
+  `trigger`, `tool`), can make that write; any other write is `403` `WRITE_POLICY_REFUSED`, root API keys included. Removing a
+  fence or admitting more needs the new `write-policy-declare` capability.
+- **Scripts can call HTTPS endpoints outside Vectros with `vectros.http.request`.** A call goes only to a destination an account owner declared and signed the outbound call waiver for, from a script version that declares `http.request` (which needs the `script-egress-declare` capability) and that an account owner approved for that destination. A destination can authenticate with a named secret that the script never sees, and a trigger's retry of the same call carries the same `Idempotency-Key`.
+- **Edge caching for public record types: `publicView.cacheSeconds` and `publicView.purgeListsOnChange`.** `cacheSeconds` (0 to
+  86400, default 0) is how long the edge may serve a type's public get, list and search answers. Cached answers are purged when a
+  record stops being public, and with `purgeListsOnChange` also when a public record changes; each purged path costs 0.5 credits
+  from the public budget.
+- **`public_view.changed` webhook event.** Sent when a record of a type with a public view becomes publicly readable
+  (`published`), stops being publicly readable (`unpublished`), or, with `purgeListsOnChange`, changes while it stays public
+  (`updated`). It carries the record's ids and the time (`changedAt`), never field values: use it to clear your own caches.
+- **`Idempotency-Key` on `POST /v1/admin/public-keys`.** A retry with the same value within 30 days returns the original key, and
+  the same server secret for a server key.
+- **Public cache hits in the usage report:** `reads.calls` adds `edgeHits`, `unitsUsed`, `unitsAllowance`, `unitsRemaining`,
+  `edgeHitsOverageCredits` and `edgeHitsOverageCreditsMilli`. The credit breakdown adds `publicAccess` and `publicAccessMilli`, which include edge cache purges.
+- `POST /v1/auth/issuers/{issuerId}/request-approval` asks a platform operator to approve a `pending_verification` issuer that cannot
+  be verified with a claim challenge; `IssuerResponse` gains `approvalStatus`, `approvalRequestedAt` and `approvalDenyReason`.
+- **Public images are processed.** An upload of a public-media type is re-encoded, which removes its metadata (location included).
+  The document's `media` gains `url` and `rejectReason`, and the upload response carries `media`.
+- **Order search results by a field.** On `POST /v1/search`, `sortBy` also takes the id of a filterable, non-sensitive `number`
+  or `date` field of `typeName`, with `order` (`asc` or `desc`), and `query` becomes optional with it.
+- **Search with filters and no query.** `POST /v1/search` and `GET /v1/public/search` accept filters without a query and return
+  the matching records in a fixed order.
+- **Listing records:** the `GET /v1/records` description now says that `type` returns only records of
+  that type, and that a page can hold fewer than `limit` records (or none) while `nextCursor` is set: page until it is null.
+  The behaviour is unchanged.
+- **Public search range filters:** `GET /v1/public/search` takes `filter.<field>.from` and `filter.<field>.to` (inclusive) on a
+  public filterable `number`, `date` or `instant` field.
+- **Public search set filters:** `GET /v1/public/search` takes `filter.<field>.in=a,b` (1 to 10 values) on a public filterable
+  `string`, `enum`, `number` or `instant` field; on an `array` field of `string`, `number` or `instant` elements it matches a record
+  when any element is in the set.
+- **Public search filters on an `instant` field:** an exact value, a range (`.from`, `.to`) or a set (`.in`), each a moment in UTC
+  written `YYYY-MM-DDTHH:MM:SS.sssZ`.
+- **Order public search results by a field: `sortBy` and `order` on `GET /v1/public/search`.** `sortBy` takes a filterable
+  `number`, `date` or `instant` field the type's public view publishes, `order` is `asc` (the default) or `desc`, and `q` is
+  optional with it.
+- **A public search near a place whose page is flagged `incompleteResults` and has no results is no longer billed or cached.** A flagged page with some results, cut short by a limit, is not cached either.
+- **`itemType` on an `array` schema field** (`string`, `number`, `boolean`, `date` or `instant`): when set, each element of a
+  value must be of that type.
+- **New field type `instant`:** a moment in time, sent as an RFC 3339 date-time with an offset and stored and returned in UTC to
+  the millisecond; lookups, filters and `sortBy` compare it by time. `FieldDef.fieldType` gains the value `instant` in every SDK:
+  an exhaustive `switch` over it needs a case for it, and a client on an older SDK that rejects unknown enum values may fail to
+  read a schema that declares one.
+- **Address geocoding is charged: 1 credit for each address looked up** for a `geo` field filled from an address, charged when the
+  result is written to the record. The usage report adds a `geocoding` section, and the credit breakdown adds `geocodeStored` and
+  `geocodeStoredMilli`.
+- **`POST /v1/records/{id}/geocode`** looks up one geo field's address again (body `{"field": "<geo field id>"}`, scope
+  `records:u:<type>`) and answers `202`. The re-check is charged 1 credit when its result is saved on the record.
+- **`geocodeStatus.status` has a new value, `LOW_CONFIDENCE`:** the address matched only uncertainly, so the field gets no
+  coordinates; code that handles every status value should handle it.
+- **A strongly consistent read by id: `GET /v1/records/{id}?consistent=true`** (`consistent` on `getRecord` in the SDKs,
+  `vectros.records.get(id, { consistent: true })` in scripts) reflects every write to the record that completed before the request.
+  It is metered as one ordinary read.
+- **A script can ask to be run again: `vectros.retry({ reason })`.** It ends the run without writing anything and reports it as
+  `CONCURRENT_MODIFICATION` with the `reason`, so a trigger rule runs it again from fresh reads and `POST /v1/scripts/execute`
+  answers `409`.
+
+### Changed
+
+- **An issuerId retired by an app context's deletion can be registered again by the same provider:** `POST /v1/auth/issuers`
+  under it succeeds when `issuer`, `jwksUri`, `audience` and `subClaim` match exactly, and is otherwise `400` `ISSUER_ID_RETIRED`.
+  An `issuerId` retired by an operator release, or before this release, stays retired. The deleted context's access profiles are
+  gone: invite each user again.
+
+- **The opt-in per-principal burst limit is now charged.** An account opted in to it is charged 1 credit for every 2,500 requests it counts, totalled for each context each month; a request refused for being over the limit is not charged. Requests before this release are not charged.
+- **Per-principal usage tracking is charged on each context's monthly total.** An account opted in to it is charged on the total of the writes and deletes it counts across all of a context's users and scope values for the month.
+- **A public projection type can be listed by any lookup field it publishes:** `GET /v1/public/records/{type}?<field>=<value>`
+  on a `projection` with `publishWhen` answers with the published records for the value, instead of `400`
+  `PUBLIC_LIST_FIELD_NOT_ALLOWED`. Existing published records gain the lookup when the type is republished
+  (`POST /v1/schemas/{id}/republish`); until then the type lists as before. A public copy's write fee now counts its lookup slots.
+- **An `asset` or `assets` field can be declared on any base schema**, not only on one with a `publicView`; its images are public
+  only while the record is public under a `publicView` that serves the field.
+- **`GET /v1/documents/{id}/download` on an image** (a type with `fileProfile: PUBLIC_MEDIA`) returns a link to a
+  private copy of the processed image, whether or not the image is public; the uploaded file itself is not kept. A rejected,
+  still-processing or taken-down image answers `409` `NO_DOWNLOAD_FOR_MEDIA`.
+- **A trigger refused for your app's rate or concurrency limit now tries again for up to 75 seconds** before the 15-minute
+  retry, so it usually runs within about a minute. Every run that executes is metered; time spent waiting is not.
+- **`GET /v1/public/search` can answer `429` `PUBLIC_SEARCH_BUSY`** when too many public searches are in progress at once. Retry after the `Retry-After` delay (about a second). The search is not charged.
+- **Public reads and search no longer answer `503` `PUBLIC_ACCESS_NOT_LAUNCHED`.** An account whose public access is ready is served; the code stays defined but is never returned.
+- **A token minted with `userId` alone now counts toward that user's per-user limits** (the burst limit and the monthly write
+  cap, where enabled). It still does not act as that user; when `scope.identity.userId` is also set and differs, that one is
+  counted. Tokens minted before this release are counted once re-minted.
+- A chat, RAG or document-ask call that ends early after streaming part of its answer is now billed for its input and the output already streamed; a call that streamed nothing is still not billed.
+- `POST /v1/runs/{id}/cancel` is no longer refused when the account is over its monthly credit limit or the user is at their usage quota.
+- **Public cache hits count against your read allowance, at a third of a read each.** Public traffic can therefore push authenticated
+  reads into overage sooner. With no public cache hits, nothing changes.
+- **`reads.calls.overage` counts read-call equivalents**, so it includes public cache hits at a third each.
+- **Geo fields, geocoding and search near a place are turned on per tenant by an owner of the account**, who signs the Geocoding
+  waiver in the developer portal (an account that holds a Business Associate Agreement accepts its current version first). While it
+  is off, a schema write that adds a `geo` field or a `geocode.from` source and a `$near` filter are `400`, and public `near.*` is
+  `400` `PUBLIC_SEARCH_NEAR_NOT_AVAILABLE`; a schema that already has a geo field stays editable.
+- **Search filters on `date` fields compare ISO-8601 operands by time.** On a field the schema declares `date`, an ISO-8601
+  operand in `POST /v1/search` and RAG `search.filters` is converted to the stored time; before, only epoch milliseconds matched.
+- **The type of a `rangeEnabled` lookup field can no longer change.** A schema update that re-declares its `fieldType` is now `400`;
+  before it was accepted and the existing records dropped out of range lookups. Add a new field instead.
+- **Schemas of one name must agree on the types of a lookup they both declare:** a save that adds such a lookup, or changes the
+  type of one of its fields, so that its types differ from another schema of that name is now `400`; before it was accepted. A
+  declaration saved unchanged is always accepted.
+- **A unique value of a record, document or folder can no longer change hands within one script run or one `all_or_nothing`
+  batch.** Freeing an `externalId`, a `unique` value or a folder slug and giving it to another item in the same run or request now
+  writes nothing (the batch reports `batch_refused` for every item); this includes deleting a record and creating a new one with its
+  `externalId`, which used to create it. Free the value in one request and reuse it in the next, or update the existing item.
+- **`POST /v1/documents/upload` naming an `externalId` another document holds now answers `403` when your credential cannot update
+  that document** (`documents:u`). It answered a `400` when the document was outside your credential's data scope or was a text
+  document, a `409` (`PUBLIC_MEDIA_IMMUTABLE`) for an uploaded public-media document, and the `403` for any other file document.
+  With `documents:u` on it, the answers are unchanged.
+- An account owner's `vectros login` session can push a script version that declares `http.request`.
+- The `providerAlias` description of `POST /v1/chat`, `POST /v1/rag` and `POST /v1/documents/{id}/ask` says that a request without it is served by the platform.
+- **Plan request rate limits are higher:** Free 200 requests per minute (was 60), Starter 1,000 (was 300), Pro 2,000 (was 600), Scale and Enterprise 4,000 (was 1,200).
+
+### Fixed
+
+- **`validation.minItems` and `validation.maxItems` are now enforced on `array` fields:** a write outside the limits is `400`,
+  naming the field; they were accepted but not checked. A write that leaves the array as stored is still accepted, so existing
+  records stay updatable. On a `sensitive` array field, a write that sends the array is accepted unchanged only with a token that
+  carries the reveal scope for the type. A schema that sets either limit on another field type (except `maxItems` on an `assets`
+  field), a negative value, or `minItems` greater than `maxItems` is now `400` when the limit is added or changed.
+- Scoped tokens (`st_*`) now apply the limits agreed for your account (rate limit, monthly credit limit, extra models, key cap), the same as API keys. Tokens minted earlier get the new limits once re-minted.
+- `POST /v1/folders`, `PATCH /v1/folders/{id}` and `PUT /v1/folders/{id}` return the folder's stored `version`. A create returned
+  `null` and an update returned the version from before the write. Passing the returned `version` back as `expectedVersion` now
+  works as documented.
+- **An exact `filter.<field>` on a public `date` field of `GET /v1/public/search` now matches.** The value is a calendar day,
+  `YYYY-MM-DD` in UTC, and matches records whose date falls on that day; before, such a filter matched nothing. Any other spelling is
+  `400` `PUBLIC_SEARCH_FILTER_NOT_ALLOWED`.
+- **A search filter that matches any of several numbers now answers correctly when one of them is negative** (`$in`, `$nin` or a
+  list of values on `POST /v1/search`, keyword and hybrid modes): it matched every item. The same fix applies to `GET /v1/public/search` on a type whose
+  public view publishes by a number field with a negative published value.
+- A search filter naming one value of an `array` field now matches a record when any of its `string`, `number` or `boolean`
+  elements equals it; the whole list was compared as one string, so a filter on one element never matched. Records written before
+  this release are found by an element once a write changes them.
+- `POST /v1/users/invite` and `POST /v1/users/invite/resend` now send the invitation email to an address containing any character
+  other than letters, digits, `.`, `_` and `-` before the `@`, such as `+` in `name+team@example.com`. Before, no email was sent to
+  such an address and the response read `emailSent: false`.
+- Lookups by range, prefix, or `value` on a range-enabled field, and lookups beyond the fast lookup slots, now return each record's and each document's current `version`. Before, they could return a lower value when the lookup field was added to the record, or the lookup was added to the type, after the record was created.
+- **A repeated or concurrent create of a record, document or folder no longer writes a second one with the same
+  `externalId`, `unique` field value or folder slug.** It returns the existing item as an idempotent create does (`200`,
+  `created: false`) or the ordinary duplicate `400`; two creates at exactly the same moment can get a retryable `409`. An update
+  moving a `unique` value, or a document's type, onto one another item has just taken is the `400` too, not a `409`. Items stored
+  before this release are checked as before.
+- On a searchable type, the platform's indexing no longer runs the type's `UPDATE` trigger rules: a write runs them once, and a create runs none.
+- A record or document written again soon after it was created has one search entry, and no second entry is indexed or charged.
+
 ## 0.50.0 — 2026-11-14
 
 ### Breaking changes

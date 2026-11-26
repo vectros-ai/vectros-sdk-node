@@ -2,7 +2,7 @@
 
 import type { BaseClientOptions, BaseRequestOptions } from "../../../../BaseClient.js";
 import { type NormalizedClientOptionsWithAuth, normalizeClientOptionsWithAuth } from "../../../../BaseClient.js";
-import { mergeHeaders } from "../../../../core/headers.js";
+import { mergeHeaders, mergeOnlyDefinedHeaders } from "../../../../core/headers.js";
 import * as core from "../../../../core/index.js";
 import { handleNonStatusCodeError } from "../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../errors/index.js";
@@ -171,7 +171,9 @@ export class RecordsClient {
     /**
      * Writes up to 50 records per request in `best_effort` mode and up to 50 with `atomicity: all_or_nothing`, in a single request. Each item in `items` has exactly the same shape, and goes through exactly the same validation, authorization and idempotency rules, as the body of a single `POST /v1/records` — including schema validation, `externalId` idempotency, unique-field enforcement, and the `records:c:<type>` scope check, which is applied per item against that item's own record type. A batch is not a way to write a type your credential could not write one at a time.
      *
-     * `atomicity` selects how the batch commits. `best_effort` (the default) writes each item independently: some can succeed while others fail, and each item's own outcome is reported. `all_or_nothing` commits every item in one transaction — if any item fails, no record is created or updated at all, and every item that was itself fine reports `not_committed` while the ones that failed report why. Because the transaction is bounded by the number of underlying storage rows rather than by the number of records, a large `all_or_nothing` batch can be refused as too large to commit atomically even when it is within the item limit; the error says so, and nothing is written when it happens.
+     * `atomicity` selects how the batch commits. `best_effort` (the default) writes each item independently: some can succeed while others fail, and each item's own outcome is reported. `all_or_nothing` commits every item in one transaction — if any item fails, no record is created or updated at all, and every item that was itself fine reports `not_committed` while the ones that failed report why. Because the transaction is bounded by the number of underlying storage rows rather than by the number of records, a large `all_or_nothing` batch can be refused as too large to commit atomically even when it is within the item limit; the error says so, and nothing is written when it happens. Each `externalId` and each value of a `unique` lookup field counts as one more row per record: up to 49 records that each carry an `externalId` fit in one `all_or_nothing` batch, and about 32 when each also carries one `unique` value.
+     *
+     * Within one `all_or_nothing` batch a unique value cannot move from one record to another: an item that takes an `externalId` or `unique` value another item in the same batch releases is refused with the whole batch. Send the two writes in separate requests.
      *
      * The response is HTTP 200 whenever the batch was processed at all — including when every item failed — so always inspect `results` rather than relying on the status code. Match each result to the item you sent using its `index`. Requires the `records:c` scope.
      *
@@ -254,7 +256,7 @@ export class RecordsClient {
     }
 
     /**
-     * Returns a paginated list of records in your account as a `{data, nextCursor}` page. Supply exactly one of `type`, `folderId`, or `recent=true` to choose the mode: `type` lists all records of a single type; `folderId` lists all records in a folder (any type); and `recent=true` returns the account-wide recently-updated feed across all types, newest first. You may combine `type` with `folderId` to list a single type within a folder. The owner filters (`userId`, `scope`) further narrow the type and folder modes; the `recent` feed is standalone and ignores all filters. Each token only sees the record types it is scoped to read. Requires the `records:r` scope. By default the response returns the indexed projection of each record; set `includePayload=true` to include full payloads.
+     * Returns a paginated list of records in your account as a `{data, nextCursor}` page. Supply exactly one of `type`, `folderId`, or `recent=true` to choose the mode: `type` lists all records of a single type; `folderId` lists all records in a folder (any type); and `recent=true` returns the account-wide recently-updated feed across all types, newest first. You may combine `type` with `folderId` to list a single type within a folder. The owner filters (`userId`, `scope`) further narrow the type and folder modes; the `recent` feed is standalone and ignores all filters. Each token only sees the record types it is scoped to read. Requires the `records:r` scope. By default the response returns the indexed projection of each record; set `includePayload=true` to include full payloads. A page can hold fewer than `limit` records (or none) while `nextCursor` is set: page until it is null.
      *
      * @param {Vectros.ListRecordsRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -428,11 +430,12 @@ export class RecordsClient {
     }
 
     /**
-     * Retrieves a single record by its Vectros-assigned ID, including its full payload (payloads that were externalized to object storage are rehydrated for this response). Sensitive fields are masked according to the record's schema. Requires the `records:r:<type>` scope. A record outside your account or scope returns 404 (not found) rather than revealing its existence.
+     * Retrieves a single record by its Vectros-assigned ID, including its full payload (payloads that were externalized to object storage are rehydrated for this response). Sensitive fields are masked according to the record's schema. Requires the `records:r:<type>` scope. A record outside your account or scope returns 404 (not found) rather than revealing its existence. By default the read is eventually consistent: a write that completed moments ago may not be visible yet. Pass `consistent=true` for a strongly consistent read that always reflects every write completed before the request.
      *
      * @param {Vectros.GetRecordRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.NotFoundError}
      *
      * @example
@@ -451,7 +454,10 @@ export class RecordsClient {
         request: Vectros.GetRecordRequest,
         requestOptions?: RecordsClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.RecordResponse>> {
-        const { id } = request;
+        const { id, consistent } = request;
+        const _queryParams: Record<string, unknown> = {
+            consistent,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -466,7 +472,11 @@ export class RecordsClient {
             ),
             method: "GET",
             headers: _headers,
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -479,6 +489,8 @@ export class RecordsClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -588,6 +600,7 @@ export class RecordsClient {
      * @param {Vectros.DeleteRecordRequest} request
      * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
+     * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.NotFoundError}
      * @throws {@link Vectros.ConflictError}
      * @throws {@link Vectros.TooManyRequestsError}
@@ -636,6 +649,8 @@ export class RecordsClient {
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
@@ -926,6 +941,91 @@ export class RecordsClient {
     }
 
     /**
+     * Looks up the address of one `geo` field filled from an address (`geocode.from`) again, even though the address has not changed. The field becomes PENDING and its coordinates are removed at once, on the record and on any public copy; they are filled again only if the new lookup finds the address (status OK). Follow it with `geocodeStatus` on a read of the record. Charged 1 credit when the new result is saved on the record, like any address lookup, and counted toward the tenant's daily geocoding limit. If the record has a public view, the re-check also updates its public copy up to twice (when the old location is cleared and when the new result is saved); each of those updates is charged at the normal write rate, in addition to the 1 credit. Note that each request after the field settles starts a new, charged lookup. It is refused for a field whose coordinates you supplied, a field with no address, and a field already `PENDING`. Requires the `records:u:<type>` scope, with ownership checked as for updating the record.
+     *
+     * @param {Vectros.GeocodeRequestBody} request
+     * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.PaymentRequiredError}
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     *
+     * @example
+     *     await client.records.geocodeRecord({
+     *         id: "id",
+     *         field: "location"
+     *     })
+     */
+    public geocodeRecord(
+        request: Vectros.GeocodeRequestBody,
+        requestOptions?: RecordsClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.GeocodeQueuedResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__geocodeRecord(request, requestOptions));
+    }
+
+    private async __geocodeRecord(
+        request: Vectros.GeocodeRequestBody,
+        requestOptions?: RecordsClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.GeocodeQueuedResponse>> {
+        const { id, ..._body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/records/${core.url.encodePathParam(id)}/geocode`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: _body,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.GeocodeQueuedResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 402:
+                    throw new Vectros.PaymentRequiredError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/records/{id}/geocode");
+    }
+
+    /**
      * For a record whose type has a `publicView` in `projection` mode: what the public sees of it, which is the fields the type lists, as last copied from the record. `published` is false when the record is not public now. Requires the `records:r:<type>` scope, with ownership checked as for reading the record.
      *
      * @param {Vectros.GetRecordPublicViewRequest} request
@@ -1134,5 +1234,99 @@ export class RecordsClient {
         }
 
         return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/records/{id}/versions");
+    }
+
+    /**
+     * Keep a counter on its own lean record type: `indexMode` `NONE`, small, the counted field `inline: true`, no `rangeEnabled`/`allowOverflow` lookups. On a searchable type every increment re-indexes the record (and may embed it again), and lookups that copy the record are each updated too: that cost is accepted by whoever keeps a counter there. Adds `by` to one `number` field of a record as a single database operation, so concurrent requests never overwrite each other's change: each one is applied to the value as it is at that moment, with no version to match. Under heavy contention a request can still be answered `409` without an error code; retry it. Send an `Idempotency-Key` to make a retry safe: retry a `5xx` or a lost response with the same key and it is not added again (short of a fault in the platform's own key store right after the increment). The result must stay within plus or minus 9007199254740991. Optional limits in `where` are checked against the NEW value in the same operation; if one does not hold, nothing changes and the request is refused with `INCREMENT_CONDITION_NOT_MET`. The field's own schema `validation.min`/`max` always apply too. A field with no value counts as 0. The record's `version` and update time change as for any update, and it records a version-history entry and fires the type's update triggers. On a type whose `indexMode` is not `NONE` it re-indexes the record for search (and may embed it again), as any write does; keep a busy counter on a type with `indexMode` `NONE`. Allowed only for a `number` field that is not sensitive, searchable or filterable, not a lookup field or a lookup's `sortBy`, not an address source of a `geo` field and not copied into a public view (otherwise `400` `INCREMENT_FIELD_NOT_ELIGIBLE`). A lookup that keeps a copy of the record (`rangeEnabled`, `allowOverflow`) is updated in the same operation. When the record's payload is stored externally (under storageProfile STANDARD, at 4096 bytes or more: see `payloadExternalized` on the record), only a field declared `inline: true` can be incremented; any other is `400` `INCREMENT_PAYLOAD_EXTERNALIZED`. Requires the `records:u:<type>` scope, with ownership checked as for updating the record. Charged as a record update.
+     *
+     * @param {Vectros.RecordIncrementRequest} request
+     * @param {RecordsClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.PaymentRequiredError}
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.UnprocessableEntityError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     * @throws {@link Vectros.InternalServerError}
+     *
+     * @example
+     *     await client.records.incrementRecord({
+     *         "Idempotency-Key": "booking-8412",
+     *         id: "id",
+     *         field: "booked",
+     *         by: 1
+     *     })
+     */
+    public incrementRecord(
+        request: Vectros.RecordIncrementRequest,
+        requestOptions?: RecordsClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.RecordIncrementResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__incrementRecord(request, requestOptions));
+    }
+
+    private async __incrementRecord(
+        request: Vectros.RecordIncrementRequest,
+        requestOptions?: RecordsClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.RecordIncrementResponse>> {
+        const { id, "Idempotency-Key": idempotencyKey, ..._body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "Idempotency-Key": idempotencyKey }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/records/${core.url.encodePathParam(id)}/increment`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: _body,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.RecordIncrementResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 402:
+                    throw new Vectros.PaymentRequiredError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 422:
+                    throw new Vectros.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                case 500:
+                    throw new Vectros.InternalServerError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "POST", "/v1/records/{id}/increment");
     }
 }

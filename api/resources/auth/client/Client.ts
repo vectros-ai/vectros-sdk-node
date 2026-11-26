@@ -2,7 +2,7 @@
 
 import type { BaseClientOptions, BaseRequestOptions } from "../../../../BaseClient.js";
 import { type NormalizedClientOptionsWithAuth, normalizeClientOptionsWithAuth } from "../../../../BaseClient.js";
-import { mergeHeaders } from "../../../../core/headers.js";
+import { mergeHeaders, mergeOnlyDefinedHeaders } from "../../../../core/headers.js";
 import * as core from "../../../../core/index.js";
 import { handleNonStatusCodeError } from "../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../errors/index.js";
@@ -1473,7 +1473,7 @@ export class AuthClient {
     }
 
     /**
-     * Permanently deletes an app context and everything in it — every record, document, folder, schema, role, access profile, and trusted-issuer registration belonging to the context. This is irreversible. The deletion runs asynchronously: the call returns 202 immediately and the context's data drains in the background. Poll the context's `status` field to observe when the teardown completes (`purging` while draining, then `deleted`). To guard against accidental deletion, you must echo the contextId back in the `confirm` query parameter (`?confirm={contextId}`). The reserved `default` and `vectros-admin` contexts cannot be deleted. This operation requires a root API key (one beginning with `sk_`): no scoped credential, not even one with full wildcard (`*`) scope, can trigger this teardown.
+     * Permanently deletes an app context and everything in it — every record, document, folder, schema, role, access profile, and trusted-issuer registration belonging to the context. This is irreversible. If users signed in through an issuer registered in the context, its issuerId is retired. Only the same provider can register it again: the same issuer, jwksUri, audience and subClaim. Each user must then be invited again to regain access. The deletion runs asynchronously: the call returns 202 immediately and the context's data drains in the background. Poll the context's `status` field to observe when the teardown completes (`purging` while draining, then `deleted`). To guard against accidental deletion, you must echo the contextId back in the `confirm` query parameter (`?confirm={contextId}`). The reserved `default` and `vectros-admin` contexts cannot be deleted. This operation requires a root API key (one beginning with `sk_`): no scoped credential, not even one with full wildcard (`*`) scope, can trigger this teardown.
      *
      * @param {Vectros.DeleteAppContextRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2351,7 +2351,7 @@ export class AuthClient {
     }
 
     /**
-     * Registers a trusted third-party IdP issuer that BYO-IdP token exchange (`POST /v1/auth/token/exchange`) may accept a `subject_token` from. Requires a root API key or the CLI bootstrap's provisioning capability — never an ordinary grantable scope. A credential authorized only via the provisioning capability may register only against the app context it is bound to; naming a different one returns 403. A root API key is unaffected and may register against any of its contexts. A registration without `restrictedToDomain` is created `pending_verification` with a one-time challenge (`verificationClaim`, `verificationNonce`, `verificationExpiresAt`) and accepts no token until you prove you control the issuer with `POST /v1/auth/issuers/{issuerId}/verify`; it claims no `(issuer, audience)` pair until then, so registering never reveals whether another tenant holds one. A registration scoped to an already-verified domain with `restrictedToDomain` is `active` at once. Idempotent by `issuerId` within your tenant. If `issuerId` collides with a registration owned by a different app context than the one you're confined to, the request fails with 400 rather than returning that context's configuration. An app context may have at most one active issuer — deregister the existing one first if you need to replace it. One issuer MAY serve several contexts, each via its own registration row with a distinct `audience`. Optionally name `restrictedToDomain` to scope this registration's (issuer, audience) uniqueness to a specific VERIFIED domain rather than the bare pair — see that field's own description. A domain-scoped registration proves control of the DOMAIN, not of the issuer itself: it routes only tokens carrying that domain's `hd` claim.
+     * Registers a trusted third-party IdP issuer that BYO-IdP token exchange (`POST /v1/auth/token/exchange`) may accept a `subject_token` from. Requires a root API key or the CLI bootstrap's provisioning capability — never an ordinary grantable scope. A credential authorized only via the provisioning capability may register only against the app context it is bound to; naming a different one returns 403. A root API key is unaffected and may register against any of its contexts. A registration without `restrictedToDomain` is created `pending_verification` with a one-time challenge (`verificationClaim`, `verificationNonce`, `verificationExpiresAt`) and accepts no token until you prove you control the issuer with `POST /v1/auth/issuers/{issuerId}/verify` or, when it cannot be verified with a claim challenge, until an operator approves it (`POST /v1/auth/issuers/{issuerId}/request-approval`); it claims no `(issuer, audience)` pair until then, so registering never reveals whether another tenant holds one. A registration scoped to an already-verified domain with `restrictedToDomain` is `active` at once. Idempotent by `issuerId` within your tenant. If `issuerId` collides with a registration owned by a different app context than the one you're confined to, the request fails with 400 rather than returning that context's configuration. An app context may have at most one active issuer — deregister the existing one first if you need to replace it. One issuer MAY serve several contexts, each via its own registration row with a distinct `audience`. Optionally name `restrictedToDomain` to scope this registration's (issuer, audience) uniqueness to a specific VERIFIED domain rather than the bare pair — see that field's own description. A domain-scoped registration proves control of the DOMAIN, not of the issuer itself: it routes only tokens carrying that domain's `hd` claim.
      *
      * @param {Vectros.IssuerRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2429,7 +2429,94 @@ export class AuthClient {
     }
 
     /**
-     * Proves you administer the IdP application a `pending_verification` registration names, activating it. A registration created without `restrictedToDomain` accepts no tokens until this succeeds. Configure your IdP, with an admin-controlled rule (an Auth0 Action, an Okta inline hook, an Entra claims-mapping policy, a Keycloak protocol mapper), to add the registration's `verificationClaim` to the tokens it issues, set to its `verificationNonce`; sign in once; and send that token here. The `jwksUri` you registered must be exactly the `jwks_uri` your issuer's OpenID Connect discovery document (`<issuer>/.well-known/openid-configuration`) publishes, and the token must verify against that key set — an issuer that publishes no discovery document cannot be verified this way. The token is checked and discarded; it is never stored. The `(issuer, audience)` pair is claimed at this moment, so a pair another registration already holds is refused with 400. A challenge expires 7 days after registration; an expired registration cannot be verified — delete it and register again. Requires a root API key or the bootstrap's provisioning capability, gated identically to every other operation on this surface. A credential confined to one app context may only verify an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId.
+     * Asks a platform operator to approve a `pending_verification` registration that cannot be verified with a claim challenge: its users sign in through an identity provider you have no admin console for (for example Google sign-in for personal accounts), or the issuer publishes no OpenID Connect discovery document. Until the operator approves it, the registration accepts no tokens. The first request extends the challenge to 30 days from the request; repeating it updates the note. After a denial you may request once more. Requires a root API key or the provisioning capability. A credential confined to one app context can only request approval for an issuer registered in that context; any other issuerId returns 404.
+     *
+     * @param {Vectros.IssuerApprovalRequest} request
+     * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link Vectros.BadRequestError}
+     * @throws {@link Vectros.ForbiddenError}
+     * @throws {@link Vectros.NotFoundError}
+     * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.TooManyRequestsError}
+     *
+     * @example
+     *     await client.auth.requestIssuerApproval({
+     *         issuerId: "auth0-prod",
+     *         note: "note"
+     *     })
+     */
+    public requestIssuerApproval(
+        request: Vectros.IssuerApprovalRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): core.HttpResponsePromise<Vectros.IssuerResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__requestIssuerApproval(request, requestOptions));
+    }
+
+    private async __requestIssuerApproval(
+        request: Vectros.IssuerApprovalRequest,
+        requestOptions?: AuthClient.RequestOptions,
+    ): Promise<core.WithRawResponse<Vectros.IssuerResponse>> {
+        const { issuerId, ..._body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/auth/issuers/${core.url.encodePathParam(issuerId)}/request-approval`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: _body,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as Vectros.IssuerResponse, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new Vectros.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new Vectros.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 429:
+                    throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.VectrosError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/auth/issuers/{issuerId}/request-approval",
+        );
+    }
+
+    /**
+     * Proves you administer the IdP application a `pending_verification` registration names, activating it. A registration created without `restrictedToDomain` accepts no tokens until this succeeds. Configure your IdP, with an admin-controlled rule (an Auth0 Action, an Okta inline hook, an Entra claims-mapping policy, a Keycloak protocol mapper), to add the registration's `verificationClaim` to the tokens it issues, set to its `verificationNonce`; sign in once; and send that token here. The `jwksUri` you registered must be exactly the `jwks_uri` your issuer's OpenID Connect discovery document (`<issuer>/.well-known/openid-configuration`) publishes, and the token must verify against that key set — an issuer that publishes no discovery document cannot be verified this way; ask an operator to approve it instead with `POST /v1/auth/issuers/{issuerId}/request-approval`. The token is checked and discarded; it is never stored. The `(issuer, audience)` pair is claimed at this moment, so a pair another registration already holds is refused with 400. A challenge expires 7 days after registration, or 30 days after a request for operator approval; an expired registration cannot be verified — delete it and register again. Requires a root API key or the bootstrap's provisioning capability, gated identically to every other operation on this surface. A credential confined to one app context may only verify an issuer registered in that context; naming one registered in another context returns 404, identically to a nonexistent issuerId.
      *
      * @param {Vectros.IssuerVerifyRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2724,7 +2811,7 @@ export class AuthClient {
     }
 
     /**
-     * Issues a publishable app key for one app context. Anonymous visitors send it as the `k` query parameter to read that context's public views; it grants nothing else. A browser key (`pub`) is meant to ship in web pages. A server key (`pubs`) also gets a server secret, returned once in this response, which your server sends in the `X-Vectros-Public-Server-Secret` header for higher rate limits. An app context has at most two active keys: issue the new one, move your clients to it, then revoke the old one. Requires the `public-keys:c` scope.
+     * Issues a publishable app key for one app context. Anonymous visitors send it as the `k` query parameter to read that context's public views; it grants nothing else. A browser key (`pub`) is meant to ship in web pages. A server key (`pubs`) also gets a server secret, returned in this response, which your server sends in the `X-Vectros-Public-Server-Secret` header. Requests that carry it get a higher limit on uncached reads and searches, 10 times a browser key's. One address is still limited to 3,000 public requests per 5 minutes across all keys. An app context holds at most two active keys, browser and server keys counted together. To replace a key without a gap, the context must hold only one active key: issue the new key, move your pages to it, then revoke the old one. If it already holds two, revoke the one you are replacing first; pages using it stop working until you issue its replacement. Send an `Idempotency-Key` header to retry safely: a retry returns the key the first request issued, with the same server secret for a server key. Requires the `public-keys:c` scope.
      *
      * @param {Vectros.CreatePublicAppKeyRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -2732,6 +2819,7 @@ export class AuthClient {
      * @throws {@link Vectros.BadRequestError}
      * @throws {@link Vectros.ForbiddenError}
      * @throws {@link Vectros.ConflictError}
+     * @throws {@link Vectros.UnprocessableEntityError}
      * @throws {@link Vectros.TooManyRequestsError}
      *
      * @example
@@ -2748,10 +2836,12 @@ export class AuthClient {
         request: Vectros.CreatePublicAppKeyRequest = {},
         requestOptions?: AuthClient.RequestOptions,
     ): Promise<core.WithRawResponse<Vectros.PublicAppKeyResponse>> {
+        const { "Idempotency-Key": idempotencyKey, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
+            mergeOnlyDefinedHeaders({ "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -2765,7 +2855,7 @@ export class AuthClient {
             contentType: "application/json",
             queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
             requestType: "json",
-            body: request,
+            body: _body,
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
@@ -2784,6 +2874,8 @@ export class AuthClient {
                     throw new Vectros.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
                     throw new Vectros.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 422:
+                    throw new Vectros.UnprocessableEntityError(_response.error.body as unknown, _response.rawResponse);
                 case 429:
                     throw new Vectros.TooManyRequestsError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -2799,7 +2891,7 @@ export class AuthClient {
     }
 
     /**
-     * Revokes a publishable app key. Revoking a key also revokes every older key of the same app context, because a revocation applies to every key version below a minimum: the response lists every key it covers. Revoked keys stop being accepted by the API within about 30 seconds, and at the edge within the edge's propagation time. Revocation is permanent; issue a new key to replace it. Revoking an already revoked key repeats the revocation and returns the same list. Requires the `public-keys:d` scope.
+     * Revokes a publishable app key. Revoking a key also revokes every older key of the same app context, because a revocation applies to every key version below a minimum: the response lists every key it covers. Revoked keys stop being accepted shortly after the revocation. Revocation is permanent; issue a new key to replace it. Revoking an already revoked key repeats the revocation and returns the same list. Requires the `public-keys:d` scope.
      *
      * @param {Vectros.RevokePublicAppKeyRequest} request
      * @param {AuthClient.RequestOptions} requestOptions - Request-specific configuration.

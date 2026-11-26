@@ -6,7 +6,7 @@
 export interface DocumentDownloadResponse {
     /** Document ID. */
     id?: string | undefined;
-    /** Presigned download URL for the original file. Short-lived — fetch the file before the time given in `expires`. */
+    /** Presigned download URL for the file (for an image, a copy of the processed image). Short-lived — fetch the file before the time given in `expires`. */
     downloadUrl?: string | undefined;
     /** Epoch-millis (Unix milliseconds) timestamp at which the presigned URL expires. */
     expires?: number | undefined;

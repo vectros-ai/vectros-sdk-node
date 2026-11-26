@@ -15,14 +15,18 @@ export interface SearchPublicRecordsRequest {
     k: string;
     /** The record type to search. */
     type: string;
-    /** The text to search for, at most 256 characters. Required, except with `near.*`: then leave it out to list the records near a place, nearest first. */
+    /** The text to search for, at most 256 characters. Required, except with `near.*`, a filter or `sortBy`: with `near.*`, leave it out to list the records near a place, nearest first; with at least one `filter.<field>`, leave it out to list the records that match the filters; with `sortBy` and no filter, leave it out to list the type's records in that field's order. */
     q?: string;
-    /** `text`, `semantic` or `hybrid`: one of the modes the type offers. Defaults to the first one it offers that the account allows. */
+    /** `text`, `semantic` or `hybrid`: one of the modes the type offers. Defaults to the first one it offers that the account allows. With `sortBy` it is `text`. */
     mode?: string;
     /** How many results to skip, 0 to 200 (default 0). */
     offset?: number;
     /** The page size, 1 to 40 (default 20). */
     limit?: number;
+    /** The id of a filterable `number`, `date` or `instant` field of the type, one of the fields its public view publishes. Results come in that field's order, records without a value last. `q` is optional with it. `mode` must be left out or be `text`, and the type must offer `text`. */
+    sortBy?: string;
+    /** `asc` (the default) or `desc`. Needs `sortBy`. */
+    order?: string;
     /** The latitude of the place to search near, -90 to 90, written as a plain decimal with at most 6 decimal places (for example `38.7223` or `-0.5`; no exponent, no leading `+`, and not `-0`). Send with `near.lon` and `near.radius`. */
     "near.lat"?: string;
     /** The longitude of the place to search near, -180 to 180, written as a plain decimal with at most 6 decimal places (for example `-9.1393`; no exponent, no leading `+`, and not `-0`). Send with `near.lat` and `near.radius`. */

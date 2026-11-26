@@ -6,10 +6,10 @@ import type * as Vectros from "../index.js";
  * A page of public search results. There is no total count.
  */
 export interface PublicSearchPage {
-    /** The matching public records, most relevant first, or nearest first when the search was sent with `near.*` and no `q`. A page can be shorter than `limit` while `hasMore` is true. */
+    /** The matching public records, most relevant first. With `sortBy`, they come in that field's order. With filters and no `q`, they come in a fixed order. With `near.*` and no `q`, they come nearest first. A page can be shorter than `limit` while `hasMore` is true. */
     data?: Vectros.PublicRecordResponse[] | undefined;
     /** True when a further page may exist: send the same request with `offset` advanced by `limit` (at most 200). */
     hasMore?: boolean | undefined;
-    /** Present and true only on a search sent with `near.*` when the search stopped at one of its limits before it could be sure it had every nearest match: the results returned are in the right order, but nearer matches may be missing. Retry, or use a smaller `near.radius`. */
+    /** Present and true only when the page may be incomplete. A search limit stopped the search. Or, with filters and no `q` or with `sortBy`, more than 2,000 index entries match (a long document, or a record edited moments ago, can be more than one). With `near.*`, the results are in the right order, but nearer matches may be missing: retry, or use a smaller `near.radius`. With filters or `sortBy`, the page is in order but drawn from some of the matches only: add filters to narrow it. A flagged page that has no results is not billed. */
     incompleteResults?: boolean | undefined;
 }

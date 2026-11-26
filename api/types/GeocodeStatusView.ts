@@ -4,9 +4,9 @@
  * How a geo field's coordinates were obtained.
  */
 export interface GeocodeStatusView {
-    /** SUPPLIED: you sent the coordinates with this address. PENDING: the address is being geocoded; the field is empty until it is done (`reason` DAILY_LIMIT: your account's daily geocoding limit is reached, and it is retried on a later day). OK: the field holds the address's coordinates. NOT_FOUND: the address could not be located; it is tried again when the address changes. FAILED: no coordinates could be obtained; `reason` says why. */
+    /** SUPPLIED: you sent the coordinates with this address. PENDING: the address is being geocoded; the field is empty until it is done (`reason` DAILY_LIMIT: the tenant's daily geocoding limit is reached, and it is retried on a later day). OK: the field holds the address's coordinates. NOT_FOUND: the address could not be located; it is tried again when the address changes. LOW_CONFIDENCE: the address was found only as an uncertain match, so the field gets no coordinates; it is tried again when the address changes, or on request (`POST /v1/records/{id}/geocode`). FAILED: no coordinates could be obtained; `reason` says why. */
     status?: GeocodeStatusView.Status | undefined;
-    /** Why the status is PENDING or FAILED, when there is a reason. DAILY_LIMIT: your account's daily geocoding limit is reached; retried on a later day. TEMPORARILY_UNAVAILABLE: geocoding could not run or the provider did not answer; retried a limited number of times, after which the field stays FAILED until its address changes. ADDRESS_TOO_LONG: the address is longer than 200 characters. METADATA_LIMIT: the record has no room left for the coordinates in its search metadata. NOT_ENABLED: geo fields are not enabled for your account. ADDRESS_REJECTED: the provider refused the address. The last four end the attempt until the address changes; editing other fields does not retry it. */
+    /** Why the status is PENDING or FAILED, when there is a reason. DAILY_LIMIT: the tenant's daily geocoding limit is reached; retried on a later day. TEMPORARILY_UNAVAILABLE: geocoding could not run or the provider did not answer; retried a limited number of times, after which the field stays FAILED until its address changes or a new lookup is requested (`POST /v1/records/{id}/geocode`). ADDRESS_TOO_LONG: the address is longer than 200 characters; it is not tried again until the address changes. METADATA_LIMIT: the record has no room left for the coordinates in its search metadata. NOT_ENABLED: geocoding was off for the tenant when the address was written. ADDRESS_REJECTED: the provider refused the address. These three are not tried again until the address changes or a new lookup is requested (for NOT_ENABLED, once geocoding is on for the tenant). Editing other fields does not retry any of them. */
     reason?: string | undefined;
     /** The geocoding provider that located the address. */
     provider?: string | undefined;
@@ -17,12 +17,13 @@ export interface GeocodeStatusView {
 }
 
 export namespace GeocodeStatusView {
-    /** SUPPLIED: you sent the coordinates with this address. PENDING: the address is being geocoded; the field is empty until it is done (`reason` DAILY_LIMIT: your account's daily geocoding limit is reached, and it is retried on a later day). OK: the field holds the address's coordinates. NOT_FOUND: the address could not be located; it is tried again when the address changes. FAILED: no coordinates could be obtained; `reason` says why. */
+    /** SUPPLIED: you sent the coordinates with this address. PENDING: the address is being geocoded; the field is empty until it is done (`reason` DAILY_LIMIT: the tenant's daily geocoding limit is reached, and it is retried on a later day). OK: the field holds the address's coordinates. NOT_FOUND: the address could not be located; it is tried again when the address changes. LOW_CONFIDENCE: the address was found only as an uncertain match, so the field gets no coordinates; it is tried again when the address changes, or on request (`POST /v1/records/{id}/geocode`). FAILED: no coordinates could be obtained; `reason` says why. */
     export const Status = {
         Supplied: "SUPPLIED",
         Pending: "PENDING",
         Ok: "OK",
         NotFound: "NOT_FOUND",
+        LowConfidence: "LOW_CONFIDENCE",
         Failed: "FAILED",
     } as const;
     export type Status = (typeof Status)[keyof typeof Status];
